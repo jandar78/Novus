@@ -1,0 +1,226 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using MongoDB.Bson;
+using MongoDB.Driver;
+using MongoDB.Driver.Builders;
+using Character;
+
+namespace Scripts {
+    public class LevelUpScript {
+		 private static MongoCollection _generalCollection;
+         private static MongoCollection _scriptCollection;
+
+         private static List<TempLvlChar> usersLevelingUp = new List<TempLvlChar>();
+
+		 public static LevelUpScript levelUpScript = null;
+
+         public static LevelUpScript GetScript() {
+             return levelUpScript ?? (levelUpScript = new LevelUpScript());
+		 }
+
+         public void AddUserToScript(User.User user) {
+             var temp = usersLevelingUp.Where(u => u.user.UserID == user.UserID).SingleOrDefault();
+             if (temp == null){
+                 usersLevelingUp.Add(new TempLvlChar(user));
+             }
+         }
+    
+
+         private LevelUpScript() {
+             MongoUtils.MongoData.ConnectToDatabase();
+             MongoDatabase db = MongoUtils.MongoData.GetDatabase("Characters");
+             _generalCollection = db.GetCollection("General");
+             db = MongoUtils.MongoData.GetDatabase("Scripts");
+             _scriptCollection = db.GetCollection("CreateCharacter");
+         }
+
+
+		 public User.User.UserState InsertResponse(string response, string userId) {
+             User.User.UserState state = User.User.UserState.LEVEL_UP;
+             if (string.IsNullOrEmpty(response)) return state;
+
+             TempLvlChar specificUser = usersLevelingUp.Where(u => u.user.UserID == userId).SingleOrDefault();
+
+             if (specificUser != null && specificUser.currentStep == LevelUpSteps.AWAITINGRESPONSE) {
+                 int increase = 0;
+				 switch (specificUser.lastStep) {
+                     case LevelUpSteps.STEP1: {
+                             int stat = -1;
+                             int.TryParse(response, out stat);
+                             if (stat >= 1 && stat <= specificUser.maxOptions + 1) {
+                                 string attribute = "";
+                                 switch (stat) {
+                                     case 1:
+                                         increase = RankIncrease(specificUser, "Hitpoints");
+                                         attribute = "Hitpoints";
+                                         break;
+                                     case 2:
+                                         increase = RankIncrease(specificUser, "Strength");
+                                         attribute = "Strength";
+                                         break;
+                                     case 3:
+                                         increase = RankIncrease(specificUser, "Dexterity");
+                                         attribute = "Dexterity";
+                                         break;
+                                     case 4:
+                                         increase = RankIncrease(specificUser, "Endurance");
+                                         attribute = "Endurance";
+                                         break;
+                                     case 5:
+                                         increase = RankIncrease(specificUser, "Intelligence");
+                                         attribute = "Intelligence";
+                                         break;
+                                     case 6:
+                                         increase = RankIncrease(specificUser, "Charisma");
+                                         attribute = "Charisma";
+                                         break;
+                                     default:
+                                         //player chose to quit while still having points to spend
+                                         state = User.User.UserState.TALKING;
+                                         usersLevelingUp.Remove(specificUser);
+                                         return state;
+                                         break;
+                                 }
+                                 if (increase > 0) {
+                                     specificUser.user.MessageHandler(String.Format("You've increased your {0} by {1} points", attribute, increase));
+                                 }
+                                 else {
+                                     specificUser.user.MessageHandler("You don't have enough points to increase the rank of " + attribute);
+                                     //this will put us back at the level up stats page
+                                     specificUser.currentStep = LevelUpSteps.STEP1;
+                                     specificUser.lastStep = LevelUpSteps.NONE;
+                                 }
+                                 if (specificUser.user.Player.PointsToSpend == 0) {
+                                     state = User.User.UserState.TALKING;
+                                     usersLevelingUp.Remove(specificUser);
+                                     specificUser.user.MessageHandler("");
+
+                                 }
+                                 //this may be the perks options
+                                 //specificUser.currentStep = LevelUpSteps.STEP2;
+                                 //specificUser.lastStep = LevelUpSteps.STEP1;
+                             }
+                             else {
+                                 specificUser.currentStep = LevelUpSteps.STEP1;
+                                 specificUser.lastStep = LevelUpSteps.NONE;
+                             }
+                         }
+                         break;
+                     case LevelUpSteps.STEP2:
+                         //this is where perks / feats would get chosen
+                         break;
+                     case LevelUpSteps.STEP3:
+                         break;
+                     default: break;
+                 }
+             }
+
+             return state;
+         }
+
+         public string ExecuteScript(string userId) {
+             string message = "";
+
+             TempLvlChar specificUser = usersLevelingUp.Where(u => u.user.UserID == userId).SingleOrDefault();
+             
+             if (specificUser != null && specificUser.lastStep != specificUser.currentStep) {
+                 switch (specificUser.currentStep) {
+                     case LevelUpSteps.STEP1:
+                         message = DisplayLvlStats(specificUser);
+                         specificUser.lastStep = specificUser.currentStep;
+                         specificUser.currentStep = LevelUpSteps.AWAITINGRESPONSE;
+                         break;
+                     case LevelUpSteps.STEP2:
+                         specificUser.user.CurrentState = User.User.UserState.TALKING;
+                         usersLevelingUp.Remove(specificUser);
+                         message = "\n\r";
+                         break;
+                     case LevelUpSteps.STEP3:
+                         break;
+                     default: break;
+                 }
+             }
+             else {
+                 if (specificUser != null) {
+                     if (specificUser.currentStep == LevelUpSteps.STEP1) {
+                         message = "That is not a valid selection.";
+                     }
+                 }
+             }
+
+             return message;
+         }
+
+         private int RankIncrease(TempLvlChar specificUser, string attributeName) {
+
+             double addToMax = 0d, calculated = 0.0d;
+
+             if (specificUser.user.Player.PointsToSpend >= GetRankCost(specificUser.user.Player.GetAttributes(), attributeName)) {
+                 specificUser.user.Player.GetAttributes()[attributeName].IncreaseRank();
+                 specificUser.user.Player.PointsToSpend = -GetRankCost(specificUser.user.Player.GetAttributes(), attributeName);
+                 double max = specificUser.user.Player.GetAttributes()[attributeName].Max;
+                 int rank = specificUser.user.Player.GetAttributes()[attributeName].Rank;
+                 calculated = (double)rank / 10;
+                 addToMax = max * calculated;
+                 specificUser.user.Player.GetAttributes()[attributeName].IncreaseMax(addToMax);
+                 specificUser.user.Player.GetAttributes()[attributeName].Value = specificUser.user.Player.GetAttributes()[attributeName].Max;
+                 specificUser.user.Player.Save();
+             }           
+             
+             return (int)Math.Round(addToMax, 2, MidpointRounding.AwayFromZero);
+
+         }
+
+         private string DisplayLvlStats(TempLvlChar user) {
+             StringBuilder sb = new StringBuilder();
+
+             //Notes: For the atributes you will need to keep a count of what rank each one is and base the attribute value/max off of that rank.
+             //The rank of the attribute also determines how many points it costs to increase it to the next rank.  The higher the rank the more expensive
+             //the upgrade is limiting you to choose wisely.  Refer back to the chart in the excel on how to calculate the attribute values based on the rank.
+
+             sb.AppendLine("Level: " + user.user.Player.Level);
+             sb.AppendLine("Points Available: " + user.user.Player.PointsToSpend);
+             sb.AppendLine("1) Hitpoints   : " + user.user.Player.GetAttributeValue("Hitpoints") + "\tCost: " + GetRankCost(user.user.Player.GetAttributes(), "Hitpoints"));
+             sb.AppendLine("2) Strength    : " + user.user.Player.GetAttributeValue("Strength") + "\tCost: " + GetRankCost(user.user.Player.GetAttributes(), "Strength"));
+             sb.AppendLine("3) Dexterity   : " + user.user.Player.GetAttributeValue("Dexterity") + "\tCost: " + GetRankCost(user.user.Player.GetAttributes(), "Dexterity"));
+             sb.AppendLine("4) Endurance   : " + user.user.Player.GetAttributeValue("Endurance") + "\tCost: " + GetRankCost(user.user.Player.GetAttributes(), "Endurance"));
+             sb.AppendLine("5) Intelligence: " + user.user.Player.GetAttributeValue("Intelligence") + "\tCost: " + GetRankCost(user.user.Player.GetAttributes(), "Intelligence"));
+             sb.AppendLine("6) Charisma    : " + user.user.Player.GetAttributeValue("Charisma") + "\tCost: " + GetRankCost(user.user.Player.GetAttributes(), "Charisma"));
+             sb.AppendLine("7) Quit");
+             sb.AppendLine("Which stat would you like to increase?: ");
+             return sb.ToString();
+         }
+
+         private int GetRankCost(Dictionary<string, Character.Attribute> attributes, string attributeName) {
+             int currentRank = attributes[attributeName].Rank;
+             //ranks cost more points as they increase
+             int cost = (int)Math.Ceiling(currentRank / 3.0d);          
+             return cost;
+         }
+    }
+
+
+    public enum LevelUpSteps { STEP1, STEP2, STEP3, AWAITINGRESPONSE, NONE};
+
+    internal class TempLvlChar {
+        public User.User user = null;
+        public LevelUpSteps currentStep;
+        public LevelUpSteps lastStep;
+        public int maxOptions;
+
+        public string FirstName { get; set; }
+        public string LastName { get; set; }
+        public string Password { get; set; }
+
+        public TempLvlChar(User.User player) {
+            user = player;
+            currentStep = LevelUpSteps.STEP1;
+            lastStep = LevelUpSteps.NONE;
+            maxOptions = player.Player.GetAttributes().Count; 
+        }
+
+    }
+}
