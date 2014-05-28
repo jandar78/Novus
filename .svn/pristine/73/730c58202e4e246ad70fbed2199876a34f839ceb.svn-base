@@ -1,0 +1,78 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using MongoDB.Driver;
+using MongoDB.Driver.Builders;
+using MongoDB.Bson;
+using MongoDB.Bson.Serialization.Attributes;
+using MongoDB.Bson.Serialization.Options;
+
+namespace Items {
+    public class Edible : Iitem, Iedible {
+        #region Properties
+        public ObjectId Id { get; set; }
+        public string Name { get; set; }
+        public string Description { get; set; }
+        public double Weight { get; set; }
+        public ItemCondition CurrentCondition { get; set; }
+        public ItemCondition MaxCondition { get; set; }
+        public bool IsWearable { get; set; }
+        public int MinimumLevel { get; set; }
+        public ItemType ItemType { get; set; }
+        public Wearable WornOn { get; set; }
+
+        [BsonDictionaryOptions(DictionaryRepresentation.ArrayOfDocuments)]
+        public Dictionary<string, double> AttributesAffected { get; set; }
+        
+        public int Location { get; set; }
+        #endregion Properties
+
+        public Edible() {
+            AttributesAffected = new Dictionary<string, double>();
+        }
+
+        public EdibleType EdibleType { get; set; }
+        
+        #region Public Methods
+        public void GetAttributesAffected(BsonArray attributesToAffect) {
+            foreach (BsonDocument affect in attributesToAffect) {
+                AttributesAffected.Add(affect["k"].AsString, affect["v"].AsDouble);
+            }
+        }
+
+        public void DeteriorateCondition() {
+            //TODO: condition should affect item stats as well
+            int newCondition = ((int)CurrentCondition) - 1;
+            if (newCondition >= 0) { //otherwise it can't deteriorate any more and it's broken anyways
+                CurrentCondition = (ItemCondition)newCondition;
+            }
+            Save();
+        }
+
+        public void ImproveCondition() {
+            //TODO: condition should affect item stats as well
+            int newCondition = ((int)CurrentCondition) + 1;
+            if (newCondition <= (int)ItemCondition.EXCELLENT) { //can't go higher than Excellent
+                CurrentCondition = (ItemCondition)newCondition;
+            }
+            Save();
+        }
+
+        public Dictionary<string, double> Consume() {
+            return AttributesAffected;
+        }
+
+        public void Save() {
+            MongoUtils.MongoData.ConnectToDatabase();
+            MongoDatabase db = MongoUtils.MongoData.GetDatabase("World");
+            MongoCollection collection = db.GetCollection("Items");
+
+            collection.Save<Edible>(this);
+        }
+        #endregion Public Methods
+    }
+
+    public enum EdibleType { FOOD, BEVERAGE }
+}

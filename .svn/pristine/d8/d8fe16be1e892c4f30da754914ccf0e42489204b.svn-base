@@ -1,0 +1,94 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using Extensions;
+
+namespace AI {
+    public class FSM {
+        private Dictionary<string, IState> cachedStates;
+        private static FSM _fsm = null;
+
+        public IState state {
+            get;
+            set;
+        }
+
+        public IState globalState {
+            get;
+            set;
+        }
+
+        public IState previousState { //for blip states mostly
+            get;
+             set;
+        }
+
+        public Character.NPC Actor {
+            get;
+            set;
+        }
+
+        private FSM() { 
+            cachedStates = new Dictionary<string, IState>();
+            CacheStates();
+        }
+
+        public static FSM GetInstance() {
+            return _fsm ?? (_fsm = new FSM());
+        }
+
+        private void CacheStates() {
+            var totalerTypes = System.Reflection.Assembly.GetExecutingAssembly().GetTypes().Where(t => typeof(IState).IsAssignableFrom(t) && t.IsClass == true);
+            foreach (Type totalerType in totalerTypes) {
+                cachedStates.Add(totalerType.Name, (IState)totalerType.GetMethod("GetState").Invoke(totalerType, null)); 
+            }    
+        }
+
+        public static bool ContinueWithThisState() {
+            if (new Random().Next(0, 6) == 2 || new Random().Next(0,6) == 5 || new Random().Next(0,6) == 0) {//if this hits then we are going to stop walking and do something else like say something
+                return false;
+            }
+            return true;
+        }
+
+
+        public IState GetStateFromName(string stateName) {
+            if (cachedStates.ContainsKey(stateName)){
+                return cachedStates[stateName];
+            }
+
+            return null;
+        }
+
+        public void ChangeState(IState newState) {
+            if (state != null && newState != null) {
+                state.Exit(Actor);
+                previousState = state;
+                state = newState;
+                state.Enter(Actor);
+            }
+        }
+
+        private void RevertState() {
+            IState temp = state;
+            state = previousState;
+            previousState = temp;
+            temp = null;
+        }
+
+        public void Update() {
+            if (state != null) {
+                state.Execute(Actor);
+            }
+            if (globalState != null) {
+                globalState.Execute(Actor);
+            }
+        }
+    }
+
+
+    
+}
+

@@ -1,0 +1,1181 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using MongoDB.Bson;
+using MongoDB.Driver;
+using MongoDB.Driver.Builders;
+using Extensions;
+using CharacterEnums;
+using System.Collections.Concurrent;
+
+namespace Character {
+    public class NPC : Iactor, Inpc {
+        private Dictionary<string, double> damageTracker;
+        #region Public Members
+        public Equipment Inventory;
+        public Equipment equipment;
+        public Queue<string> Messages;
+        public List<AI.Trigger> Triggers;
+        #endregion Public Members
+
+        #region Protected Members
+        protected Dictionary<string, Attribute> Attributes;
+        protected Dictionary<string, double> SubAttributes;
+        protected HashSet<CharacterEnums.Languages> KnownLanguages; //this will hold all the languages the player can understand
+        protected double _levelModifier;
+        
+
+        #region Stances
+        protected CharacterStanceState _stanceState;
+        protected CharacterActionState _actionState;
+        #endregion Stances
+
+        #region Misc
+        protected int _level;
+        protected CharacterClass _class;
+        protected Languages _primaryLanguage;
+        protected Tuple<int, DateTime> _koCount; //this will only ever be zero on initialize until first knockout
+        protected int _points;
+        #endregion Misc
+
+        #region Bodily descriptions
+        protected Genders _gender;
+        protected EyeColors _eyeColor;
+        protected HairColors _hairColor;
+        protected SkinColors _skinColor;
+        protected SkinType _skinType;
+        protected BodyBuild _build;
+        protected CharacterRace _race;
+        #endregion Bodily descriptions
+        #endregion Protected Members
+
+        #region Private members
+        private int points = 0;
+        #endregion Private members
+
+        #region  Properties
+        public string Password {
+            get;
+            set;
+        }
+
+        public long Experience {
+            get;
+            set;
+        }
+
+        public long NextLevelExperience {
+            get;
+            set;
+        }
+
+        public bool Leveled {
+            get;
+            set;
+        }
+
+        public bool IsLevelUp {
+            get {
+                if (Leveled || Experience >= NextLevelExperience) {
+                    return true;
+                }
+                return false;
+            }
+        }
+
+       
+        public string ID {
+            get;
+            set;
+        }
+
+        public int Location {
+            get;
+            set;
+        }
+
+        public int LastLocation {
+            get;
+            set;
+        }
+
+        public bool IsNPC {
+            get;
+            set;
+        }
+
+        public int MobTypeID {
+            get;
+            set;
+        }
+
+        public AI.FSM Fsm {
+            get;
+            set;
+
+        }
+
+         public DateTime NextAiAction {
+            get;
+            set;
+        }
+
+        public void Update() {
+            Fsm.Update(this);
+        }
+
+        private bool IsMob { 
+            get; 
+            set; 
+        }
+        #endregion Properties
+
+        #region Descriptive
+        public string Gender {
+            get {
+                return _gender.ToString().CamelCaseWord();
+            }
+        }
+
+        public string MainHand {
+            get;
+            set;
+        }
+
+
+        public string GenderPossesive {
+            get {
+                if (Gender == "Male") {
+                    return "He";
+                }
+                else if (Gender == "Female") {
+                    return "She";
+                }
+                else return "It";
+            }
+        }
+
+        public string Build {
+            get {
+                return _build.ToString().CamelCaseWord();
+            }
+        }
+
+        public int Age {
+            get;
+            set;
+        }
+
+        public double Weight {
+            get;
+            set;
+        }
+
+        public double Height {
+            get;
+            set;
+        }
+
+        public string FirstName {
+            get;
+            set;
+        }
+
+        public string LastName {
+            get;
+            set;
+        }
+
+        public string Class {
+            get {
+                return _class.ToString().CamelCaseWord();
+            }
+        }
+
+        public string Race {
+            get {
+                return _race.ToString().CamelCaseWord();
+            }
+        }
+
+        public string Description {
+            get;
+            set;
+        }
+
+        public string EyeColor {
+            get {
+                return _eyeColor.ToString().CamelCaseWord();
+            }
+        }
+
+        public string SkinColor {
+            get {
+                return _skinColor.ToString().CamelCaseWord();
+            }
+        }
+
+        public string SkinType {
+            get {
+                return _skinType.ToString().CamelCaseWord();
+            }
+        }
+
+        public string HairColor {
+            get {
+                return _hairColor.ToString().CamelCaseWord();
+            }
+        }
+        #endregion Descriptive
+
+        #region Stances
+        public string Action {
+            get {
+                return ActionState.ToString().Replace("_", " ").ToLower();
+            }
+        }
+
+        public string Stance {
+            get {
+                return StanceState.ToString().Replace("_", " ").ToLower();
+            }
+        }
+
+        public CharacterStanceState StanceState {
+            get {
+                return _stanceState;
+            }
+        }
+
+        public CharacterActionState ActionState {
+            get {
+                return _actionState;
+            }
+        }
+        #endregion Stances
+
+        #region Leveling
+        public int PointsToSpend {
+            get {
+                return _points;
+            }
+            set {
+                _points += value;
+            }
+        }
+
+        public int Level {
+            get;
+            set;
+        }
+
+        public double LevelModifier {
+            get {
+                return _levelModifier;
+            }
+            set {
+                MongoUtils.MongoData.ConnectToDatabase();
+                MongoDatabase db = MongoUtils.MongoData.GetDatabase("Character");
+                MongoCollection charCollection = db.GetCollection("General");
+                BsonDocument result = charCollection.FindOneAs<BsonDocument>(Query.EQ("_id", "LevelModifier"));
+                if (result != null) {
+                    _levelModifier = result[Level.ToString()].AsDouble;
+                }
+            }
+        }
+        #endregion Leveling
+
+        #region Combat
+        public bool CheckUnconscious {
+            get {
+                bool result = false;
+                double health = Attributes["Hitpoints"].Value;
+
+                if (health > DeathLimit && health <= 0) {
+                    result = true;
+                    //guy's knocked out let's increment the KO counter
+                    if ((_koCount.Item1 > 0 && _koCount.Item1 < 3) && (_koCount.Item2 - DateTime.Now).Minutes < 10) {
+                        _koCount = new Tuple<int, DateTime>(_koCount.Item1 + 1, _koCount.Item2);
+                    }
+                    //ok he got knocked out 3 times in less than 10 minutes he's dead now
+                    else if (_koCount.Item1 == 3 && (_koCount.Item2 - DateTime.Now).Minutes < 10) {
+                        Attributes["Hitpoints"].ApplyNegative(100);
+                    }
+                    //well at this point we'll reset his knockout counter and reset the timer since he hasn't been knocked out in at least 10 minutes
+                    else {
+                        _koCount = new Tuple<int, DateTime>(1, DateTime.Now); //it's not zero because he's knocked out!!
+                    }
+                }
+                //if no longer unconcious, remove the state
+                else if (health > 0) {
+                    if (ActionState == CharacterActionState.UNCONCIOUS) {
+                        SetActionState(CharacterActionState.NONE);
+                        SetStanceState(CharacterStanceState.PRONE);
+                    }
+                }
+
+                return result;
+            }
+        }
+
+        public bool CheckDead {
+            get {
+                bool result = false;
+
+                if (GetAttributeValue("Hitpoints") <= DeathLimit) {
+                    result = true;
+                }
+
+                return result;
+            }
+        }
+
+        public double DeathLimit {
+            get {
+                //would probably be a good idea to grab the multiplier from the database
+                double value = GetAttributeMax("Hitpoints");
+                return (-1 * (0.015 * value));
+            }
+        }
+
+        public string CurrentTarget {
+            get;
+            set;
+        }
+
+        public string LastTarget {
+            get;
+            set;
+        }
+
+        public bool InCombat {
+            get;
+            set;
+        }
+
+        public DateTime LastCombatTime {
+            get;
+            set;
+        }
+        #endregion Combat
+
+        public NPC() { }
+
+        public NPC(CharacterRace race, CharacterClass characterClass, Genders gender, Languages language, SkinColors skinColor, SkinType skinType, HairColors hairColor, EyeColors eyeColor, BodyBuild build) {
+            Messages = new Queue<string>();
+            
+            Fsm = AI.FSM.GetInstance();
+            Fsm.state = Fsm.GetStateFromName("Wander");
+            
+            _class = characterClass;
+			_race = race;
+			_gender = gender;
+            _skinColor = skinColor;
+            _skinType = skinType;
+            _hairColor = hairColor;
+            _eyeColor = eyeColor;
+            _build = build;
+
+			_koCount = new Tuple<int, DateTime>(0, DateTime.Now);
+			_actionState = CharacterActionState.NONE;
+			_stanceState = CharacterStanceState.STANDING;
+            
+            _primaryLanguage = language;
+            KnownLanguages = new HashSet<Languages>();
+            KnownLanguages.Add(_primaryLanguage);
+
+            Inventory = new Equipment();
+            damageTracker = new Dictionary<string, double>();
+            Triggers = new List<AI.Trigger>();
+
+			FirstName = "";
+            LastName = "";
+            Description = "";
+            Age = 17;   //Do we want an age? And are we going to advance it every in game year?  Players could be 400+ years old rather quick.
+            Weight = 180; //pounds or kilos?
+            Height = 70;  //inches or centimeters?
+            Location = 1000;
+            InCombat = false;
+            LastCombatTime = DateTime.MinValue.ToUniversalTime();
+            IsNPC = true;
+            Leveled = false;
+            MainHand = "WIELD_RIGHT";
+            NextLevelExperience = 300;
+            Level = 1;
+            Experience = 0;
+            PointsToSpend = 0;
+            IsMob = false;
+
+			Attributes = new Dictionary<string, Attribute>();
+
+			Attributes.Add("Hitpoints", new Attribute(200, "Hitpoints", 200, 0.2, 1));
+			Attributes.Add("Dexterity", new Attribute(10, "Dexterity", 10, 0, 1));
+			Attributes.Add("Strength", new Attribute(10, "Strength", 10, 0, 1));
+			Attributes.Add("Intelligence", new Attribute(10, "Intelligence", 10, 0, 1));
+			Attributes.Add("Endurance", new Attribute(10, "Endurance", 10, 0, 1));
+			Attributes.Add("Charisma", new Attribute(10, "Charisma", 10, 0, 1));
+
+			SubAttributes = new Dictionary<string, double>();
+
+			SubAttributes.Add("Agility", 10);
+			SubAttributes.Add("Toughness", 10);
+			SubAttributes.Add("Cunning", 10);
+			SubAttributes.Add("Wisdom", 10);
+			SubAttributes.Add("Leadership", 10);
+        }
+
+        public void Save() {
+            MongoUtils.MongoData.ConnectToDatabase();
+            MongoDatabase characterDB = MongoUtils.MongoData.GetDatabase("Characters");
+            if (this.ID == null) {
+                this.ID = new MongoDB.Bson.ObjectId().ToString();
+            }; //new character
+            MongoCollection characterCollection = characterDB.GetCollection<BsonDocument>("NPCCharacters");
+            IMongoQuery search = Query.EQ("_id", ObjectId.Parse(this.ID));
+            BsonDocument npcCharacter = characterCollection.FindOneAs<BsonDocument>(search);
+
+            if (npcCharacter == null) {
+                //this is the NPC's first save, create everything from scratch
+                npcCharacter = new BsonDocument();
+                npcCharacter.Add("FirstName", this.FirstName);
+				npcCharacter.Add("LastName", this.LastName);
+				npcCharacter.Add("Race", this.Race.CamelCaseWord());
+				npcCharacter.Add("Class", this.Class.CamelCaseWord());
+				npcCharacter.Add("Gender", this.Gender.CamelCaseWord());
+                npcCharacter.Add("SkinColor", this.SkinColor.CamelCaseWord());
+                npcCharacter.Add("SkinType", this.SkinType.CamelCaseWord());
+                npcCharacter.Add("HairColor", this.HairColor.CamelCaseWord());
+                npcCharacter.Add("EyeColor", this.EyeColor.CamelCaseWord());
+                npcCharacter.Add("Weight", this.Weight);
+                npcCharacter.Add("Height", this.Height);
+                npcCharacter.Add("ActionState", this.ActionState.ToString().CamelCaseWord());
+				npcCharacter.Add("StanceState", this.StanceState.ToString().CamelCaseWord());
+				npcCharacter.Add("Description", this.Description);
+				npcCharacter.Add("Location", this.Location);
+                npcCharacter.Add("AiState", Fsm.state.ToString());
+                npcCharacter.Add("previousAiState", Fsm.previousState != null ? Fsm.previousState.ToString() : "");
+                npcCharacter.Add("AiGlobalState", Fsm.globalState != null ? Fsm.globalState.ToString() : "");
+                npcCharacter.Add("NextAiAction", this.NextAiAction.ToUniversalTime());
+                npcCharacter.Add("IsNPC", this.IsNPC);
+                npcCharacter.Add("MobTypeID", this.MobTypeID);
+                npcCharacter.Add("CurrentTarget", this.CurrentTarget != null ? this.CurrentTarget.ToString() : "");
+                npcCharacter.Add("LastTarget", this.LastTarget != null ? this.LastTarget.ToString() : "");
+                npcCharacter.Add("InCombat", this.InCombat);
+                npcCharacter.Add("LastCombatTime", this.LastCombatTime);
+                npcCharacter.Add("Experience", this.Experience);
+                npcCharacter.Add("Level", this.Level);       
+
+				BsonArray attributeList = new BsonArray();
+
+                foreach (Attribute a in this.Attributes.Values) {
+                    BsonDocument attributes = new BsonDocument();
+                    attributes.Add("Name", "");
+                    attributes.Add("Value", "");
+                    attributes.Add("Max", "");
+                    attributes.Add("RegenRate", "");
+
+                    attributes["Name"] = a.Name;
+                    attributes["Value"] = (BsonValue)a.Value;
+                    attributes["Max"] = (BsonValue)a.Max;
+                    attributes["RegenRate"] = (BsonValue)a.RegenRate;
+
+                    attributeList.Add(attributes);
+                }
+                npcCharacter.Add("Attributes", attributeList);
+
+                BsonArray xpTracker = new BsonArray();
+
+                foreach (KeyValuePair<string, double> tracker in damageTracker) {
+                    BsonDocument track = new BsonDocument();
+                    track.Add("ID", "");
+                    track.Add("Value", 0.0);
+
+                    track["ID"] = tracker.Key;
+                    track["Value"] = tracker.Value;
+
+                    xpTracker.Add(track);
+                }
+
+                npcCharacter.Add("XpTracker", xpTracker);
+            }
+            else {
+                npcCharacter["FirstName"] = this.FirstName;
+                npcCharacter["LastName"] = this.LastName;
+                npcCharacter["Race"] = this.Race;
+                npcCharacter["Class"] = this.Class;
+                npcCharacter["Gender"] = this.Gender.CamelCaseWord();
+                npcCharacter["SkinColor"] = this.SkinColor.CamelCaseWord();
+                npcCharacter["SkinType"] = this.SkinType.CamelCaseWord();
+                npcCharacter["HairColor"] = this.HairColor.CamelCaseWord();
+                npcCharacter["EyeColor"] = this.EyeColor.CamelCaseWord();
+                npcCharacter["Weight"] = this.Weight;
+                npcCharacter["Height"] = this.Height;
+                npcCharacter["Description"] = this.Description;
+                npcCharacter["Location"] = this.Location;
+                npcCharacter["ActionState"] = this.ActionState.ToString().CamelCaseWord();
+                npcCharacter["StanceState"] = this.StanceState.ToString().CamelCaseWord();
+                npcCharacter["AiState"] = Fsm.state.ToString();
+                npcCharacter["previousAiState"] = Fsm.previousState == null ? "" : Fsm.previousState.ToString();
+                npcCharacter["AiGlobalState"] = Fsm.globalState == null ? "" : Fsm.globalState.ToString();
+                npcCharacter["NextAiAction"] = this.NextAiAction.ToUniversalTime();
+                npcCharacter["MobTypeID"] = this.MobTypeID;
+                npcCharacter["IsNPC"] = this.IsNPC;
+                npcCharacter["CurrentTarget"] = this.CurrentTarget == null ? "" : this.CurrentTarget;
+                npcCharacter["LastTarget"] = this.LastTarget == null ? "" : this.LastTarget;
+                npcCharacter["InCombat"] = this.InCombat;
+                npcCharacter["LastCombatTime"] = this.LastCombatTime;
+                npcCharacter["Experience"] = this.Experience;
+                npcCharacter["Level"] = this.Level;
+
+                BsonArray playerAttributes = new BsonArray();
+                BsonArray xpTracker = new BsonArray();
+
+                foreach (KeyValuePair<string, Attribute> attribute in Attributes) {
+                    BsonDocument attrib = new BsonDocument();
+                    attrib.Add("Name", "");
+                    attrib.Add("Value", "");
+                    attrib.Add("Max", "");
+                    attrib.Add("RegenRate", "");
+
+
+                    attrib["Name"] = attribute.Key;
+                    attrib["Value"] = attribute.Value.Value;
+                    attrib["Max"] = attribute.Value.Max;
+                    attrib["RegenRate"] = attribute.Value.RegenRate;
+
+                    playerAttributes.Add(attrib);
+                }
+
+                npcCharacter["Attributes"] = playerAttributes;
+
+                foreach (KeyValuePair<string, double> tracker in damageTracker) {
+                    BsonDocument track = new BsonDocument();
+                    track.Add("ID","");
+                    track.Add("Value", 0.0);
+
+                    track["ID"] = tracker.Key;
+                    track["Value"] = tracker.Value;
+
+                    xpTracker.Add(track);
+                }
+
+                npcCharacter["XpTracker"] = xpTracker;
+            }
+
+            characterCollection.Save(npcCharacter);
+
+            if (this.ID == "000000000000000000000000") {
+                this.ID = npcCharacter["_id"].AsObjectId.ToString();
+            }
+
+        }
+
+        public void Load(string id) {
+            MongoUtils.MongoData.ConnectToDatabase();
+            MongoDatabase characterDB = MongoUtils.MongoData.GetDatabase("Characters");
+            MongoCollection characterCollection = characterDB.GetCollection<BsonDocument>("NPCCharacters");
+            IMongoQuery query = Query.EQ("_id", ObjectId.Parse(id));
+            BsonDocument found = characterCollection.FindOneAs<BsonDocument>(query);
+
+            ID = found["_id"].AsObjectId.ToString();
+            FirstName = found["FirstName"].AsString.CamelCaseWord();
+            LastName = found["LastName"].AsString.CamelCaseWord();
+            _class = (CharacterClass)Enum.Parse(typeof(CharacterClass), found["Class"].AsString.ToUpper());
+            _race = (CharacterRace)Enum.Parse(typeof(CharacterRace), found["Race"].AsString.ToUpper());
+            _gender = (Genders)Enum.Parse(typeof(Genders), found["Gender"].AsString.ToUpper());
+            _skinType = (SkinType)Enum.Parse(typeof(SkinType), found["SkinType"].AsString.ToUpper());
+            _skinColor = (SkinColors)Enum.Parse(typeof(SkinColors), found["SkinColor"].AsString.ToUpper());
+            _skinType = (SkinType)Enum.Parse(typeof(SkinType), found["SkinType"].AsString.ToUpper());
+            _hairColor = (HairColors)Enum.Parse(typeof(HairColors), found["HairColor"].AsString.ToUpper());
+            _eyeColor = (EyeColors)Enum.Parse(typeof(EyeColors), found["EyeColor"].AsString.ToUpper());
+            _stanceState = (CharacterStanceState)Enum.Parse(typeof(CharacterStanceState), found["StanceState"].AsString.ToUpper());
+            _actionState = (CharacterActionState)Enum.Parse(typeof(CharacterActionState), found["ActionState"].AsString.ToUpper());
+            Description = found["Description"].AsString;
+            Location = found["Location"].AsInt32;
+            Height = found["Height"].AsDouble;
+            Weight = found["Weight"].AsDouble;
+            IsNPC = found["IsNPC"].AsBoolean;
+            MobTypeID = found["MobTypeID"].AsInt32;
+            NextAiAction = found["NextAiAction"].ToUniversalTime();
+            InCombat = found["InCombat"].AsBoolean;
+            LastCombatTime = found["LastCombatTime"].ToUniversalTime();
+            CurrentTarget = found["CurrentTarget"].AsString != "" ? found["CurrentTarget"].AsString : null;
+            LastTarget = found["LastTarget"].AsString != "" ? found["LastTarget"].AsString : null;
+            Fsm.state = Fsm.GetStateFromName(found["AiState"].AsString);
+            Fsm.previousState = Fsm.GetStateFromName(found["previousAiState"].AsString);
+            Fsm.globalState = Fsm.GetStateFromName(found["AiGlobalState"].AsString);
+            Experience = found["Experience"].AsInt64;
+            Level = found["Level"].AsInt32;
+
+            //if you just use var instead of casting it like this you will be in a world of pain and suffering when dealing with subdocuments.
+            BsonArray playerAttributes = found["Attributes"].AsBsonArray;
+            BsonArray xpTracker = found["XpTracker"].AsBsonArray;
+            BsonDocument triggers = found["Triggers"].AsBsonDocument;
+
+            if (playerAttributes != null) {
+                foreach (BsonDocument attrib in playerAttributes) {
+
+                    if (!this.Attributes.ContainsKey(attrib["Name"].ToString())) {
+                        Attribute tempAttrib = new Attribute();
+                        tempAttrib.Name = attrib["Name"].ToString();
+                        tempAttrib.Value = attrib["Value"].AsDouble;
+                        tempAttrib.Max = attrib["Max"].AsDouble;
+                        tempAttrib.RegenRate = attrib["RegenRate"].AsDouble;
+
+
+                        this.Attributes.Add(tempAttrib.Name, tempAttrib);
+                    }
+                    else {
+                        this.Attributes[attrib["Name"].ToString()].Max = attrib["Max"].AsDouble;
+                        this.Attributes[attrib["Name"].ToString()].Value = attrib["Value"].AsDouble;
+                        this.Attributes[attrib["Name"].ToString()].RegenRate = attrib["RegenRate"].AsDouble;
+                    }
+                }
+            }
+
+            if (xpTracker != null && xpTracker.Count > 0) {
+                foreach (BsonDocument track in xpTracker) {
+                    //we just newed this up so it should always have to be refilled
+                    damageTracker.Add(track["ID"].AsString, track["Value"].AsDouble);
+                }
+            }
+
+            AI.Trigger trigger = new AI.Trigger();
+            if (triggers.ElementCount > 0) {
+                trigger.TriggerOn = triggers["TriggerOn"].AsString;
+                trigger.ChanceToTrigger = triggers["ChanceToTrigger"].AsDouble;
+                trigger.StateToExecute = triggers["StateToExecute"].AsString;
+                foreach (var overrides in triggers["Overrides"].AsBsonArray) {
+                    trigger.MessageOverrideAsString.Add(overrides.AsString);
+                }
+
+                Triggers.Add(trigger);
+            }
+
+        }
+
+        public void CalculateXP() {
+            if (this.IsDead()) {
+                foreach (KeyValuePair<string, double> pair in damageTracker) {
+                    User.User player = MySockets.Server.GetAUser(pair.Key);
+                    if (player != null) {
+                        double rewardPercentage = ((pair.Value *-1) / GetAttributeMax("Hitpoints"));
+                        if (rewardPercentage > 1.0) rewardPercentage = 1.0;
+                        long xp = (long)(Experience * rewardPercentage);
+                        //ok based on the level of the player should we provide less and less XP based on the target level
+                        //to prevent farming of easy targets?  For now sure why the hell not, maybe in the future we'll just increase the level
+                        //required by a shit ton each time they level up.  We'll do a four tier approach we''l discount 25% for each level above the target level
+                        int levelDifference = player.Player.Level - Level;
+                        if (levelDifference == 1) {
+                            xp = xp - (long)(xp * 0.25);
+                        }
+                        else if (levelDifference == 2) {
+                            xp = xp - (long)(xp * 0.5);
+                        }
+                        else if (levelDifference == 3) {
+                            xp = xp - (long)(xp * 0.75);
+                        }
+                        else if (levelDifference >= 4) {
+                            xp = 0;
+                        }
+
+                        player.Player.RewardXP(ID, xp);
+                    }
+                }
+            }
+        }
+
+        public void IncreaseXPReward(string id, double damage) {
+            //we only want to deal with base hitpoints, knocking unconcious doesn't add to the XP reward
+            if (IsUnconcious()){
+                damage += 100;
+            }
+            
+            if (damageTracker.ContainsKey(id)) {
+                damageTracker[id] = damageTracker[id] + (damage * -1);
+            }
+            else {
+                damageTracker.Add(id, damage);
+            }
+            Save();
+        }
+        
+        public void ParseMessage(string message) {
+            Fsm.InterpretMessage(message, this);
+        }
+
+        public void SetActionState(CharacterActionState state) {
+            _actionState = state;
+        }
+
+        public void SetStanceState(CharacterStanceState state) {
+            _stanceState = state;
+        }
+
+        public void SetActionStateDouble(double state) {
+            _actionState = (CharacterActionState)(int)state;
+        }
+
+        public void SetStanceStateDouble(double state) {
+            _stanceState = (CharacterStanceState)(int)state;
+        }
+
+        public void IncreasePoints() {
+            if (Level % 10 == 0) {
+                _points += 4;
+            }
+            else if (Level % 5 == 0) {
+                _points += 3;
+            }
+            else if (Level % 1 == 0) {
+                _points += 1;
+            }
+        }
+
+        public bool IsUnconcious() {
+            bool result = false;
+            if (CheckUnconscious) {
+                SetActionState(CharacterEnums.CharacterActionState.UNCONCIOUS);
+                SetStanceState(CharacterStanceState.LAYING_UNCONCIOUS);
+                ClearTarget();
+                result = true;
+            }
+            else {
+                if (ActionState == CharacterActionState.UNCONCIOUS) {
+                    SetActionState(CharacterActionState.NONE);
+                }
+                if (StanceState == CharacterStanceState.LAYING_UNCONCIOUS) {
+                    SetStanceState(CharacterStanceState.PRONE);
+                }
+            }
+
+            return result;
+        }
+
+        public bool IsDead() {
+            bool result = false;
+            if (CheckDead) {
+                SetActionState(CharacterActionState.DEAD);
+                SetStanceState(CharacterStanceState.LAYING_DEAD);
+                ClearTarget();
+                result = true;
+            }
+
+            return result;
+        }
+
+        public void ClearTarget() {
+            InCombat = false;
+            LastTarget = CurrentTarget;
+            CurrentTarget = "";
+        }
+
+        public void UpdateTarget(string targetID) {
+            LastTarget = CurrentTarget ?? null;
+            CurrentTarget = targetID;
+        }
+
+        public void ApplyRegen(string attribute) {
+            bool applied = this.Attributes[attribute].ApplyRegen();
+            //if we recovered health let's no longer be dead or unconcious
+            if (applied && String.Compare(attribute, "hitpoints", true) == 0) {
+                if (Attributes[attribute.CamelCaseWord()].Value > -10 && Attributes[attribute.CamelCaseWord()].Value <= 0) {
+                    this.SetActionState(CharacterActionState.UNCONCIOUS);
+                }
+                else if (Attributes[attribute].Value > 0) {
+                    this.SetActionState(CharacterActionState.UNCONCIOUS);
+                    this.SetStanceState(CharacterStanceState.PRONE);
+                }
+            }
+        }
+
+        public void ApplyEffectOnAttribute(string name, double value) {
+            if (this.Attributes.ContainsKey(name.CamelCaseWord())) {
+                this.Attributes[name.CamelCaseWord()].ApplyEffect(value);
+            }
+        }
+
+        public double GetAttributeMax(string attribute) {
+            if (this.Attributes.ContainsKey(attribute.CamelCaseWord())) {
+                return this.Attributes[attribute.CamelCaseWord()].Max;
+            }
+            return 0;
+        }
+
+        public double GetAttributeValue(string attribute) {
+            if (this.Attributes.ContainsKey(attribute.CamelCaseWord())) {
+                return this.Attributes[attribute.CamelCaseWord()].Value;
+            }
+            return 0;
+        }
+
+        public int GetAttributeRank(string attribute) {
+            if (this.Attributes.ContainsKey(attribute.CamelCaseWord())) {
+                return this.Attributes[attribute.CamelCaseWord()].Rank;
+            }
+            return 0;
+        }
+
+        public void SetAttributeValue(string name, double value) {
+            if (this.Attributes.ContainsKey(name.CamelCaseWord())) {
+                this.Attributes[name.CamelCaseWord()].Value = value;
+            }
+            CalculateSubAttributes();
+        }
+
+        public void SetMaxAttributeValue(string name, double value) {
+            if (this.Attributes.ContainsKey(name.CamelCaseWord())) {
+                this.Attributes[name.CamelCaseWord()].Max = value;
+            }
+        }
+
+        public void SeAttributeRegenRate(string name, double value) {
+            if (this.Attributes.ContainsKey(name.CamelCaseWord())) {
+                this.Attributes[name.CamelCaseWord()].RegenRate = value;
+            }
+        }
+
+        public Dictionary<string, Attribute> GetAttributes() {
+            return this.Attributes;
+        }
+
+        public Dictionary<string, double> GetSubAttributes() {
+            CalculateSubAttributes();
+            return this.SubAttributes;
+        }
+
+        public void CalculateSubAttributes() {
+            if (SubAttributes.Count == 0) {
+                SubAttributes.Add("Agility", (GetAttributeValue("Strength") + GetAttributeValue("Dexterity")) / 2);
+                SubAttributes.Add("Cunning", (GetAttributeValue("Charisma") + GetAttributeValue("Dexterity")) / 2);
+                SubAttributes.Add("Leadership", (GetAttributeValue("Intelligence") + GetAttributeValue("Charisma")) / 2);
+                SubAttributes.Add("Wisdom", (GetAttributeValue("Intelligence") + GetAttributeValue("Endurance")) / 2);
+                SubAttributes.Add("Toughness", (GetAttributeValue("Endurance") + GetAttributeValue("Strength")) / 2);
+            }
+            else {
+                SubAttributes["Agility"] = (GetAttributeValue("Strength") + GetAttributeValue("Dexterity")) / 2;
+                SubAttributes["Cunning"] = (GetAttributeValue("Charisma") + GetAttributeValue("Dexterity")) / 2;
+                SubAttributes["Leadership"] = (GetAttributeValue("Intelligence") + GetAttributeValue("Charisma")) / 2;
+                SubAttributes["Wisdom"] = (GetAttributeValue("Intelligence") + GetAttributeValue("Endurance")) / 2;
+                SubAttributes["Toughness"] = (GetAttributeValue("Endurance") + GetAttributeValue("Strength")) / 2;
+            }
+        }
+
+        public void AddLanguage(Languages language) {
+            if (KnowsLanguage(language)) {
+                KnownLanguages.Add(language);
+            }
+        }
+
+        public bool KnowsLanguage(Languages language) {
+            if (KnownLanguages.Contains(language)) return true;
+            return false;
+        }
+
+        public void AddItemToInventory(Items.Iitem item) {
+            Inventory.AddInventoryItem(item);
+            Save();
+        }
+
+        public void RemoveItemFromInventory(Items.Iitem item) {
+            Inventory.RemoveInventoryItem(item);
+            Save();
+        }
+
+        public void EquipItem(Items.Iitem item) {
+            Inventory.EquipItem(item);
+            Save();
+        }
+
+        public void UnequipItem(Items.Iitem item) {
+            string resultHand = null;
+            Inventory.UnequipItem(item, out resultHand, MainHand);
+            if (!string.IsNullOrEmpty(resultHand)) {
+                MainHand = resultHand;
+            }
+            Save();
+        }
+
+        public List<Items.Iitem> GetInventoryAsItemList() {
+            return Inventory.inventory.ToList();
+        }
+
+        public List<string> GetInventoryList() {
+            List<string> result = new List<string>();
+            Dictionary<string, int> itemGroups = new Dictionary<string, int>();
+
+            foreach (Items.Iitem item in GetInventoryAsItemList()) {
+                if (item != null) {
+                    Items.Icontainer containerItem = item as Items.Icontainer;
+                    if (containerItem != null) {
+                        if (!itemGroups.ContainsKey(item.Name + "$" + (containerItem.Opened ? "[Opened]" : "[Closed]"))) {
+                            itemGroups.Add(item.Name + "$" + (containerItem.Opened ? "[Opened]" : "[Closed]"), 1);
+                        }
+                        else {
+                            itemGroups[item.Name + "$" + (containerItem.Opened ? "[Opened]" : "[Closed]")] += 1;
+                        }
+                    }
+                    else {
+                        if (!itemGroups.ContainsKey(item.Name + "$" + item.CurrentCondition)) {
+                            itemGroups.Add(item.Name + "$" + item.CurrentCondition, 1);
+                        }
+                        else {
+                            itemGroups[item.Name + "$" + item.CurrentCondition] += 1;
+                        }
+                    }
+                }
+            }
+
+            foreach (KeyValuePair<string, int> pair in itemGroups) {
+                string[] temp = pair.Key.Split('$');
+                if (!string.Equals(temp[1], "NONE", StringComparison.InvariantCultureIgnoreCase)) {
+                    if (temp[1].Contains("[Opened]") || temp[1].Contains("[Closed]")) {
+                        result.Add(temp[0] + " " + temp[1] + (pair.Value > 1 ? (" [x" + pair.Value + "]") : ""));
+                    }
+                    else {
+                        result.Add(temp[0] + " (" + temp[1].Replace("_", " ").ToLower() + " condition)" + (pair.Value > 1 ? ("[x" + pair.Value + "]") : ""));
+                    }
+                }
+            }
+
+            return result;
+        }
+
+        public Dictionary<Items.Wearable, Items.Iitem> GetEquipment() {
+            return Inventory.equipped;
+        }
+
+        public void Wield(Items.Iitem item) {
+            Inventory.WieldItem(item);
+            Save();
+        }
+
+        public List<Items.Iitem> GetWieldedWeapons() {
+            List<Items.Iitem> result = new List<Items.Iitem>();
+            if (Inventory.equipped.ContainsKey(Items.Wearable.WIELD_RIGHT)) {
+                result.Add((Items.Iitem)Items.ItemFactory.CreateItem(Inventory.equipped[Items.Wearable.WIELD_RIGHT].Id));
+            }
+            if (Inventory.equipped.ContainsKey(Items.Wearable.WIELD_LEFT)) {
+                result.Add((Items.Iitem)Items.ItemFactory.CreateItem(Inventory.equipped[Items.Wearable.WIELD_LEFT].Id));
+            }
+
+            return result;
+        }
+
+        public Items.Wearable GetMainHandWeapon() {
+            if (MainHand != null) {
+                return (Items.Wearable)Enum.Parse(typeof(Items.Wearable), MainHand);
+            }
+
+            return Items.Wearable.NONE;
+        }
+
+        public void Loot(User.User looter, List<string> commands) {
+            if (IsDead()) {
+                List<Items.Iitem> result = new List<Items.Iitem>();
+                StringBuilder sb = new StringBuilder();
+                if (commands.Contains("all")) {
+                    sb.AppendLine("You loot the following items from " + FirstName + ":");
+                    GetInventoryAsItemList().ForEach(i => {
+                        sb.AppendLine(i.Name);
+                        looter.Player.AddItemToInventory(Inventory.RemoveInventoryItem(i));
+                        
+                    });
+                }
+                else if (commands.Count > 2) { //the big one, should allow to loot individual item from the inventory
+                    string itemName = Items.Items.ParseItemName(commands);
+                    int index = 1;
+                    int position = 1;
+                    string[] positionString = commands[0].Split('.'); //we are separating based on using the decimal operator after the name of the npc/item
+                    if (positionString.Count() > 1) {
+                        int.TryParse(positionString[positionString.Count() - 1], out position);
+                    }
+
+                    GetInventoryAsItemList().ForEach(i => {
+                        if (string.Equals(i.Name, itemName, StringComparison.InvariantCultureIgnoreCase) && index == position) {
+                            looter.Player.AddItemToInventory(Inventory.RemoveInventoryItem(i));
+                            sb.AppendLine("You loot " + i.Name + " from " + FirstName);
+                            index = -1; //we found it and don't need this to match anymore
+                            //no need to break since we are checking on index and I doubt a player will have so many items in their inventory that it will
+                            //take a long time to go through each of them
+                        }
+                        else {
+                            index++;
+                        }
+                    });
+                }
+                else {
+                    sb.AppendLine(FirstName + " is carrying: ");
+                    GetInventoryAsItemList().ForEach(i => sb.AppendLine(i.Name));
+                }
+            }
+        }
+
+        void Iactor.RewardXP(string id, long amount) {
+            throw new NotImplementedException();
+        }
+    }
+
+    
+
+    public class NPCUtils {
+        private static NPCUtils Instance;
+        private static ConcurrentBag<string> _npcList;
+
+        private NPCUtils() {
+            ProcessingAI = false;
+            _npcList = new ConcurrentBag<string>();
+        }
+
+        public static NPCUtils GetInstance() {
+            return Instance ?? (Instance = new NPCUtils());
+        }
+
+        public bool ProcessingAI {
+            get;
+            set;
+        }
+
+        public void LoadNPCs(){
+            GetNPCList();
+        }
+
+        public void ProcessAiForNpcs() {
+            if (!ProcessingAI){
+                ProcessingAI = true;
+                LoadNPCs();
+                //loop through each NPC and call the Update() method
+                foreach(string id in _npcList){
+                    Iactor actor = CharacterFactory.Factory.CreateCharacter(CharacterType.NPC);
+                    actor.Load(id);
+                    Inpc npc = actor as Inpc;
+                    if (DateTime.Now.ToUniversalTime() > npc.NextAiAction) {
+                        npc.Update();
+                        //in case the Rot Ai state cleaned this guy out of the DB.
+                        if (GetAnNPCByID(id) != null) {
+                            actor.Save();
+                        }
+                    }
+                }
+                ProcessingAI = false;
+            }
+        }
+
+        //this creates a new type of NPC as long as it hasn't hit the max world amount permissible
+        public static Iactor CreateNPC(int MobTypeID, string state = null){
+            MongoUtils.MongoData.ConnectToDatabase();
+            MongoDatabase character = MongoUtils.MongoData.GetDatabase("World");
+            MongoCollection npcCollection = character.GetCollection("NPCs");
+            IMongoQuery query = Query.EQ("_id", MobTypeID);
+            BsonDocument doc = npcCollection.FindOneAs<BsonDocument>(query);
+
+            Iactor actor = null;
+
+            if (doc["Current"].AsInt32 < doc["Max"].AsInt32) {
+                actor = CharacterFactory.Factory.CreateNPCCharacter(MobTypeID);
+                Inpc npc = actor as Inpc;
+                if (state != null) {//give it a starting state, so it can be something other than Wander
+                    npc.Fsm.state = npc.Fsm.GetStateFromName(state.CamelCaseWord());
+                }
+                doc["Current"] = doc["Current"].AsInt32 + 1;
+                npcCollection.Save(doc);
+            }
+            
+            return actor;
+        }
+
+        private void GetNPCList() {
+            MongoUtils.MongoData.ConnectToDatabase();
+            MongoDatabase character = MongoUtils.MongoData.GetDatabase("Characters");
+            MongoCollection npcCollection = character.GetCollection("NPCCharacters");         
+            
+
+            if (!_npcList.IsEmpty) {
+                _npcList = new ConcurrentBag<string>(); //new it up to clear it
+            }
+
+
+            foreach (BsonDocument id in npcCollection.FindAllAs<BsonDocument>() ) {
+                _npcList.Add(id["_id"].AsObjectId.ToString());
+            }
+        }
+
+        public static List<Iactor> GetAnNPCByName(string name, int location = 0) {
+            List<Iactor> npcList = null;
+            MongoUtils.MongoData.ConnectToDatabase();
+            MongoDatabase character = MongoUtils.MongoData.GetDatabase("Characters");
+            MongoCollection npcCollection = character.GetCollection("NPCCharacters");
+            IMongoQuery query;
+            if (location == 0) {
+                query = Query.EQ("FirstName", name.CamelCaseWord());
+            }
+            else {
+                query = Query.And(Query.EQ("FirstName", name.CamelCaseWord()), Query.EQ("Location", location)); 
+            }
+
+            var results = npcCollection.FindAs<BsonDocument>(query);
+
+            if (results != null) {
+                npcList = new List<Iactor>();
+                foreach (BsonDocument found in results) {
+                    Iactor npc = CharacterFactory.Factory.CreateCharacter(CharacterType.NPC);
+                    npc.Load(found["_id"].AsObjectId.ToString());
+                    npcList.Add(npc);
+                }
+            }
+
+            return npcList;
+        }
+
+        public static User.User GetUserAsNPCFromList(List<string> id) {
+            if (id.Count > 0) {
+                User.User result = new User.User();
+                result.Player = GetAnNPCByID(id[0]);
+                result.CurrentState = User.User.UserState.TALKING;
+                return result;
+            }
+
+            return null;
+        }
+
+        public static Iactor GetAnNPCByID(string id) {
+            if (string.IsNullOrEmpty(id)) {
+                return null;
+            }
+
+            MongoUtils.MongoData.ConnectToDatabase();
+            MongoDatabase character = MongoUtils.MongoData.GetDatabase("Characters");
+            MongoCollection npcCollection = character.GetCollection("NPCCharacters");
+            IMongoQuery query = Query.EQ("_id", ObjectId.Parse(id));
+
+            BsonDocument results = npcCollection.FindOneAs<BsonDocument>(query);
+            Iactor npc = null;
+
+            if (results != null) {
+                npc = CharacterFactory.Factory.CreateCharacter(CharacterType.NPC);
+                npc.Load(results["_id"].AsObjectId.ToString());
+            }
+
+            return npc;
+        }
+
+        public static void AlertOtherMobs(int location, int mobType, string id) {
+            MongoUtils.MongoData.ConnectToDatabase();
+            MongoDatabase db = MongoUtils.MongoData.GetDatabase("Characters");
+            MongoCollection collection = db.GetCollection("NPCCharacters");
+
+            IMongoQuery query = Query.And(Query.EQ("Location", location), Query.EQ("MobtypeID", mobType));
+
+            var results = collection.FindAs<BsonDocument>(query);
+            
+            foreach (BsonDocument npc in results) {
+                npc["CurrentTarget"] = id;
+                npc["AiState"] = AI.Combat.GetState().ToString();
+                npc["NextAiAction"] = DateTime.Now.ToUniversalTime();
+                collection.Save(npc);
+            }
+        }
+    }
+}

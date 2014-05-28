@@ -1,0 +1,62 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using MongoDB.Driver;
+using MongoDB.Driver.Builders;
+using MongoDB.Bson;
+using Extensions;
+using MongoDB.Bson.Serialization;
+
+namespace Items {
+    class ItemFactory {
+
+        public static Iitem CreateItem(ItemType type, ObjectId id){
+            BsonDocument tempItem = null;
+
+            if (id != null) { //id got passed in so we are looking for a specific edible item
+                MongoUtils.MongoData.ConnectToDatabase();
+                MongoDatabase db = MongoUtils.MongoData.GetDatabase("World");
+                MongoCollection itemCollection = db.GetCollection("Items");
+                tempItem = itemCollection.FindOneAs<BsonDocument>(Query.EQ("_id", id));
+            }
+
+            //all items inherit Iitem, but some items inherit a second interface the factory should figure this all out and just return the item
+            //as an Iitem than can be cast to whatever needs be by the caller.
+            Iitem result = null;
+
+            switch (type){
+                case ItemType.WEAPON:
+                     Weapon weapon = new Weapon();
+                     result = BsonSerializer.Deserialize<Weapon>(tempItem);
+                    break;
+                case ItemType.EDIBLE:
+                    Edible edible = new Edible();
+                    result = BsonSerializer.Deserialize<Edible>(tempItem);
+                    edible.GetAttributesAffected(tempItem["AttributesAffected"].AsBsonArray);
+                    break;
+                case ItemType.DRINKABLE:
+                    Beverage beverage = new Beverage();
+                    result = BsonSerializer.Deserialize<Beverage>(tempItem);
+                    beverage.GetAttributesAffected(tempItem["AttributesAffected"].AsBsonArray);
+                    break;
+                case ItemType.CONTAINER:
+                    Container container = new Container();
+                    result = BsonSerializer.Deserialize<Container>(tempItem);
+                    //this is where we would serialize the dictionaries for the effects
+                    break;
+                default:
+                    // result will be null
+                    break;
+            }
+
+            return result;
+        }
+
+        public static Iitem CreateItem(string typeIn, ObjectId id) {
+            ItemType type = (ItemType)Enum.Parse(typeof(ItemType), typeIn);
+            return CreateItem(type, id);
+        }
+    }
+}

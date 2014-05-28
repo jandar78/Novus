@@ -1,0 +1,103 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using MongoDB.Driver;
+using MongoDB.Driver.Builders;
+using MongoDB.Bson;
+using Extensions;
+
+namespace Items {
+    public class Items {
+        private Wearable _wornOn;
+        private ItemCondition _condition;
+        private ItemCondition _maxCondition;
+
+        public ObjectId Id { get; set; }
+        public string Name { get; set; }
+        public string Description { get; set; }
+        public double Weight { get; set; }
+        public string Condition {
+            get {
+                return _condition.ToString();
+            }
+            set {
+                _condition = (ItemCondition)Enum.Parse(typeof(ItemCondition), value.ToUpper()); 
+            }
+        }
+        public string MaxCondition {
+            get {
+                return _maxCondition.ToString();
+            }
+            set {
+                _maxCondition = (ItemCondition)Enum.Parse(typeof(ItemCondition), value.ToUpper());
+            }
+        }
+        public double MinDamage { get; set; }
+        public double MaxDamage { get; set; }
+        public double AttackSpeed { get; set; }
+        public bool Wieldable { get; set; }
+        public bool Wearable { get; set; }
+        public int MinimumLevel { get; set; }
+        public string WornOn { 
+            get {
+                return _wornOn.ToString();
+            }
+            set {
+                _wornOn = (Wearable)Enum.Parse(typeof(Wearable), value.ToUpper()); 
+            }
+        }
+        public int Location { get; set; }
+
+        public static Items GetByName(string name, int location) {
+            MongoUtils.MongoData.ConnectToDatabase();
+            MongoDatabase db = MongoUtils.MongoData.GetDatabase("World");
+            MongoCollection collection = db.GetCollection("Items");
+            name = name.CamelCaseString();
+            Items result = collection.FindOneAs<Items>(Query.And(Query.EQ("Name", name), Query.EQ("Location", location)));
+
+            return result;
+        }
+
+        public static Items GetByID(string id) {
+            MongoUtils.MongoData.ConnectToDatabase();
+            MongoDatabase db = MongoUtils.MongoData.GetDatabase("World");
+            MongoCollection collection = db.GetCollection("Items");
+            Items result = collection.FindOneAs<Items>(Query.EQ("_id", ObjectId.Parse(id)));
+            
+            return result;
+        }
+
+        public static void Deteriorate(string id) {
+            MongoUtils.MongoData.ConnectToDatabase();
+            MongoDatabase db = MongoUtils.MongoData.GetDatabase("World");
+            MongoCollection collection = db.GetCollection("Items");
+            Items result = collection.FindOneAs<Items>(Query.EQ("_id", ObjectId.Parse(id)));
+
+            if (result != null) {
+                int newCondition = ((int)result._condition) - 1;
+                if (newCondition >= 1) { //otherwise it can't deteriorate any more and it's broken anyways
+                    result.Condition = ((ItemCondition)newCondition).ToString();
+                }
+                result.Save();
+            }
+        }
+
+        public void Save() {
+            MongoUtils.MongoData.ConnectToDatabase();
+            MongoDatabase db = MongoUtils.MongoData.GetDatabase("World");
+            MongoCollection collection = db.GetCollection("Items");
+
+            collection.Save<Items>(this);
+        }
+
+        public Items(){}
+    }
+
+            
+
+   
+    public enum Wearable { NONE, HEAD, LEFT_EAR, RIGHT_EAR, NECK, BACK, CHEST, SHOULDERS, WAIST, FEET, HANDS, WIELD, WIELD_RIGHT, WIELD_LEFT} //this is enough for now add more later
+    public enum ItemCondition { DESTROYED_BEYOND_REPAIR, DESTROYED, DAMAGED, VERY_WORN, WORN, GOOD, VERY_GOOD, EXCELLENT } //a few item conditions
+}

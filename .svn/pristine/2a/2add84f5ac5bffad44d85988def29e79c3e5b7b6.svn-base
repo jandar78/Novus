@@ -1,0 +1,491 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using MongoDB.Bson;
+using MongoDB.Driver;
+using MongoDB.Driver.Builders;
+using MongoUtils;
+using Extensions;
+using MongoDB.Bson.Serialization;
+using NCalc;
+using System.Reflection;
+using Rooms;
+using Character;
+using Items;
+using System.Xml;
+using System.Collections;
+using LuaInterface;
+
+namespace Commands {
+
+    //TODO: some skills may need to call some unerlying methods like OPEN, UNLOCK, NORTH, WEST, etc.  Need to implement a way for that to happen and also
+    //if that underlying method should be called before or after the skill is performed. Example: Sneak needs to display messages to players in the room the player
+    //arrives to. PickLock needs to call UNLOCK after the skill was completed.
+    
+
+    public class Skill {
+        private Dictionary<string, object> DataSet { get; set; }
+        private Stack<object> DataStack { get; set; }
+
+        public BsonDocument SkillDocument { get; set; }
+        public BsonArray CheckPlayersInRoom { get; set; }
+        
+        public SkillLevel skillLevel { get; set; }
+        public SkillTypes skillType { get; set; }
+        
+        public string MsgTarget { get; set; }
+        public string MsgOthers { get; set; }
+        public string Message { get; set; }
+        public string Calculation { get; set; }
+        public bool MustHavePlayersInRoom { get; set; }
+        public List<string> UserCommand { get; set; }
+
+        public BsonArray StateSelfNotAllowed { get; set; } 
+        public BsonArray StateSelfNeedsToBe { get; set; }
+        public BsonArray StanceSelfNotAllowed { get; set; }
+        public BsonArray StanceSelfNeedsToBe { get; set; }
+        public BsonArray StateOtherNotAllowed { get; set; } 
+        public BsonArray StanceOtherNotAllowed { get; set; }
+        public BsonArray StateOtherNeedsToBe { get; set; }
+        public BsonArray StanceOtherNeedsToBe { get; set; }
+
+        public User.User Target { get; set; }
+        public User.User Player { get; set; }
+
+        //this may end up being a dictionary if player can have more than one action state applied
+        //there could be states if skill outcome is succesful or not that affects the player and others around him
+        //ex. if player cartwheels and fails stance would be lying down and not standing. (what if different stances based on how close to success it was?)
+        //may make these a dictionary in the future we'll see
+        public CharacterEnums.CharacterActionState StateIfSuccessSelf { get; set; }
+        public CharacterEnums.CharacterStanceState StanceIfSuccessSelf { get; set; }
+
+        public CharacterEnums.CharacterActionState StateIfSuccessOthers { get; set; }
+        public CharacterEnums.CharacterStanceState StanceIfSuccessOthers { get; set; }
+        
+        public double CheckToPass { get; set; }
+
+        public Skill() { }
+
+        public void FillSkill(User.User user, List<string> commands) {
+            //get the Skill from the DB
+            DataSet = new Dictionary<string, object>();
+            DataStack = new Stack<object>();
+
+            MongoCollection col = MongoUtils.MongoData.GetCollection("Messages", "Skills");
+            SkillDocument = col.FindOneAs<BsonDocument>(Query.EQ("_id", commands[1].CamelCaseWord()));
+
+            //skillType = (SkillTypes)SkillDocument["SkillType"].AsInt32;
+            //Calculation = SkillDocument["Calculation"].AsString;
+            //skillType = (SkillTypes)SkillDocument["SkillType"].AsInt32;
+            //MustHavePlayersInRoom = SkillDocument["MustHavePlayersInRoom"].AsBoolean;
+            UserCommand = commands;
+
+            Player = user;
+            if (commands.Count > 3) {
+                Target = CommandParser.FindTargetByName(commands[2], user.Player.Location);
+            }
+        }
+
+        
+
+        /// <summary>
+        /// For this method to work correctly the Attribute names **MUST** be separated by a space at the start and end.
+        /// (Dexterity+Cunning) will not work it needs to be ( Dexterity + Cunning ) any other math symbols and numbers do not require
+        /// spaces.
+        /// </summary>
+        /// <param name="player"></param>
+        /// <returns></returns>
+        private string ReplaceStringWithNumber(Character.Iactor player) {
+            //would like to make this a bit more generic so if new attributes are inserted we don't have to change this method
+            //I think easiest way is to have the expression be separated by spaces, but just so it works with anything let's get rid of
+            //any mathematical signs and then we should just have the name of the attributes we want.
+            string temp = Calculation;
+            string[] operators = new string[] { "+", "-", "/", "*", "(", ")", "[", "]", "{", "}", "^", "SQRT", "POW", "." };
+            foreach (string operand in operators) {
+             temp = temp.Replace(operand, " ");
+            }
+           
+            //need to get rid of repeats and empty spaces
+            string[] attributeList = temp.Split(' ');
+
+            temp = Calculation;
+
+            foreach (string attributeName in attributeList) {
+                if (!string.IsNullOrEmpty(attributeName)) {
+                    if (player.GetAttributes().ContainsKey(attributeName)) {
+                       temp = temp.Replace(attributeName, player.GetAttributeValue("attributeName").ToString());
+                    }
+                    else if (player.GetSubAttributes().ContainsKey(attributeName)) {
+                        temp = temp.Replace(attributeName, player.GetSubAttributes()[attributeName].ToString());
+                    }
+                    else if (attributeName.Contains("Rank")){
+                        temp = temp.Replace(attributeName, player.GetAttributeRank(attributeName.Substring(0, attributeName.Length - 4)).ToString());
+                    }
+                }
+            }
+
+            return temp;                     
+        }
+
+    
+        #region Lua script parsing methods
+        public void ExecuteScript() {
+            string path = @"E:\Mud\" + SkillDocument["_id"].AsString + ".lua";
+            using (Lua luaParser = new Lua()) {
+                luaParser.RegisterMarkedMethodsOf(this);
+                luaParser.DoFile(path);
+
+                if (Message != null) {
+                    Player.MessageHandler(Message);
+                }
+                if (Target != null && MsgTarget != null) {
+                    Target.MessageHandler(MsgTarget);
+                }
+                if (MsgOthers != null) {
+                    Room.GetRoom(Player.Player.Location).InformPlayersInRoom(MsgOthers, new List<string>(new string[] { Player.UserID }));
+                }
+            }
+        }
+        
+        //LUA methods need to be public or you'll get "method is nil" exception
+        [LuaAccessible]
+        public double ParseAndCalculateCheck(Character.Iactor player, string calculation) {
+            Calculation = calculation;
+            Expression expression = new Expression(ReplaceStringWithNumber(player));
+            double result = 0;
+            try {
+                result = (double)expression.Evaluate();
+            }
+            catch (Exception) {}
+            
+            return CheckToPass = result;
+        }
+
+        [LuaAccessible]
+        public void SetSkillStates(object o, bool others = false) {
+            if (o != null) {
+                Character.Iactor actor = (Character.Iactor)o;
+
+                if (!others) {
+                    if (StanceIfSuccessSelf != CharacterEnums.CharacterStanceState.NONE) {
+                        actor.SetStanceState(StanceIfSuccessSelf);
+                    }
+
+                    actor.SetActionState(StateIfSuccessSelf);
+                }
+                else {
+                    actor.SetStanceState(StanceIfSuccessOthers);
+                    actor.SetActionState(StateIfSuccessOthers);
+                }
+            }
+        }
+
+
+        [LuaAccessible]
+        public double ParseAndCalculateCheckOther(object player) {
+            if (player != null) {
+                Expression expression = new Expression(ReplaceStringWithNumber((Character.Iactor)player));
+                return (double)expression.Evaluate();
+            }
+            return 0.0d;
+        }
+
+        [LuaAccessible]
+        public Type GetObjectType(object o) {
+            Type t = o.GetType();
+            switch (t.Name) {
+                case "bool":
+                    t = typeof(System.Boolean);
+                    break;
+                case "int":
+                    t = typeof(System.Int32);
+                    break;
+                case "double":
+                    t = typeof(System.Double);
+                    break;
+                case "string":
+                default:
+                    t = typeof(System.String);
+                    break;
+            }
+            return t;
+        }
+
+         [LuaAccessible]
+        public object CastObject(object o, string type) {
+            return Convert.ChangeType(o, Type.GetType(type));
+        }
+
+        [LuaAccessible]
+         public Type GetClassType(string className) {
+            Type t = null;
+
+            switch (className) {
+                case "Utils":
+                    t = typeof(Utils);
+                    break;
+                case "Room":
+                    t = typeof(Room);
+                    break;
+                case "Exits":
+                    t = typeof(Exits);
+                    break;
+                case "Skill":
+                    t = typeof(Skill);
+                    break;
+                case "Character":
+                    t = typeof(Character.Character);
+                    break;
+                case "NPC":
+                    t = typeof(Character.NPC);
+                    break;
+                case "NPCUtils":
+                    t = typeof(Character.NPCUtils);
+                    break;
+                case "Items":
+                    t = typeof(Items.Items);
+                    break;
+                case "User":
+                    t = typeof(User.User);
+                    break;
+                case "Server":
+                    t = typeof(MySockets.Server);
+                    break;
+                case "CommandParser":
+                    t = typeof(CommandParser);
+                    break;
+                default:
+                    break;
+            }
+
+            return t;
+        }
+
+        [LuaAccessible]
+        public object GetObjectType(string value, string type) {
+            object o = null;
+            switch (type) {
+                case "System.Int32": {
+                        int result;
+                        int.TryParse(value, out result);
+                        o = result;
+                        break;
+                    }
+                case "System.Double": {
+                        double result;
+                        double.TryParse(value, out result);
+                        o = result;
+                        break;
+                    }
+                case "System.Boolean": {
+                        bool result;
+                        bool.TryParse(value, out result);
+                        o = result;
+                        break;
+                    }
+                case "System.String":
+                default: {
+                        o = value;
+                        break;
+                    }
+            }
+
+            return o;
+        }
+
+        [LuaAccessible]
+        public object GetMethodResult(string className, string methodName, object table) {
+            Type t = GetClassType(className);
+            MethodInfo m = t.GetMethod(methodName, BindingFlags.Public | BindingFlags.Static | BindingFlags.NonPublic);
+                            
+            LuaTable luaTable = (LuaTable)table;
+            ParameterInfo[] p = m.GetParameters();
+            object[] parameters = new object[luaTable.Values.Count];
+            int i = 0;
+            foreach (var value in luaTable.Values) {
+                parameters[i] = CastObject(value, p[i].ParameterType.FullName);
+                i++;
+            }
+
+            
+            object result = m.Invoke(null, parameters);
+
+            return result;
+        }
+
+        [LuaAccessible]
+        public object ColorFont(string message, double color) {
+            Utils.FontForeColor fontColor = (Utils.FontForeColor)color;
+            return message.FontColor(fontColor);
+        }
+
+        [LuaAccessible]
+        public void InvokeMethod(object o, string methodName, object table) {
+            Type t = o.GetType();
+            MethodInfo m = t.GetMethod(methodName, BindingFlags.Public | BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic);
+            
+            LuaTable luaTable = table as LuaTable;
+            if (luaTable != null) {
+                object[] parameters = new object[luaTable.Values.Count];
+                int i = 0;
+                foreach (var value in luaTable.Values) {
+                    var vType = value.GetType();
+                    parameters[i] = value;
+                    i++;
+                }
+                if (m.IsStatic) {
+                    o = null;
+                }
+
+               m.Invoke(o, parameters);
+            }
+            else {
+                if (m.IsStatic) {
+                    o = null;
+                }
+                
+                m.Invoke(o, new object[] { table });
+            }
+        }
+
+        [LuaAccessible]
+        public void SetVariable(string name, object o) {
+            if (!DataSet.ContainsKey(name)) {
+                DataSet.Add(name, o);
+            }
+            else {
+                DataSet[name] = o;
+            }
+        }
+
+        [LuaAccessible]
+        public object GetVariable(string name) {
+            object o = null;
+            if (DataSet.ContainsKey(name)) {
+                o = DataSet[name];
+            }
+
+            return o;
+        }
+
+        [LuaAccessible]
+        public object GetDictionaryElement(object o, string name) {
+            IDictionary dict = (IDictionary)o;
+            if (dict.Contains(name.CamelCaseWord())) {
+                o = dict[name.CamelCaseWord()];
+            }
+
+            return o;
+        }
+
+        [LuaAccessible]
+        public object GetElement(object[] array, double position, string type) {
+            object o = null;
+            if ((int)position >= 0 && (int)position < array.Length) {
+                o = array[(int)position];
+                o = CastObject(o, type);
+            }
+            return o;
+        }
+
+        [LuaAccessible]
+        public void AssignMessage(string who, string message) {
+            if (!string.IsNullOrEmpty(message)) {
+                if (string.Equals(who, "Player", StringComparison.CurrentCultureIgnoreCase)) {
+                    Message = message;
+                }
+                else if (string.Equals(who, "Target", StringComparison.CurrentCultureIgnoreCase)) {
+                    MsgTarget = message;
+                }
+                else if (string.Equals(who, "Room", StringComparison.CurrentCultureIgnoreCase)) {
+                    MsgOthers = message;
+                }
+            }
+        }
+
+        [LuaAccessible]
+        public void SendMessage(string playerID, string message) {
+            User.User player = MySockets.Server.GetAUser(playerID);
+            player.MessageHandler(message);
+        }
+
+        [LuaAccessible]
+        public object GetPlayer(string type) {
+            object o = null;
+            if (string.Equals(type, "Character", StringComparison.CurrentCultureIgnoreCase)) {
+                o = Player.Player;
+            }
+            else {
+                o = Player;
+            }
+
+            return o;
+        }
+
+        [LuaAccessible]
+        public object GetTarget(string type) {
+            object o = null;
+            if (string.Equals(type, "Character", StringComparison.CurrentCultureIgnoreCase)) {
+                o = Target.Player;
+            }
+            else {
+                o = Target;
+            }
+
+            return o;
+        }
+
+        [LuaAccessible]
+        public object GetProperty(object o, string value, string type, string className = null) {
+            if (o == null && className == null) {
+                return null;
+            }
+            
+            Type t = null;
+            
+            if (!string.IsNullOrEmpty(className) && string.Equals(className, "Skill", StringComparison.CurrentCultureIgnoreCase)) {
+                o = this;
+                t = o.GetType();
+            }
+            else {
+                t = o.GetType();
+            }
+                       
+            var p = t.GetProperties();
+
+            o = p.Where(prop => string.Equals(prop.Name, value, StringComparison.CurrentCultureIgnoreCase)).SingleOrDefault().GetValue(o, null);
+
+            if (!string.IsNullOrEmpty(type)) {
+                o = CastObject(o, type);
+            }
+
+            return o;
+        }
+
+        [LuaAccessible]
+        public object GetField(object o, string name) {
+            Type t = o.GetType();
+            FieldInfo f = t.GetField(name);
+
+            o = f.GetValue(o);
+            
+            return o;
+        }
+
+        [LuaAccessible]
+        public object GetMember(object o, string name) {
+            Type t = o.GetType();
+            
+            o = t.GetMember(name)[0];
+            
+            return o;
+        }
+     
+        #endregion Lua script parsing methods
+        
+        private enum CheckRoom { NONE, ALL, GREATER_OR_EQUAL, GREATER, LESS, LESS_OR_EQUAL }
+    }
+
+}

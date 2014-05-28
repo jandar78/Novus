@@ -1,0 +1,255 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using Rooms;
+using User;
+using MongoDB.Driver;
+using MongoDB.Bson;
+using MongoDB.Driver.Builders;
+using Extensions;
+
+namespace Commands {
+	public partial class CommandParser {
+
+		//this method is way too long and needs to be broken down a little bit into a few method calls
+		private static void Kill(User.User player, List<string> commands) {
+			User.User enemy = null;
+           
+            if (commands.Count > 2) {
+                foreach (User.User foe in MySockets.Server.GetAUserByName(commands[2])) {
+                    if (foe.Player.Location == player.Player.Location) {
+                        enemy = foe;
+                    }
+                }
+            }
+           
+            //TODO: if enemy == null then look to see if we have a target and attack it otherwise look for any NPCs in the room and attack the first one
+            //that logic goes here
+
+			if (enemy == null){
+                //pull target not found message from DB
+				player.OutBuffer = "You can't kill what you can't see!";
+				return;
+			}
+			//set both players to fighting status if not already fighting
+            //both players should be in combat regardless if the target will attack the attacker.
+            //I may remove the auto-combat and make it maybe a bit twitch based combat.  A player could then choose
+            //to go several rounds wihtout hitting the other player or just parrying them constantly.
+			if (player.Player.InCombat == false || enemy.Player.InCombat == false) {
+				player.Player.InCombat = true;
+				enemy.Player.InCombat = true;
+			}
+
+			//set them both as current targets to each other and update the last target as well
+			player.Player.UpdateTarget(enemy.UserID);
+            enemy.Player.UpdateTarget(player.UserID);
+
+			if (player.Player.LastCombatTime == DateTime.MinValue) {
+				player.Player.LastCombatTime = DateTime.Now.AddSeconds(-3);
+			}
+
+			TimeSpan wait = player.Player.LastCombatTime - DateTime.Now;
+			if (wait.Seconds > -5) {
+				return; //no combat this round 
+			}
+			
+			//Finally the good stuff
+			//This here is half a round of combat when we parse the other players commands they will be the attackers
+			//yes, it pays off to be the first one to strike.
+			double attack = CalculateAttack(player, enemy.Player.Level);
+			double defense = CalculateDefense(enemy);
+			double damage = (attack - defense) * -1;
+
+			//this is very simple and basic combat logic and it sucks but hey it's something...
+			if (damage < 0) { //hey looks like the other player didn't have enough defense! Let's destroy him...
+				player.OutBuffer = String.Format("You hit {0} for {1} points of damage!", enemy.Player.FirstName, (damage * -1).ToString().FontColor(Utils.FontForeColor.RED));
+				enemy.OutBuffer = String.Format("{0} hits you for {1} points of damage!", player.Player.FirstName, (damage * -1).ToString().FontColor(Utils.FontForeColor.RED));
+				string roomMessage = String.Format("{0} hits {1} for {2} points of damage!", player.Player.FirstName, enemy.Player.FirstName, damage * -1);
+				Rooms.Room.InformPlayersInRoom(roomMessage, player.Player.Location, new List<string>(new string[] { player.UserID, enemy.UserID })); 
+				enemy.Player.ApplyEffectOnAttribute("Hitpoints", damage);
+			}
+			else {
+				player.OutBuffer = String.Format("You swing with all your might and do no damage to {0}", enemy.Player.FirstName);
+				enemy.OutBuffer = String.Format("{0} swings with all their might and does no damage to you!", player.Player.FirstName);
+				string roomMessage = String.Format("{0} hits {1} for {2} points of damage!", player.Player.FirstName, enemy.Player.FirstName, damage * -1);
+				Rooms.Room.InformPlayersInRoom(roomMessage, player.Player.Location, new List<string>(new string[] { player.UserID, enemy.UserID }));
+			}
+			
+			double enemyHealth = enemy.Player.GetAttributeValue("Hitpoints");
+			
+            //call the methods and let them do each their thing
+            if (enemy.Player.IsUnconcious()) SetUnconcious(player, enemy);
+            if (enemy.Player.IsDead()) SetDead(player, enemy); ;
+			
+            
+			
+
+			//combat timestamp
+			player.Player.LastCombatTime = DateTime.Now;
+		}
+
+
+		#region Combat calculations
+		private static double CalculateAttack(User.User player, int targetLevel) {
+            double result = 0.0;
+            //gonna break it out for debug purposes 
+            result = 100 - ((player.Player.Level - targetLevel) * 10);
+            result *= 0.01;
+            //result *= (WeaponDamage * WeaponSkill);
+            result += player.Player.GetAttributeValue("Power") * player.Player.LevelModifier;
+						
+			return result;
+		}
+
+		private static double CalculateDefense(User.User enemy) {
+			double result = 0.0;
+			//lame calculation here as well
+            if (!enemy.Player.CheckUnconscious) {
+				double modifier = new Random().Next(0, 10);
+				result = enemy.Player.GetAttributeValue("Dexterity") * (enemy.Player.GetAttributeValue("Strength") * ( modifier / 100.0));
+			}
+			else { //if player is unconcious he's going to die in one hit
+				result = -100;
+			}
+			return result;
+		}
+
+		private static double CalculateDefense(Door door) {
+            //some doors may have some resistance to damage
+			double result = 0.0;
+			return result;
+		}
+		#endregion Combat calculations
+
+		#region Combat State Changes
+		//state changes for combat
+        //I think this is now getting handled by the actor abstract class now
+		private static void SetUnconcious(User.User player, User.User enemy) {
+            player.Player.ClearTarget();
+			player.OutBuffer = String.Format("You knocked {0} unconcious.", enemy.Player.FirstName);
+			enemy.OutBuffer = String.Format("{0} knocked you unconcious.", player.Player.FirstName);
+			Room.InformPlayersInRoom(String.Format("{0} knocked {1} unconcious.", player.Player.FirstName, enemy.Player.FirstName), player.Player.Location, new List<string>(new string[] { player.UserID, enemy.UserID }));
+			SetCombatTimer(player, enemy);
+		}
+
+		private static void SetDead(User.User player, User.User enemy) {
+            player.Player.ClearTarget();
+			player.OutBuffer = String.Format("You have killed {0}!", enemy.Player.FirstName);
+			enemy.OutBuffer = String.Format("{0} has killed you!", player.Player.FirstName);
+			Room.InformPlayersInRoom(String.Format("{0} killed {1}.", player.Player.FirstName, enemy.Player.FirstName), player.Player.Location, new List<string>(new string[] { player.UserID, enemy.UserID }));
+			SetCombatTimer(player, enemy);
+		}
+
+		//set player timer to minvalue
+		private static void SetCombatTimer(User.User player, User.User enemy) {
+			player.Player.LastCombatTime = DateTime.MinValue;
+			enemy.Player.LastCombatTime = DateTime.MinValue;
+		}
+		#endregion
+
+		#region Finishing moves
+		//finisher moves
+		private static void Cleave(User.User player, List<string> commands) {//this will need a check in the future to be used with only bladed weapons
+			User.User enemy = null;
+			if (commands.Count > 2) {
+				foreach (User.User foe in MySockets.Server.GetAUserByName(commands[2])) {
+					if (foe.Player.Location == player.Player.Location) {
+						enemy = foe;
+					}
+				}
+			}
+			else {
+				enemy = MySockets.Server.GetCurrentUserList().Where(u => u.Player.Location == player.Player.Location && String.Compare(u.Player.ActionState.ToString(), "unconcious", true) == 0).SingleOrDefault(); 
+			}
+
+			if (enemy == null) {
+				player.OutBuffer = "You can't kill what you can't see!";
+				return;
+			}
+
+			if (String.Compare(enemy.Player.ActionState.ToString(),"unconcious", true) == 0) {
+				if (commands.Count > 2 && commands[3].ToLower() == "slowly") {  //a slow death for your opponent, bask in it.
+					player.OutBuffer = String.Format("You slowly drive your blade through {0}'s chest and twist it a few times as {1} lays on the ground unconcious.", enemy.Player.FirstName, enemy.Player.Gender == "Male" ? "he" : "she");
+					enemy.OutBuffer = String.Format("{0} slowly drives {1} blade through your chest and twists it a few times as you lay on the ground unconcious.", player.Player.FirstName, player.Player.Gender == "Male" ? "his" : "her");
+					string roomMessage = String.Format("{0} slowly drives {1} blade through {2}'s chest and twists it a few times as {3} lay on the ground unconcious.", player.Player.FirstName, player.Player.Gender == "Male" ? "his" : "her", enemy.Player.FirstName, enemy.Player.Gender == "Male" ? "he" : "she");
+					Rooms.Room.InformPlayersInRoom(roomMessage, player.Player.Location, new List<string>(new string[] {player.UserID, enemy.UserID})); 
+; 
+				}
+				else {
+					player.OutBuffer = String.Format("You cleave {0} as {1} lays on the ground unconcious.", enemy.Player.FirstName, enemy.Player.Gender == "Male" ? "he" : "she");
+					enemy.OutBuffer = String.Format("{0} cleaved you as you lay on the ground unconcious.", player.Player.FirstName);
+					string roomMessage = String.Format("{0} cleaved {1} as {2} lay on the ground unconcious.", player.Player.FirstName, enemy.Player.FirstName, enemy.Player.Gender == "Male" ? "he" : "she");
+					Rooms.Room.InformPlayersInRoom(roomMessage, player.Player.Location, new List<string>(new string[] {player.UserID, enemy.UserID})); 
+				}
+				SetDead(player, enemy);
+			}
+			else {
+				player.OutBuffer = String.Format("You can't cleave {0}, {1} not unconcious.", enemy.Player.FirstName, enemy.Player.Gender == "Male" ? "he's" : "she's");
+			}
+		}
+		#endregion
+
+        #region Combat Messages
+        //replaces the placeholder with the actual value, so edits can all be made on the DB, if you add anymore place holders this is where you would do the replace
+        public string ParseMessage(string message, User.User attacker, User.User target, double damage, double defense, double attack) {
+
+            message = message.Replace("{attacker}", attacker.Player.FirstName)
+                             .Replace("{target}", target.Player.FirstName)
+                             .Replace("{him-her}", target.Player.Gender == "Male" ? "him" : "her")
+                             .Replace("{damage}", damage.ToString())
+                             .Replace("{attack}", attack.ToString())
+                             .Replace("{defense}", defense.ToString());
+                       
+            return message;
+        }
+        #endregion Combat Messages
+
+        #region Break shit
+        private static void Destroy(User.User player, List<string> commands) {
+			player.OutBuffer = "You think about it and then decide against it.";
+		}
+
+		private static void Break(User.User player, List<string> commands) {
+			string objectName = "";
+
+			for (int i = commands.Count -1; i > 0; i--){ //this should keep the words in the order we want
+				objectName += commands[i];
+			}
+
+		    //let's see if it a door we want to break down first
+			if (BreakDoor(player, commands)) return;
+			if	(BreakObject(player, objectName)) return;
+
+			player.OutBuffer = "You look all around but can't find that to break.";
+			
+		}
+
+		private static bool BreakDoor(User.User player, List<string> commands){
+			Door door = FindDoor(player.Player.Location, commands);
+			if (door == null) {
+				return false;
+			}
+
+			if (door.Destroyed) {
+				player.OutBuffer = "It is already destroyed, why bother?";
+				return true;
+			}
+
+		    double attack = CalculateAttack(player, 0);
+			double defense = CalculateDefense(door);
+			double damage = attack - defense;
+			List<string> message = door.ApplyDamage(damage);
+			door.UpdateDoorStatus();
+			player.OutBuffer = message[0].FontColor(Utils.FontForeColor.RED);
+			Rooms.Room.InformPlayersInRoom(String.Format(message[1], player.Player.FirstName), player.Player.Location, new List<string>(new string[] {player.UserID}));
+			return true;
+		}
+
+		private static bool BreakObject(User.User player, string objectName) {
+			return false;
+		}
+		#endregion
+	}
+} 

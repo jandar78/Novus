@@ -1,0 +1,311 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using MongoDB.Driver;
+using MongoDB.Bson;
+using MongoDB.Driver.Builders;
+using MongoUtils;
+using Extensions;
+
+namespace Calendar {
+	public static class Calendar {
+
+		public static Dictionary<string, string> GetDate() {
+			Dictionary<string, string> dateInfo = new Dictionary<string, string>();
+			
+			BsonDocument calendar = GetCalendarData();
+
+			BsonArray dayArray = calendar["Days"].AsBsonArray;
+			BsonArray monthArray = calendar["Months"].AsBsonArray;
+			BsonArray yearArray = calendar["Year"].AsBsonArray;
+			
+			BsonDocument dayInWeek = dayArray[calendar["CurrentDayInWeek"].AsInt32].AsBsonDocument;
+		    BsonDocument month = monthArray[calendar["CurrentMonth"].AsInt32].AsBsonDocument;
+			BsonDocument year = yearArray[calendar["CurrentYearName"].AsInt32].AsBsonDocument;
+
+			dateInfo.Add("DayInWeek", dayInWeek["Name"].AsString);
+			dateInfo.Add("DayInMonth",  calendar["CurrentDayInMonth"].AsInt32.ToString());
+			dateInfo.Add("Month", month["Name"].AsString);
+			dateInfo.Add("Year", calendar["CurrentYear"].AsInt32.ToString());
+			dateInfo.Add("YearOf", year["Name"].AsString);
+
+			return dateInfo;
+		}
+
+		public static BsonDocument GetTime() {
+            return GetCalendarCollection().FindOneAs<BsonDocument>(Query.EQ("_id", "Time"));
+		}
+
+		public static bool IsNight() {
+			//yeah I know, it's long all in one mongoCall. Does the job though
+			return GetCalendarCollection().FindOneAs<BsonDocument>(Query.EQ("_id", "Time"))["TimeOfDay"].AsString.ToUpper() == "NIGHT";
+		}
+
+        public static void UpdateClock() {
+            MongoCollection calendar = GetCalendarCollection();
+            BsonDocument time = calendar.FindOneAs<BsonDocument>(Query.EQ("_id", "Time"));
+            time["Second"] = time["Second"].AsInt32 + 28;
+
+            if (time["Second"].AsInt32 >= 60) {
+                time["Second"] = time["Second"].AsInt32 - 60;
+                if (time["Second"].AsInt32 < 0) time["Second"] = time["Second"].AsInt32 * -1;
+                time["Minute"] = time["Minute"].AsInt32 + 1;
+
+                if (time["Minute"].AsInt32 >= 60) {
+                    time["Minute"] = 0;
+                    time["Hour"] = time["Hour"].AsInt32 + 1;
+						 
+						  time = UpdateTimeOfDay(time);
+
+                    if (time["Hour"].AsInt32 == 24) {
+                        time["Hour"] = 0;
+                        AdvanceDate();
+                    }
+                }
+            }
+
+            UpdateCalendar(time);
+           
+        }
+
+		public static void AdvanceDate() {
+			BsonDocument calendar = GetCalendarData();
+
+			BsonArray monthArray = calendar["Months"].AsBsonArray;
+			BsonDocument months = monthArray[calendar["CurrentMonth"].AsInt32].AsBsonDocument;
+
+			int day = calendar["CurrentDayInMonth"].AsInt32;
+			int month = calendar["CurrentMonth"].AsInt32;
+			int year = calendar["CurrentYear"].AsInt32;
+			int weekDay = calendar["CurrentDayInWeek"].AsInt32;
+
+			//advance a day
+			day++;
+
+			if (day > months["Days"].AsInt32) {//we exceeded the days in the month, move on to the next month
+				if (month++ > monthArray.Values.Count()-1) {
+					year++;
+					month = 0;
+					day = 1;
+				}
+				else {
+					month++;
+					day = 1;
+				}
+			}
+				
+			//weekdays advance regardless of the month or year change
+			weekDay++;
+
+			if (weekDay > calendar["Days"].AsBsonArray.Values.Count()-1) {
+				weekDay = 0;
+			}
+
+			calendar["CurrentDayInMonth"] = day; 
+			calendar["CurrentMonth"] = month;
+			calendar["CurrentYear"] = year;
+			calendar["CurrentDayInWeek"] = weekDay;
+
+			UpdateCalendar(calendar);
+		}
+
+		public static BsonDocument UpdateTimeOfDay(BsonDocument time) {
+			int dayTicks = time["Hour"].AsInt32;
+			string oldTime = time["TimeOfDay"].AsString;
+
+			if (Enum.IsDefined(typeof(DayNight), dayTicks) && oldTime != ((DayNight)dayTicks).ToString()) {
+				time["TimeOfDay"] = ((DayNight)dayTicks).ToString();
+
+                foreach (User.User u in MySockets.Server.GetCurrentUserList()) {
+                    if (Rooms.Room.IsOutdoors(u.Player.Location) == true && u.CurrentState == User.User.UserState.TALKING) {
+                        u.MessageHandler(time[((DayNight)dayTicks).ToString()].AsString != "" ? time[((DayNight)dayTicks).ToString()].AsString : "");
+                    }
+                }
+			}
+			return time;
+		}
+
+		private static void UpdateCalendar(BsonDocument calendar) {
+			GetCalendarCollection().Save(calendar, WriteConcern.Acknowledged);
+		}
+
+		private static BsonDocument GetCalendarData() {
+			MongoCollection calendarCollection = GetCalendarCollection();
+			IMongoQuery query = Query.EQ("_id", "Calendar");
+			BsonDocument result = calendarCollection.FindOneAs<BsonDocument>(query);
+			return result;
+		}
+
+		public static MongoCollection GetCalendarCollection() {
+			MongoUtils.MongoData.ConnectToDatabase();
+			MongoDatabase db = MongoData.GetDatabase("World");
+			MongoCollection result = db.GetCollection<BsonDocument>("Globals");
+			return result;
+		}
+
+
+		//this method needs to be broken down a bit more
+		//i'm going to comment the hell out of this because it's confusing even to me
+		public static void ApplyWeather(int lowerEnd, int upperEnd){ 
+				BsonDocument weather = GetCalendarCollection().FindOneAs<BsonDocument>(Query.EQ("_id","Weather"));
+			   
+			//if the time for the wheather to change has elapsed let's change it
+			   TimeSpan ts = DateTime.Now - DateTime.Parse(weather["StartTime"].AsString);
+				string type = "";
+				if (ts.Minutes >= weather["Duration"].AsInt32) {
+					
+					//we want to restart the timer so we don't have another pattern getting applied while the other one 
+					//is still going through the auto script process
+					weather["StartTime"] = DateTime.Now.ToString();
+					weather["Duration"] = Extensions.RandomNumber.GetRandomNumber().NextNumber(0,5);
+					GetCalendarCollection().Save(weather);
+					
+					//choose a new type of weather pattern
+                    int rand = Extensions.RandomNumber.GetRandomNumber().NextNumber(0, weather["Types"].AsBsonArray.Count);
+					//we need enums for the previous and now new pattern
+					Weather weatherEnum = Weather.CLEAR;
+					Weather previousWeather = Weather.CLEAR;
+					//define the new pattern
+					weatherEnum = (Weather)rand;
+
+					//Did this to prevent a Null Ref Exception
+					type = weatherEnum.ToString().ToUpper();
+					
+					//get the wheather pattern we want to run through the auto script, we have to peel back a few layers first
+					BsonArray drizArray = weather["Types"].AsBsonArray;
+
+					//if the weather is clear 
+					if (weatherEnum == Weather.CLEAR) {
+						//and the previous weather was clear we are done
+						if (weather["CurrentType"].AsString.ToUpper() == "CLEAR") {
+							return;
+						}
+						//if it's not CLEAR grab the previous weather type so we can run the end sequence script
+						previousWeather = (Weather)Enum.Parse(typeof(Weather), weather["CurrentType"].AsString.ToUpper());
+						type = previousWeather.ToString(); //since it's clear we want all the previous information so we can run the end sequence properly
+					}
+
+					//keep peeling back layers now that we have the weather type
+					BsonDocument weatherType = new BsonDocument();
+					weatherType = drizArray.Where(d => d["Name"].AsString.ToUpper() == type).SingleOrDefault().AsBsonDocument;
+					BsonArray intensityArray = weatherType["Intensities"].AsBsonArray;
+
+					//lets see how strong the weather patter will be
+                    WeatherStrength strength = (WeatherStrength)Extensions.RandomNumber.GetRandomNumber().NextNumber(0, intensityArray.Values.Count(b => b.AsBsonDocument.ElementCount > 0));
+					int intensity = (int)strength;
+
+					BsonDocument pattern = null;
+					//not all patterns may have an intensity sequence like CLEAR for example so let's check
+					if (intensityArray.Values.Count(b => b.AsBsonDocument.ElementCount > 0) > 0) {
+						pattern = intensityArray[intensity][strength.ToString().CamelCaseWord()].AsBsonDocument;
+					}
+					//this tuple will contain the increase/decrease sequence (just make Item1 a list and modify the script Func<> a little bit)
+					Tuple<string, int> tupe = null;
+					//if the previous pattern is not CLEAR and the previous pattern is the same as the previous
+					//then we are going to see if the intensity maybe changed
+					if (weather["CurrentType"].AsString != "CLEAR" && weather["CurrentType"].AsString == weatherEnum.ToString()) {
+						BsonDocument oldPattern = intensityArray[weather["CurrentIntensity"].AsInt32][((WeatherStrength)weather["CurrentIntensity"].AsInt32).ToString().CamelCaseWord()].AsBsonDocument;
+						//intensity increased
+						if (intensity > weather["CurrentIntensity"].AsInt32) {
+							tupe = Tuple.Create<string, int>(oldPattern["Increase"].AsString, 30);
+						}
+						//intensity decreased
+						else if (intensity < weather["CurrentIntensity"].AsInt32) {
+							tupe = Tuple.Create<string, int>(oldPattern["Decrease"].AsString, 30);
+						}
+					}
+					//the previous pattern is now clearing because the new pattern is clear
+					else if (weatherEnum.ToString() == "CLEAR") {
+						//let's get the end sequence
+						BsonDocument oldPattern = intensityArray[weather["CurrentIntensity"].AsInt32][((WeatherStrength)weather["CurrentIntensity"].AsInt32).ToString().CamelCaseWord()].AsBsonDocument;
+						BsonArray endSequence = oldPattern["EndSequence"].AsBsonArray;
+						Func<BsonArray, Tuple<string, int>, string, bool> endScript = GetScript(lowerEnd, upperEnd);
+						//execute the script
+						while (endScript(endSequence, tupe, weatherEnum.ToString().ToUpper())) { tupe = null; }
+					}
+					//it's other than CLEAR and it's not the same intensity
+					if (weatherEnum != Weather.CLEAR && weather["CurrentIntensity"].AsInt32 != intensity) {
+						BsonArray startSequence = pattern["StartSequence"].AsBsonArray;
+						Func<BsonArray, Tuple<string, int>, string, bool> script = GetScript(lowerEnd, upperEnd);
+						while (script(startSequence, tupe, weatherEnum.ToString().ToUpper())) { tupe = null; }
+					}
+
+					//let's update the DB
+					weather["CurrentMessage"] = (pattern != null ? pattern["Message"].AsString : "");
+					weather["CurrentType"] = weatherEnum.ToString().ToUpper();
+					weather["CurrentIntensity"] = intensity;
+					GetCalendarCollection().Save(weather);
+				}
+		}
+
+		//Neat way of making a pseudo auto script for automatic wheather messages
+		private static Func<BsonArray, Tuple<string, int>, string, bool> GetScript(int lowerEnd, int upperEnd) {
+			int step = 0;
+			
+			Func<BsonArray, Tuple<string, int>, string, bool> result = delegate(BsonArray sequence, Tuple<string,int> tuple, string type){
+
+				//the sequence has ended nothing left to do here
+				if (step >= sequence.Count) {
+					for (int low = lowerEnd; low <= upperEnd; low++) {
+						Rooms.Room.Updateweather(low, type);
+					}
+					return false;
+				}
+
+
+				for (int low = lowerEnd; low <= upperEnd; low++) {
+					if (Rooms.Room.IsOutdoors(low)) {
+						BsonDocument room = Rooms.Room.GetRoom(low);
+						
+						//ok if the tuple is not null then we are going to process it first. As of now it is just one single message with a wait time
+						//this can be modified to include more step easily by making item1 a list and using steps to keep track
+						if (tuple != null){
+							Rooms.Room.InformPlayersInRoom(tuple.Item1, low, new List<string>(new string[] { }));
+							System.Threading.Thread.Sleep(tuple.Item2 * 1000);
+							return true; //we still want the other sequence to execute we will set the tuple to null in the body of the while loop
+						}
+						//run the main sequence script
+						Rooms.Room.InformPlayersInRoom(sequence[step]["Step"].AsString, low, new List<string>(new string[] { }));
+					}
+				}
+
+				System.Threading.Thread.Sleep(sequence[step]["Wait"].AsInt32 * 1000);
+				step++;
+				return true;
+			};
+
+			return result;
+		}
+
+	}
+
+
+	//not sure if keeping these enums here quite yet, may be a pain to maintain later when more wheather types are added.
+	//might just have it all on the DB
+	internal enum Weather { 
+			CLEAR, 
+			RAIN,
+			SNOW, 
+			FOG 
+		}
+
+	internal enum WeatherStrength {
+		LOW,
+		MEDIUM
+		//STRONG,
+		//INSANE
+	}
+
+		//this gives us 13 hours of daylight and 11 of night time.
+	   //the numbers are based on a 24 hour clock
+	internal enum DayNight {
+			DAWN = 7,
+			MORNING = 9,
+			AFTERNOON = 12,
+			EVENING = 17,
+			DUSK = 19,
+			NIGHT = 20
+		}
+}

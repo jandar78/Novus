@@ -1,0 +1,490 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using MongoDB.Bson;
+using MongoDB.Driver;
+using MongoDB.Driver.Builders;
+using Extensions;
+using CharacterEnums;
+
+namespace Character {
+    public class NPC : Character {
+        private Dictionary<string, double> damageTracker;
+
+        public int MobTypeID {
+            get;
+            set;
+        }
+
+        public AI.FSM fsm {
+            get;
+            set;
+
+        }
+
+         public DateTime NextAiAction {
+            get;
+            set;
+        }
+
+        public void Update() {
+            fsm.Update(this);
+        }
+
+        private bool IsMob { 
+            get; 
+            set; 
+        }
+
+
+        public NPC(CharacterRace race, CharacterClass characterClass, Genders gender, Languages language, SkinColors skinColor, SkinType skinType, HairColors hairColor, EyeColors eyeColor, BodyBuild build) {
+            fsm = AI.FSM.GetInstance();
+            //fsm.Actor = this;
+            fsm.state = fsm.GetStateFromName("Wander");
+
+            _class = characterClass;
+			_race = race;
+			_gender = gender;
+            _skinColor = skinColor;
+            _skinType = skinType;
+            _hairColor = hairColor;
+            _eyeColor = eyeColor;
+            _build = build;
+
+			_koCount = new Tuple<int, DateTime>(0, DateTime.Now);
+			_actionState = CharacterActionState.NONE;
+			_stanceState = CharacterStanceState.STANDING;
+            
+            _primaryLanguage = language;
+            KnownLanguages = new HashSet<Languages>();
+            KnownLanguages.Add(_primaryLanguage);
+
+            damageTracker = new Dictionary<string, double>();
+
+			FirstName = "";
+			LastName = "";
+			Description = "";
+			Age = 17;   //Do we want an age? And are we going to advance it every in game year?  Players could be 400+ years old rather quick.
+			Weight = 180; //pounds or kilos?
+			Height = 70;  //inches or centimeters?
+			Location = 1000;
+			InCombat = false;
+			LastCombatTime = DateTime.MinValue.ToUniversalTime();
+            IsNPC = true;
+
+			Attributes = new Dictionary<string, Attribute>();
+
+			Attributes.Add("Hitpoints", new Attribute(200, "Hitpoints", 200, 0.2, 1));
+			Attributes.Add("Dexterity", new Attribute(10, "Dexterity", 10, 0, 1));
+			Attributes.Add("Strength", new Attribute(10, "Strength", 10, 0, 1));
+			Attributes.Add("Intelligence", new Attribute(10, "Intelligence", 10, 0, 1));
+			Attributes.Add("Endurance", new Attribute(10, "Endurance", 10, 0, 1));
+			Attributes.Add("Charisma", new Attribute(10, "Charisma", 10, 0, 1));
+
+			SubAttributes = new Dictionary<string, double>();
+
+			SubAttributes.Add("Agility", 10);
+			SubAttributes.Add("Toughness", 10);
+			SubAttributes.Add("Cunning", 10);
+			SubAttributes.Add("Wisdom", 10);
+			SubAttributes.Add("Leadership", 10);
+        }
+
+
+        public override void Save() {
+            MongoUtils.MongoData.ConnectToDatabase();
+            MongoDatabase characterDB = MongoUtils.MongoData.GetDatabase("Characters");
+            if (this.ID == null) {
+                this.ID = new MongoDB.Bson.ObjectId().ToString();
+            }; //new character
+            MongoCollection characterCollection = characterDB.GetCollection<BsonDocument>("NPCCharacters");
+            IMongoQuery search = Query.EQ("_id", ObjectId.Parse(this.ID));
+            BsonDocument npcCharacter = characterCollection.FindOneAs<BsonDocument>(search);
+
+            if (npcCharacter == null) {
+                //this is the NPC's first save, create everything from scratch
+                npcCharacter = new BsonDocument();
+                npcCharacter.Add("FirstName", this.FirstName);
+				npcCharacter.Add("LastName", this.LastName);
+				npcCharacter.Add("Race", this.Race.CamelCaseWord());
+				npcCharacter.Add("Class", this.Class.CamelCaseWord());
+				npcCharacter.Add("Gender", this.Gender.CamelCaseWord());
+                npcCharacter.Add("SkinColor", this.SkinColor.CamelCaseWord());
+                npcCharacter.Add("SkinType", this.SkinType.CamelCaseWord());
+                npcCharacter.Add("HairColor", this.HairColor.CamelCaseWord());
+                npcCharacter.Add("EyeColor", this.EyeColor.CamelCaseWord());
+                npcCharacter.Add("Weight", this.Weight);
+                npcCharacter.Add("Height", this.Height);
+                npcCharacter.Add("ActionState", this.ActionState.ToString().CamelCaseWord());
+				npcCharacter.Add("StanceState", this.StanceState.ToString().CamelCaseWord());
+				npcCharacter.Add("Description", this.Description);
+				npcCharacter.Add("Location", this.Location);
+                npcCharacter.Add("AiState", fsm.state.ToString());
+                npcCharacter.Add("previousAiState", fsm.previousState != null ? fsm.previousState.ToString() : "");
+                npcCharacter.Add("AiGlobalState", fsm.globalState != null ? fsm.globalState.ToString() : "");
+                npcCharacter.Add("NextAiAction", this.NextAiAction.ToUniversalTime());
+                npcCharacter.Add("IsNPC", this.IsNPC);
+                npcCharacter.Add("MobTypeID", this.MobTypeID);
+                npcCharacter.Add("CurrentTarget", this.CurrentTarget != null ? this.CurrentTarget.ToString() : "");
+                npcCharacter.Add("LastTarget", this.LastTarget != null ? this.LastTarget.ToString() : "");
+                npcCharacter.Add("InCombat", this.InCombat);
+                npcCharacter.Add("LastCombatTime", this.LastCombatTime);
+                npcCharacter.Add("Experience", this.Experience);
+                       
+				BsonArray attributeList = new BsonArray();
+
+                foreach (Attribute a in this.Attributes.Values) {
+                    BsonDocument attributes = new BsonDocument();
+                    attributes.Add("Name", "");
+                    attributes.Add("Value", "");
+                    attributes.Add("Max", "");
+                    attributes.Add("RegenRate", "");
+
+                    attributes["Name"] = a.Name;
+                    attributes["Value"] = (BsonValue)a.Value;
+                    attributes["Max"] = (BsonValue)a.Max;
+                    attributes["RegenRate"] = (BsonValue)a.RegenRate;
+
+                    attributeList.Add(attributes);
+                }
+                npcCharacter.Add("Attributes", attributeList);
+
+                BsonArray xpTracker = new BsonArray();
+
+                foreach (KeyValuePair<string, double> tracker in damageTracker) {
+                    BsonDocument track = new BsonDocument();
+                    track.Add("ID", "");
+                    track.Add("Value", 0.0);
+
+                    track["ID"] = tracker.Key;
+                    track["Value"] = tracker.Value;
+
+                    xpTracker.Add(track);
+                }
+
+                npcCharacter.Add("XpTracker", xpTracker);
+            }
+            else {
+                npcCharacter["FirstName"] = this.FirstName;
+                npcCharacter["LastName"] = this.LastName;
+                npcCharacter["Race"] = this.Race;
+                npcCharacter["Class"] = this.Class;
+                npcCharacter["Gender"] = this.Gender.CamelCaseWord();
+                npcCharacter["SkinColor"] = this.SkinColor.CamelCaseWord();
+                npcCharacter["SkinType"] = this.SkinType.CamelCaseWord();
+                npcCharacter["HairColor"] = this.HairColor.CamelCaseWord();
+                npcCharacter["EyeColor"] = this.EyeColor.CamelCaseWord();
+                npcCharacter["Weight"] = this.Weight;
+                npcCharacter["Height"] = this.Height;
+                npcCharacter["Description"] = this.Description;
+                npcCharacter["Location"] = this.Location;
+                npcCharacter["ActionState"] = this.ActionState.ToString().CamelCaseWord();
+                npcCharacter["StanceState"] = this.StanceState.ToString().CamelCaseWord();
+                npcCharacter["AiState"] = fsm.state.ToString();
+                npcCharacter["previousAiState"] = fsm.previousState == null ? "" : fsm.previousState.ToString();
+                npcCharacter["AiGlobalState"] = fsm.globalState == null ? "" : fsm.globalState.ToString();
+                npcCharacter["NextAiAction"] = this.NextAiAction.ToUniversalTime();
+                npcCharacter["MobTypeID"] = this.MobTypeID;
+                npcCharacter["IsNPC"] = this.IsNPC;
+                npcCharacter["CurrentTarget"] = this.CurrentTarget == null ? "" : this.CurrentTarget;
+                npcCharacter["LastTarget"] = this.LastTarget == null ? "" : this.LastTarget;
+                npcCharacter["InCombat"] = this.InCombat;
+                npcCharacter["LastCombatTime"] = this.LastCombatTime;
+                npcCharacter["Experience"] = this.Experience;
+
+                BsonArray playerAttributes = new BsonArray();
+                BsonArray xpTracker = new BsonArray();
+
+                foreach (KeyValuePair<string, Attribute> attribute in Attributes) {
+                    BsonDocument attrib = new BsonDocument();
+                    attrib.Add("Name", "");
+                    attrib.Add("Value", "");
+                    attrib.Add("Max", "");
+                    attrib.Add("RegenRate", "");
+
+
+                    attrib["Name"] = attribute.Key;
+                    attrib["Value"] = attribute.Value.Value;
+                    attrib["Max"] = attribute.Value.Max;
+                    attrib["RegenRate"] = attribute.Value.RegenRate;
+
+                    playerAttributes.Add(attrib);
+                }
+
+                npcCharacter["Attributes"] = playerAttributes;
+
+                foreach (KeyValuePair<string, double> tracker in damageTracker) {
+                    BsonDocument track = new BsonDocument();
+                    track.Add("ID","");
+                    track.Add("Value", 0.0);
+
+                    track["ID"] = tracker.Key;
+                    track["Value"] = tracker.Value;
+
+                    xpTracker.Add(track);
+                }
+
+                npcCharacter["XpTracker"] = xpTracker;
+            }
+
+            characterCollection.Save(npcCharacter);
+
+            if (this.ID == "000000000000000000000000") {
+                this.ID = npcCharacter["_id"].AsObjectId.ToString();
+            }
+
+        }
+
+        public override void Load(string id) {
+            MongoUtils.MongoData.ConnectToDatabase();
+            MongoDatabase characterDB = MongoUtils.MongoData.GetDatabase("Characters");
+            MongoCollection characterCollection = characterDB.GetCollection<BsonDocument>("NPCCharacters");
+            IMongoQuery query = Query.EQ("_id", ObjectId.Parse(id));
+            BsonDocument found = characterCollection.FindOneAs<BsonDocument>(query);
+
+            ID = found["_id"].AsObjectId.ToString();
+            FirstName = found["FirstName"].AsString.CamelCaseWord();
+            LastName = found["LastName"].AsString.CamelCaseWord();
+            _class = (CharacterClass)Enum.Parse(typeof(CharacterClass), found["Class"].AsString.ToUpper());
+            _race = (CharacterRace)Enum.Parse(typeof(CharacterRace), found["Race"].AsString.ToUpper());
+            _gender = (Genders)Enum.Parse(typeof(Genders), found["Gender"].AsString.ToUpper());
+            _skinType = (SkinType)Enum.Parse(typeof(SkinType), found["SkinType"].AsString.ToUpper());
+            _skinColor = (SkinColors)Enum.Parse(typeof(SkinColors), found["SkinColor"].AsString.ToUpper());
+            _skinType = (SkinType)Enum.Parse(typeof(SkinType), found["SkinType"].AsString.ToUpper());
+            _hairColor = (HairColors)Enum.Parse(typeof(HairColors), found["HairColor"].AsString.ToUpper());
+            _eyeColor = (EyeColors)Enum.Parse(typeof(EyeColors), found["EyeColor"].AsString.ToUpper());
+            _stanceState = (CharacterStanceState)Enum.Parse(typeof(CharacterStanceState), found["StanceState"].AsString.ToUpper());
+            _actionState = (CharacterActionState)Enum.Parse(typeof(CharacterActionState), found["ActionState"].AsString.ToUpper());
+            Description = found["Description"].AsString;
+            Location = found["Location"].AsInt32;
+            Height = found["Height"].AsDouble;
+            Weight = found["Weight"].AsDouble;
+            IsNPC = found["IsNPC"].AsBoolean;
+            MobTypeID = found["MobTypeID"].AsInt32;
+            NextAiAction = found["NextAiAction"].ToUniversalTime();
+            InCombat = found["InCombat"].AsBoolean;
+            LastCombatTime = found["LastCombatTime"].ToUniversalTime();
+            CurrentTarget = found["CurrentTarget"].AsString != "" ? found["CurrentTarget"].AsString : null;
+            LastTarget = found["LastTarget"].AsString != "" ? found["LastTarget"].AsString : null;
+            fsm.state = fsm.GetStateFromName(found["AiState"].AsString);
+            fsm.previousState =  fsm.GetStateFromName(found["previousAiState"].AsString);
+            fsm.globalState = fsm.GetStateFromName(found["AiGlobalState"].AsString);
+            Experience = found["Experience"].AsDouble;
+
+            //if you just use var instead of casting it like this you will be in a world of pain and suffering when dealing with subdocuments.
+            BsonArray playerAttributes = found["Attributes"].AsBsonArray;
+            BsonArray xpTracker = found["XpTracker"].AsBsonArray;
+
+            if (playerAttributes != null) {
+                foreach (BsonDocument attrib in playerAttributes) {
+
+                    if (!this.Attributes.ContainsKey(attrib["Name"].ToString())) {
+                        Attribute tempAttrib = new Attribute();
+                        tempAttrib.Name = attrib["Name"].ToString();
+                        tempAttrib.Value = attrib["Value"].AsDouble;
+                        tempAttrib.Max = attrib["Max"].AsDouble;
+                        tempAttrib.RegenRate = attrib["RegenRate"].AsDouble;
+                        
+
+                        this.Attributes.Add(tempAttrib.Name, tempAttrib);
+                    }
+                    else {
+                        this.Attributes[attrib["Name"].ToString()].Max = attrib["Max"].AsDouble;
+                        this.Attributes[attrib["Name"].ToString()].Value = attrib["Value"].AsDouble;
+                        this.Attributes[attrib["Name"].ToString()].RegenRate = attrib["RegenRate"].AsDouble;
+                    }
+                }
+            }
+
+            if (xpTracker != null) {
+                foreach (BsonDocument track in xpTracker) {
+                    //we just newed this up so it should always have to be refilled
+                    damageTracker.Add(track["ID"].AsString, track["Value"].AsDouble);
+                }
+            }
+
+        }
+
+        public void CalculateXP() {
+            if (this.IsDead()) {
+                foreach (KeyValuePair<string, double> pair in damageTracker) {
+                    User.User player = MySockets.Server.GetAUser(pair.Key);
+                    if (player != null) {
+                        double rewardPercentage = ((pair.Value *-1) / GetAttributeMax("Hitpoints"));
+                        if (rewardPercentage > 1.0) rewardPercentage = 1.0;
+                        long xp = (long)(Experience * rewardPercentage);
+                        player.Player.RewardXP(ID, xp);
+                    }
+                }
+            }
+        }
+
+        public void IncreaseXPReward(string id, double damage) {
+            //we only want to deal with base hitpoints, knocking unconcious doesn't add to the XP reward
+            if (IsUnconcious()){
+                damage = 0;
+            }
+            
+            if (damageTracker.ContainsKey(id)) {
+                damageTracker[id] = damageTracker[id] + (damage * -1);
+            }
+            else {
+                damageTracker.Add(id, damage);
+            }
+        }
+
+        public void ParseMessage(string message) {
+            //this method will look for keywords within the message and convert them into
+            //enum messages for the AI to handle
+        }
+    }
+
+    
+
+    public class NPCUtils {
+        private static NPCUtils Instance;
+        private static List<string> _npcList;
+
+        private NPCUtils() {
+            ProcessingAI = false;
+            _npcList = new List<string>();
+        }
+
+        public static NPCUtils GetInstance() {
+            return Instance ?? (Instance = new NPCUtils());
+        }
+
+        public bool ProcessingAI {
+            get;
+            set;
+        }
+
+        public void LoadNPCs(){
+            GetNPCList();
+        }
+
+        public void ProcessAiForNpcs() {
+            if (!ProcessingAI){
+                ProcessingAI = true;
+                LoadNPCs();
+                //loop through each NPC and call the Update() method
+                foreach(string id in _npcList){
+                    NPC npc = (NPC)CharacterFactory.Factory.CreateCharacter(CharacterType.NPC);
+                    npc.Load(id);
+                    if (DateTime.Now.ToUniversalTime() > npc.NextAiAction) {
+                        npc.Update();
+                        //in case the Rot Ai state cleaned this guy out of the DB.
+                        if (GetAnNPCByID(id) != null) {
+                            npc.Save();
+                        }
+                    }
+                }
+                ProcessingAI = false;
+            }
+        }
+
+        //this creates a new type of NPC as long as it hasn't hit the max world amount permissible
+        public static NPC CreateNPC(int MobTypeID, string state = null){
+            MongoUtils.MongoData.ConnectToDatabase();
+            MongoDatabase character = MongoUtils.MongoData.GetDatabase("World");
+            MongoCollection npcCollection = character.GetCollection("NPCs");
+            IMongoQuery query = Query.EQ("_id", MobTypeID);
+            BsonDocument doc = npcCollection.FindOneAs<BsonDocument>(query);
+
+            NPC npc = null;
+
+            if (doc["Current"].AsInt32 < doc["Max"].AsInt32) {
+                npc = CharacterFactory.Factory.CreateNPCCharacter(MobTypeID);
+                if (state != null) {//give it a starting state, so it can be something other than Wander
+                    npc.fsm.state = npc.fsm.GetStateFromName(state.CamelCaseWord());
+                }
+                doc["Current"] = doc["Current"].AsInt32 + 1;
+                npcCollection.Save(doc);
+            }
+            
+            return npc;
+        }
+
+        private void GetNPCList() {
+            MongoUtils.MongoData.ConnectToDatabase();
+            MongoDatabase character = MongoUtils.MongoData.GetDatabase("Characters");
+            MongoCollection npcCollection = character.GetCollection("NPCCharacters");
+            
+            if (_npcList.Count != 0) {
+                _npcList.Clear();
+            }
+
+            foreach (BsonDocument id in npcCollection.FindAllAs<BsonDocument>() ) {
+                _npcList.Add(id["_id"].AsObjectId.ToString());
+            }
+        }
+
+        public static List<NPC> GetAnNPCByName(string name, int location = 0) {
+            List<NPC> npcList = null;
+            MongoUtils.MongoData.ConnectToDatabase();
+            MongoDatabase character = MongoUtils.MongoData.GetDatabase("Characters");
+            MongoCollection npcCollection = character.GetCollection("NPCCharacters");
+            IMongoQuery query;
+            if (location == 0) {
+                query = Query.EQ("FirstName", name.CamelCaseWord());
+            }
+            else {
+                query = Query.And(Query.EQ("FirstName", name.CamelCaseWord()), Query.EQ("Location", location)); 
+            }
+
+            var results = npcCollection.FindAs<BsonDocument>(query);
+
+            if (results != null) {
+                npcList = new List<NPC>();
+                foreach (BsonDocument found in results) {
+                    NPC npc = (NPC)CharacterFactory.Factory.CreateCharacter(CharacterType.NPC);
+                    npc.Load(found["_id"].AsObjectId.ToString());
+                    npcList.Add(npc);
+                }
+            }
+
+            return npcList;
+
+        }
+
+        public static NPC GetAnNPCByID(string id) {
+            if (string.IsNullOrEmpty(id)) {
+                return null;
+            }
+
+            MongoUtils.MongoData.ConnectToDatabase();
+            MongoDatabase character = MongoUtils.MongoData.GetDatabase("Characters");
+            MongoCollection npcCollection = character.GetCollection("NPCCharacters");
+            IMongoQuery query = Query.EQ("_id", ObjectId.Parse(id));
+
+            BsonDocument results = npcCollection.FindOneAs<BsonDocument>(query);
+            NPC npc = null;
+
+            if (results != null) {
+                npc = (NPC)CharacterFactory.Factory.CreateCharacter(CharacterType.NPC);
+                npc.Load(results["_id"].AsObjectId.ToString());
+            }
+
+            return npc;
+        }
+
+        public static void AlertOtherMobs(int location, int mobType, string id) {
+            MongoUtils.MongoData.ConnectToDatabase();
+            MongoDatabase db = MongoUtils.MongoData.GetDatabase("Characters");
+            MongoCollection collection = db.GetCollection("NPCCharacters");
+
+            IMongoQuery query = Query.And(Query.EQ("Location", location), Query.EQ("MobtypeID", mobType));
+
+            var results = collection.FindAs<BsonDocument>(query);
+            
+            foreach (BsonDocument npc in results) {
+                npc["CurrentTarget"] = id;
+                npc["AiState"] = AI.Combat.GetState().ToString();
+                npc["NextAiAction"] = DateTime.Now.ToUniversalTime();
+                collection.Save(npc);
+            }
+        }
+    }
+}

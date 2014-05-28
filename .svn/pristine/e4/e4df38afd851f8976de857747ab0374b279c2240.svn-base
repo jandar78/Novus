@@ -1,0 +1,84 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace AI {
+    public interface IState {
+         void Execute(Character.NPC actor);
+         void Enter(Character.NPC actor);
+         void Exit(Character.NPC actor);
+         string ToString();
+    }
+
+    public class Wander : IState {
+        private static Wander _wander;
+        private Wander() { }
+
+        public static Wander GetState() {
+            return _wander ?? (_wander = new Wander());
+        }
+
+        public void Execute(Character.NPC actor) {
+            if (!actor.IsDead() && !actor.InCombat) {
+                List<Rooms.Exits> availableExits = new List<Rooms.Exits>();
+                availableExits = Rooms.Room.GetRoomExits(actor.Location);
+                if (DateTime.Now.ToUniversalTime() > actor.NextAiAction) {//so it's time for this AI state to execute
+                   Commands.CommandParser.ExecuteCommand(actor, availableExits[new Random().Next(0, availableExits.Count)].Direction);
+                    actor.NextAiAction = DateTime.Now.AddSeconds(new Random().Next(60, 121)).ToUniversalTime(); //set when we want this action to execute next
+                    if (!FSM.ContinueWithThisState()) {
+                        actor.fsm.ChangeState(Speak.GetState());
+                        actor.Save();
+                    }
+                }
+            }
+        }
+
+        public void Enter(Character.NPC actor) {
+            actor.NextAiAction = DateTime.Now.AddSeconds(new Random().Next(60, 121)).ToUniversalTime();
+        }
+
+        public void Exit(Character.NPC actor) {
+        }
+
+        public override string ToString() {
+            return "Wander";
+        }
+
+    }
+
+    public class Speak : IState {
+        private static Speak _speak;
+        private Speak() { }
+
+        public static Speak GetState() {
+            return _speak ?? (_speak = new Speak());
+        }
+
+        public void Execute(Character.NPC actor) {
+            if (!actor.IsDead() && !actor.InCombat) {
+                if (DateTime.Now.ToUniversalTime() > actor.NextAiAction) {
+                    Commands.CommandParser.ExecuteCommand(actor, "EMOTE", "moans loudly");
+                    actor.NextAiAction = DateTime.Now.AddSeconds(new Random().Next(15, 60)).ToUniversalTime();
+                    if (!FSM.ContinueWithThisState()) {
+                        actor.fsm.ChangeState(Wander.GetState());
+                    }
+                }
+            }
+        }
+
+        public void Enter(Character.NPC actor) {
+            actor.NextAiAction = DateTime.Now.AddSeconds(new Random().Next(15, 60)).ToUniversalTime();
+        }
+
+        public void Exit(Character.NPC actor) {
+        }
+
+        public override string ToString() {
+            return "Speak";
+        }
+    }
+}
+
+

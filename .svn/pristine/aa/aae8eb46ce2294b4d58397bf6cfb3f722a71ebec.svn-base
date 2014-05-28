@@ -1,0 +1,163 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using Rooms;
+using User;
+using MongoDB.Driver;
+using MongoDB.Bson;
+using MongoDB.Driver.Builders;
+using Extensions;
+
+namespace Commands {
+	public  partial class CommandParser {
+
+
+        private static void Examine(User.User player, List<string> commands) {
+            string message = "";
+            bool foundIt = false;
+            if (commands.Count > 2) {
+                //Todo:
+                //the player is trying to examine an item, the order will be room,exit, door, items, player, NPCs
+                //rooms should have a list of items that belong to the room (non removable) but whihc can be interacted with by the player.  For example a loose brick, oven, fridge, closet, etc.
+                //in turn these objects can items that can be removed from the room I.E. food, clothing, weapons, etc.  This is not implemented yet.
+
+                //exits will never, ever, ever be null but just in case you can be teleported to somewhere where there are no exits....
+
+                //Ok let's really think this over, do exits really need an examine? I mean they just lead somewhere.  A door on the other hand could have an inscription on it that if read can open the door.
+
+
+                Door door = FindDoor(player.Player.Location, commands);
+                if (door != null) {
+                    message = door.Examine;
+                    foundIt = true;
+                }
+
+
+                //items
+                if (!foundIt) {
+                    //find me an item
+                    foundIt = true;
+                }
+
+                if (!foundIt) {
+                    List<string> chars = Room.GetPlayersInRoom(player.Player.Location);
+                    foreach (string id in chars) {
+                        Character.Character playerChar = MySockets.Server.GetAUser(id).Player as Character.Character;
+                        string tempName = playerChar.FirstName + " " + playerChar.LastName;
+                        if (commands[2].ToLower().Contains(playerChar.FirstName.ToLower()) || commands[2].ToLower().Contains(playerChar.LastName.ToLower())) {
+                            message = playerChar.Examine();
+                            foundIt = true;
+                            break;
+                        }
+                    }
+                }
+            }
+            else {
+                message = "Examine what?";
+            }
+
+            player.OutBuffer = message;
+        }
+
+		private static void Look(User.User player, List<string> commands) {
+			Dictionary<string, string> roomdescription = Rooms.Room.GetRoomTitleAndDescription(player.Player.Location);
+			List<Exits> exitList = Room.GetRoomExits(player.Player.Location);
+
+			StringBuilder sb = new StringBuilder();
+			sb.AppendLine(("- " + roomdescription["Title"] + " -").FontStyle(Utils.FontStyles.BOLD));
+			sb.AppendLine(roomdescription["Description"].ToString());
+			//int index = 1;
+			if (exitList.Count > 0) {
+
+			}
+			string[] vowel = new string[] { "a", "e", "i", "o", "u" };
+			foreach (Exits exit in exitList) {
+				Dictionary<string, string> title = Room.GetRoomTitleAndDescription(exit.availableExits[exit.Direction.CamelCaseWord()]);
+				if (string.IsNullOrEmpty(exit.Description)) {
+					exit.Description = title["Title"].ToLower();
+				}
+
+                if (exit.Description.Contains("that leads to")) {
+                    exit.Description += title["Title"].ToLower();
+                }
+
+				string directionCorrected = "To the " + exit.Direction.CamelCaseWord().FontColor(Utils.FontForeColor.CYAN) + " there is ";
+
+				if (String.Compare(exit.Direction, "up", true) == 0 || String.Compare(exit.Direction, "down", true) == 0) {
+					directionCorrected = exit.Description.UppercaseFirstWordInString();
+
+					directionCorrected += " leads " + exit.Direction.CamelCaseWord().FontColor(Utils.FontForeColor.CYAN) + " towards ";
+
+					exit.Description = title["Title"].ToLower();
+				}
+
+				if (!exit.Description.Contains("somewhere") && vowel.Contains(exit.Description[0].ToString())) {
+					directionCorrected += "an ";
+				}
+				else if (!exit.Description.Contains("somewhere") && exit.Description != "something") {
+					directionCorrected += "a ";
+				}
+				sb.AppendLine(directionCorrected + exit.Description + ".");
+			}
+			if (roomdescription.ContainsKey("Weather")) sb.AppendLine(roomdescription["Weather"]);
+
+			sb.Append(HintCheck(player));
+			sb.Append(DisplayPlayersInRoom(player.Player.Location, player.UserID));
+
+			//Todo: display items in room
+            if (!(player.Player is Character.NPC)) {
+                player.OutBuffer = sb.ToString();
+            }
+		}
+
+		private static void DisplayDate(User.User player, List<string> commands) {
+			//full, short or whatever combination we feel like allowing the player to grab
+			Dictionary<string, string> dateInfo = Calendar.Calendar.GetDate();
+			string message = "";
+			if (commands.Count < 3) { commands.Add("FULL"); } //let's add in the "full" for date full
+			string inth = "";
+			if (dateInfo["DayInMonth"] == "1") inth = "st";
+			else if (dateInfo["DayInMonth"] == "2") inth = "nd";
+			else if (dateInfo["DayInMonth"] == "3") inth = "rd";
+			else inth = "th";
+			switch (commands[2].ToUpper()) {
+				case "SHORT":
+					message = String.Format("\r{0}, {1}{2} of {3}, {4}.\n", dateInfo["DayInWeek"], dateInfo["DayInMonth"], inth, dateInfo["Month"], dateInfo["Year"]);
+					break;
+				case "FULL":
+				default:
+					message = String.Format("\r{0}, on the {1}{2} day of the month of {3}, {4} the year of the {5}.\n", dateInfo["DayInWeek"], dateInfo["DayInMonth"], inth, dateInfo["Month"], dateInfo["Year"], dateInfo["YearOf"]);
+					break;
+			}
+
+			player.OutBuffer = message;
+		}
+
+		private static void DisplayTime(User.User player, List<string> commands) {
+			//full, short or whatever combination we feel like allowing the player to grab
+			BsonDocument time = Calendar.Calendar.GetTime();
+			string message = "";
+			if (commands.Count < 3) { commands.Add("SHORT"); } //let's add in the "full" for time full
+
+			string amPm = time["Hour"].AsInt32 > 12 ? "PM" : "AM";
+
+			if (!player.HourFormat24) {
+				int hour = time["Hour"].AsInt32 > 12 ? time["Hour"].AsInt32 - 12 : time["Hour"].AsInt32;
+			}
+
+			switch (commands[2].ToUpper()) {
+				case "SHORT":
+					message = String.Format("\rCurrent Time: {0:D2}:{1:D2}:{2:D2} {3}.\n", time["Hour"].AsInt32, time["Minute"].AsInt32, time["Second"].AsInt32, amPm);
+					break;
+				case "FULL":
+				default:
+					message = String.Format("\rCurrent Time: {0}, {1:D2}:{2:D2}:{3:D2} {4}.\n", time["TimeOfDay"].AsString.CamelCaseWord(), time["Hour"].AsInt32, time["Minute"].AsInt32, time["Second"].AsInt32, amPm);
+					break;
+			}
+
+			player.OutBuffer = message;
+		}
+	}
+}

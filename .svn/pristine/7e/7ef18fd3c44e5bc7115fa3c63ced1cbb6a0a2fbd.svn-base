@@ -1,0 +1,532 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using CharacterEnums;
+using CharacterFactory;
+using Extensions;
+using MongoDB.Bson;
+using MongoDB.Driver;
+using MongoDB.Driver.Builders;
+
+namespace Character {
+    //TODO: Convert this to an interface rather than an abstract class, same with Character and Actor
+    public abstract class Actor {
+        #region Protected Stuff
+        protected Dictionary<string, Attribute> Attributes;
+        protected Equipment Inventory;
+        //sub attributes don't get saved to the database we'll just calculate these on the fly
+        //based on base stats, equipment, buffs, etc. every character will have these
+        protected Dictionary<string, double> SubAttributes;
+        protected HashSet<CharacterEnums.Languages> KnownLanguages; //this will hold all the languages the player can understand
+        protected double _levelModifier;
+
+        #region Stances
+        protected CharacterStanceState _stanceState;
+        protected CharacterActionState _actionState;
+        #endregion Stances
+
+        #region Misc
+        protected int _level;
+        protected CharacterClass _class;
+        protected Languages _primaryLanguage;
+        protected Tuple<int, DateTime> _koCount; //this will only ever be zero on initialize until first knockout
+        protected int _points;
+        #endregion Misc
+
+        #region Bodily descriptions
+        protected CharacterRace _race;
+        protected Genders _gender;
+        protected EyeColors _eyeColor;
+        protected HairColors _hairColor;
+        protected SkinColors _skinColor;
+        protected SkinType _skinType;
+        protected BodyBuild _build;
+        
+        #endregion Bodily descriptions
+
+        #endregion Protected Stuff
+
+        #region Properties
+
+        #region Miscellaneous
+        public string ID {
+            get;
+            set;
+        }
+
+        public int Location {
+            get;
+            set;
+        }
+
+        public int LastLocation {
+            get;
+            set;
+        }
+
+        public virtual bool IsNPC {
+            get;
+            set;
+        }
+
+        public int PointsToSpend {
+            get {
+                return _points;
+            }
+            set {
+                _points += value;
+            }
+        }
+        #endregion Miscellaneous
+
+        #region Critical
+        //every actor has the potential to do a critical hit
+        //public bool IsCritical {
+        //    get; //logic for determining if hit is crit goes here
+        //    private set;
+        //}
+
+        //public double CriticalChance {
+        //    get;
+        //}
+
+        //public double CriticalAmount {
+        //    get; //do calculation logic here
+        //}
+        #endregion Critical
+
+        #region Descriptive Features
+        public string Gender {
+            get {
+                return _gender.ToString().CamelCaseWord();
+            }
+        }
+
+        public string MainHand { get; set; }
+
+        public string GenderPossesive {
+            get {
+               if (Gender == "Male"){
+                   return "He";
+               }
+               else if (Gender == "Female"){
+                   return "She";
+               }
+               else return "It";
+            }
+        }
+
+        public string Build {
+            get {
+                return _build.ToString().CamelCaseWord();
+            }
+        }
+
+        public int Age {
+            get;
+            set;
+        }
+
+        public double Weight {
+            get;
+            set;
+        }
+
+        public double Height {
+            get;
+            set;
+        }
+
+        public string FirstName {
+            get;
+            set;
+        }
+
+        public string LastName {
+            get;
+            set;
+        }
+
+        public string Class {
+            get {
+                return _class.ToString().CamelCaseWord();
+            }
+        }
+
+        public string Race {
+            get {
+                return _race.ToString().CamelCaseWord();
+            }
+        }
+
+        public string Description {
+            get;
+            set;
+        }
+
+        public string EyeColor {
+            get {
+                return _eyeColor.ToString().CamelCaseWord();
+            }
+        }
+
+        public string SkinColor {
+            get {
+                return _skinColor.ToString().CamelCaseWord();
+            }
+        }
+
+        public string SkinType {
+            get {
+                return _skinType.ToString().CamelCaseWord();
+            }
+        }
+
+        public string HairColor {
+            get {
+                return _hairColor.ToString().CamelCaseWord();
+            }
+        }
+
+        public string Action {
+            get {
+                return ActionState.ToString().Replace("_", " ").ToLower();
+            }
+        }
+
+        public string Stance {
+            get {
+                return StanceState.ToString().Replace("_", " ").ToLower();
+            }
+        }
+        #endregion Descriptive Features   
+
+        #region Combat Properties
+        public int Level {
+            get;
+            set;
+        }
+
+        public double LevelModifier {
+            get { 
+                return _levelModifier;
+            }
+            protected set {
+                MongoUtils.MongoData.ConnectToDatabase();
+                MongoDatabase db = MongoUtils.MongoData.GetDatabase("Character");
+                MongoCollection charCollection = db.GetCollection("General");
+                BsonDocument result = charCollection.FindOneAs<BsonDocument>(Query.EQ("_id", "LevelModifier"));
+                if (result != null) {
+                    _levelModifier = result[Level.ToString()].AsDouble;
+                }
+            }
+        }
+
+        public bool CheckUnconscious {
+            get {
+                bool result = false;
+                double health = Attributes["Hitpoints"].Value;
+
+                if (health > DeathLimit && health <= 0) {
+                    result = true;
+                    //guy's knocked out let's increment the KO counter
+                    if ((_koCount.Item1 > 0 && _koCount.Item1 < 3) && (_koCount.Item2 - DateTime.Now).Minutes < 10) {
+                        _koCount = new Tuple<int, DateTime>(_koCount.Item1 + 1, _koCount.Item2);
+                    }
+                    //ok he got knocked out 3 times in less than 10 minutes he's dead now
+                    else if (_koCount.Item1 == 3 && (_koCount.Item2 - DateTime.Now).Minutes < 10) {
+                        Attributes["Hitpoints"].ApplyNegative(100);
+                    }
+                    //well at this point we'll reset his knockout counter and reset the timer since he hasn't been knocked out in at least 10 minutes
+                    else {
+                        _koCount = new Tuple<int, DateTime>(1, DateTime.Now); //it's not zero because he's knocked out!!
+                    }
+                }
+                //if no longer unconcious, remove the state
+                else if (health > 0) {
+                    if (ActionState == CharacterActionState.UNCONCIOUS) {
+                        SetActionState(CharacterActionState.NONE);
+                        SetStanceState(CharacterStanceState.PRONE);
+                    }
+                }
+
+                return result;
+            }
+        }
+
+        public bool CheckDead {
+            get {
+                bool result = false;
+               
+                  if (GetAttributeValue("Hitpoints") <= DeathLimit) {
+                    result = true;
+                }
+
+                return result;
+            }
+        }
+
+        public double DeathLimit {
+            get {
+                //would probably be a good idea to grab the multiplier from the database
+                    double value = GetAttributeMax("Hitpoints");
+                    return (-1 * (0.015 * value ));
+                
+                return -15;
+            }
+        }
+
+        public string CurrentTarget {
+            get;
+            set;
+        }
+
+        //this is for aggro memory purposes, we would like NPC's and mob to remember who last they attacked as well as for the player
+        //in case he switches between targets, but maybe instead we would like to keep a list of maybe a few most recent targets?
+        //we'll just keep the last target as of now
+        public string LastTarget {
+            get;
+            set;
+        }
+
+        public bool InCombat {
+            get;
+            set;
+        }
+
+        public DateTime LastCombatTime {
+            get;
+            set;
+        }
+        #endregion Combat Properties
+
+        #region Stances
+        public CharacterStanceState StanceState {
+            get {
+                return _stanceState;
+            }
+        }
+
+        public CharacterActionState ActionState {
+            get {
+                return _actionState;
+            }
+        }
+        #endregion Stances
+
+        #endregion Properties
+
+        #region Public Methods
+        public virtual void Save() { }
+        public virtual void Load(string id){ }
+
+        public virtual void SetActionState(CharacterActionState state) {
+            _actionState = state;
+        }
+
+        public virtual void SetStanceState(CharacterStanceState state) {
+            _stanceState = state;
+        }
+
+        public virtual void RewardXP(string id, long amount){}
+
+        public virtual void IncreasePoints(){
+            if (Level % 10 == 0) {
+                _points += 4;
+            }
+            else if (Level % 5 == 0) {
+                _points += 3;
+            }
+            else if (Level % 1 == 0) {
+                _points += 1;
+            }
+        }
+
+        #region Combat Methods
+        public bool IsUnconcious() {
+            bool result = false;
+            if (CheckUnconscious) {
+                SetActionState(CharacterEnums.CharacterActionState.UNCONCIOUS);
+                SetStanceState(CharacterStanceState.LAYING_UNCONCIOUS);
+                ClearTarget();
+                result = true;
+            }
+            else {
+                if (ActionState == CharacterActionState.UNCONCIOUS) {
+                    SetActionState(CharacterActionState.NONE);
+                }
+                if (StanceState == CharacterStanceState.LAYING_UNCONCIOUS) {
+                    SetStanceState(CharacterStanceState.PRONE);
+                }
+            }
+
+            return result;
+        }
+
+        public bool IsDead() {
+            bool result = false;
+            if (CheckDead) {
+                SetActionState(CharacterActionState.DEAD);
+                SetStanceState(CharacterStanceState.LAYING_DEAD);
+                ClearTarget();
+                result = true;
+            }
+
+            return result;
+        }
+
+        public void ClearTarget() {
+            InCombat = false;
+            LastTarget = CurrentTarget;
+            CurrentTarget = "";
+        }
+
+        public void UpdateTarget(string targetID) {
+            LastTarget = CurrentTarget ?? null;
+            CurrentTarget = targetID;
+        }
+
+        #endregion Combat Methods
+
+        #region Attribute Wrappers
+        public void ApplyRegen(string attribute) {
+            bool applied = this.Attributes[attribute].ApplyRegen();
+            //if we recovered health let's no longer be dead or unconcious
+            if (applied && String.Compare(attribute, "hitpoints", true) == 0) {
+                if (Attributes[attribute.CamelCaseWord()].Value > -10 && Attributes[attribute.CamelCaseWord()].Value <= 0) {
+                    this.SetActionState(CharacterActionState.UNCONCIOUS);
+                }
+                else if (Attributes[attribute].Value > 0) {
+                    this.SetActionState(CharacterActionState.UNCONCIOUS);
+                    this.SetStanceState(CharacterStanceState.PRONE);
+                }
+            }
+        }
+
+        public void ApplyEffectOnAttribute(string name, double value) {
+            if (this.Attributes.ContainsKey(name.CamelCaseWord())) {
+                this.Attributes[name.CamelCaseWord()].ApplyEffect(value);
+            }
+        }
+
+        public double GetAttributeMax(string attribute) {
+            if (this.Attributes.ContainsKey(attribute.CamelCaseWord())) {
+                return this.Attributes[attribute.CamelCaseWord()].Max;
+            }
+            return 0;
+        }
+
+        public double GetAttributeValue(string attribute) {
+            if (this.Attributes.ContainsKey(attribute.CamelCaseWord())) {
+                return this.Attributes[attribute.CamelCaseWord()].Value;
+            }
+            return 0;
+        }
+
+        public int GetAttributeRank(string attribute) {
+            if (this.Attributes.ContainsKey(attribute.CamelCaseWord())) {
+                return this.Attributes[attribute.CamelCaseWord()].Rank;
+            }
+            return 0;
+        }
+
+        public void SetAttributeValue(string name, double value) {
+            if (this.Attributes.ContainsKey(name.CamelCaseWord())) {
+                this.Attributes[name.CamelCaseWord()].Value = value;
+            }
+        }
+
+        public void SetMaxAttributeValue(string name, double value) {
+            if (this.Attributes.ContainsKey(name.CamelCaseWord())) {
+                this.Attributes[name.CamelCaseWord()].Max = value;
+            }
+        }
+
+        public void SeAttributeRegenRate(string name, double value) {
+            if (this.Attributes.ContainsKey(name.CamelCaseWord())) {
+                this.Attributes[name.CamelCaseWord()].RegenRate = value;
+            }
+        }
+
+        public Dictionary<string, Attribute> GetAttributes() {
+            return this.Attributes;
+        }
+        #endregion Attributes Wrappers
+
+        #region Language Stuff
+        public void AddLanguage(CharacterEnums.Languages language) {
+            if (KnowsLanguage(language)) {
+                KnownLanguages.Add(language);
+            }
+        }
+
+        public bool KnowsLanguage(CharacterEnums.Languages language) {
+            if (KnownLanguages.Contains(language)) return true;
+            return false;
+        }
+        #endregion Language Stuff
+
+        #region Inventory/Equipment Wrappers
+        public void AddItemToInventory(Items.Iitem item) {
+            Inventory.AddInventoryItem(item);
+            Save();
+        }
+
+        public void RemoveItemFromInventory(Items.Iitem item) {
+            Inventory.RemoveInventoryItem(item);
+            Save();
+        }
+
+        public void EquipItem(Items.Iitem item) {
+            Inventory.EquipItem(item);
+            Save();
+        }
+
+        public void UnequipItem(Items.Iitem item) {
+            string resultHand = null;
+            Inventory.UnequipItem(item, out resultHand, MainHand);
+            if (!string.IsNullOrEmpty(resultHand)) {
+                MainHand = resultHand;
+            }
+            Save();
+        }
+
+        public List<Items.Iitem> GetInventory() {
+            return Inventory.inventory.ToList();
+        }
+
+        public Dictionary<Items.Wearable, Items.Iitem> GetEquipment() {
+            return Inventory.equipped;
+        }
+
+        public void Wield(Items.Iitem item) {
+            Inventory.WieldItem(item);
+            Save();
+        }
+
+        public List<Items.Iitem> GetWieldedWeapons() {
+            List<Items.Iitem> result = new List<Items.Iitem>();
+            if (Inventory.equipped.ContainsKey(Items.Wearable.WIELD_RIGHT)) {
+                result.Add((Items.Iitem)Items.ItemFactory.CreateItem(Items.ItemType.WEAPON, Inventory.equipped[Items.Wearable.WIELD_RIGHT].Id));
+            }
+            if (Inventory.equipped.ContainsKey(Items.Wearable.WIELD_LEFT)) {
+                result.Add((Items.Iitem)Items.ItemFactory.CreateItem(Items.ItemType.WEAPON, Inventory.equipped[Items.Wearable.WIELD_LEFT].Id));
+            }
+
+            return result;
+        }
+        #endregion Inventory/Equipment Wrappers
+
+        #endregion Public Methods
+
+        public Items.Wearable GetMainHandWeapon() {
+            if (MainHand != null) {
+                return (Items.Wearable)Enum.Parse(typeof(Items.Wearable), MainHand);
+            }
+
+            return Items.Wearable.NONE;
+        }
+    }
+}

@@ -1,0 +1,395 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using Rooms;
+using User;
+using MongoDB.Driver;
+using MongoDB.Bson;
+using MongoDB.Driver.Builders;
+using MongoDB.Driver.Linq;
+using Extensions;
+
+namespace Commands {
+    public partial class CommandParser {
+
+        //called from the LOOK command
+        private static string DisplayPlayersInRoom(int roomId, string ignoreId) {
+            StringBuilder sb = new StringBuilder();
+            List<string> playersInRoom = Room.GetPlayersInRoom(roomId);
+            List<string> npcsInRoom = Room.GetNPCsInRoom(roomId);
+            bool spot = false;
+
+            if (!Room.IsDark(roomId)) {
+                foreach (string id in playersInRoom) {
+                    if (id != ignoreId) {
+                        User.User otherUser = MySockets.Server.GetAUser(id);
+                        if (otherUser != null && otherUser.CurrentState == User.User.UserState.TALKING) {
+                            if (string.IsNullOrEmpty(PassesHideCheck(otherUser, ignoreId, out spot))) {
+                                sb.AppendLine(otherUser.Player.FirstName + " is " + otherUser.Player.StanceState.ToString().ToLower() + " here.");
+                            }  
+                        }
+                    }
+                }
+                Dictionary<string, int> npcGroups = new Dictionary<string, int>();
+
+                foreach (string id in npcsInRoom) {
+                    //we don't need to create an npc object here since we can just poll the DB for the info
+                    MongoUtils.MongoData.ConnectToDatabase();
+                    MongoDatabase db = MongoUtils.MongoData.GetDatabase("Characters");
+                    MongoCollection npcs = db.GetCollection("NPCCharacters");
+                    IMongoQuery query = Query.EQ("_id", ObjectId.Parse(id));
+                    BsonDocument npc = npcs.FindOneAs<BsonDocument>(query);
+                    //let's create groups for easy display
+                    if (!npcGroups.ContainsKey(npc["FirstName"].AsString + "$" + npc["LastName"].AsString + "$" + npc["StanceState"])) {
+                        npcGroups.Add(npc["FirstName"].AsString + "$" + npc["LastName"].AsString + "$" + npc["StanceState"], 1);
+                    }
+                    else {
+                        npcGroups[npc["FirstName"].AsString + "$" + npc["LastName"].AsString + "$" + npc["StanceState"]] += 1;
+                    }
+                }
+
+                foreach (KeyValuePair<string, int> pair in npcGroups) {
+                    string[] temp = pair.Key.Split('$');
+                    sb.AppendLine(temp[0] + " is " + temp[2].Replace("_", " ").ToLower() + " here. " + (pair.Value > 1 ? ("[x" + pair.Value + "]") : ""));
+                    //sb.AppendLine(npc["FirstName"].AsString + " is " + npc["StanceState"].ToString().Replace("_", " ").ToLower() + " here.");
+                }
+            }
+            else {
+                int count = 0;
+                foreach (string id in playersInRoom) {
+                    if (id != ignoreId) {
+                        User.User otherUser = MySockets.Server.GetAUser(id);
+                        if (otherUser != null && otherUser.CurrentState == User.User.UserState.TALKING) {
+                            count++;
+                        }
+                    }
+                }
+                count += npcsInRoom.Count;
+
+                if (count == 1) {
+                    sb.AppendLine("Someone is here.");
+                }
+                else if (count > 1) {
+                    sb.AppendLine("Some persons are here.");
+                }
+            }
+
+            return sb.ToString();
+        }
+
+        private static string PassesHideCheck(User.User target, string playerID, out bool spotted) {
+            string message = null;
+            spotted = true;
+
+            if (target.Player.ActionState == CharacterEnums.CharacterActionState.HIDING || target.Player.ActionState == CharacterEnums.CharacterActionState.SNEAKING) {
+                User.User player = MySockets.Server.GetAUser(playerID);
+             
+                string msgOther = null;
+                
+
+                MongoUtils.MongoData.ConnectToDatabase();
+                MongoDatabase db = MongoUtils.MongoData.GetDatabase("Messages");
+                MongoCollection col = db.GetCollection("Skills");
+                var mastery = col.FindOneAs<BsonDocument>(Query.EQ("_id", "Spot"));
+
+                double hide = GetHide(target.Player.GetSubAttributes()["Agility"], target.Player.GetSubAttributes()["Cunning"], target.Player.GetAttributeRank("Dexterity"));
+                double spot = GetHide(player.Player.GetSubAttributes()["Agility"], player.Player.GetSubAttributes()["Cunning"], player.Player.GetAttributeRank("Dexterity"));
+
+                double result = hide - spot;
+
+                foreach (BsonDocument doc in mastery["Message"].AsBsonArray) {
+                    if (result >= doc["min"].AsInt32 && result < doc["max"].AsInt32) {
+                        message = string.Format(doc["msg"].AsString, target.Player.FirstName).FontColor(Utils.FontForeColor.YELLOW);
+                        spotted = doc["spotted"].AsBoolean;
+                        break;
+                    }
+                }
+
+                foreach (BsonDocument doc in mastery["MessageOthers"].AsBsonArray) {
+                    if (result >= doc["min"].AsInt32 && result < doc["max"].AsInt32) {
+                        msgOther = string.Format(doc["msg"].AsString, player.Player.FirstName).FontColor(Utils.FontForeColor.YELLOW);
+                        target.MessageHandler(string.Format(msgOther));
+                        break;
+                    }
+                }
+            }
+            if (spotted) return null;
+            else return "You fail to spot anyone hiding here.";
+        }
+
+        private static string PassSneakCheck(User.User target, string playerID, out bool spotted) {
+            User.User player = MySockets.Server.GetAUser(playerID);
+            string message = null;
+            string msgOther = null;
+            spotted = false;
+
+            MongoUtils.MongoData.ConnectToDatabase();
+            MongoDatabase db = MongoUtils.MongoData.GetDatabase("Messages");
+            MongoCollection col = db.GetCollection("Skills");
+            var mastery = col.FindOneAs<BsonDocument>(Query.EQ("_id", "SpotSneak"));
+
+            double hide = GetHide(target.Player.GetSubAttributes()["Agility"], target.Player.GetSubAttributes()["Cunning"], target.Player.GetAttributeRank("Dexterity"));
+            double spot = GetHide(player.Player.GetSubAttributes()["Agility"], player.Player.GetSubAttributes()["Cunning"], player.Player.GetAttributeRank("Dexterity"));
+
+            double result = hide - spot;
+
+            foreach (BsonDocument doc in mastery["Message"].AsBsonArray) {
+                if (result >= doc["min"].AsInt32 && result < doc["max"].AsInt32) {
+                    message = string.Format(doc["msg"].AsString, target.Player.FirstName).FontColor(Utils.FontForeColor.YELLOW);
+                    spotted = doc["spotted"].AsBoolean;
+                    break;
+                }
+            }
+
+            foreach (BsonDocument doc in mastery["MessageOthers"].AsBsonArray) {
+                if (result >= doc["min"].AsInt32 && result < doc["max"].AsInt32) {
+                    msgOther = string.Format(doc["msg"].AsString, player.Player.FirstName).FontColor(Utils.FontForeColor.YELLOW);
+                    target.MessageHandler(string.Format(msgOther));
+                    break;
+                }
+            }
+
+            return message;
+        }
+
+        //bonus points should already be applied toward these values from items
+        //this may need to take feats into consideration in the future
+        private static double GetHide(double agility, double cunning, int DexRank) {
+            double hiding = (agility + cunning) / 2;
+            return hiding + (hiding * (DexRank * 0.1));
+        }
+
+        private static string DisplayItemsInRoom(int roomId) {
+            StringBuilder sb = new StringBuilder();
+            List<string> itemsInRoom = Room.GetItemsInRoom(roomId);
+
+            Dictionary<string, int> itemGroups = new Dictionary<string, int>();
+
+            if (!Room.IsDark(roomId)) {
+                foreach (string id in itemsInRoom) {
+
+                    Items.Iitem item = Items.Items.GetByID(id);
+                    if (item != null) {
+                        Items.Icontainer containerItem = item as Items.Icontainer;
+                        Items.Ibeverage beverage = item as Items.Ibeverage;
+                        Items.Iedible edible = item as Items.Iedible;
+
+                        if (containerItem != null) {
+                            if (!itemGroups.ContainsKey(item.Name + "$" + (containerItem.IsOpenable == true ? (containerItem.Opened ? "[Opened]" : "[Closed]") : "[container]"))) {
+                                itemGroups.Add(item.Name + "$" + (containerItem.IsOpenable == true ? (containerItem.Opened ? "[Opened]" : "[Closed]") : "[container]"), 1);
+                            }
+                            else {
+                                itemGroups[item.Name + "$" + (containerItem.IsOpenable == true ? (containerItem.Opened ? "[Opened]" : "[Closed]") : "[container]")] += 1;
+                            }
+                        }
+                        else if (beverage != null) {
+                            if (!itemGroups.ContainsKey(item.Name)) {
+                                itemGroups.Add(item.Name, 1);
+                            }
+                            else {
+                                itemGroups[item.Name] += 1;
+                            }
+                        }
+                        else if (edible != null) {
+                            if (!itemGroups.ContainsKey(item.Name)) {
+                                itemGroups.Add(item.Name, 1);
+                            }
+                            else {
+                                itemGroups[item.Name] += 1;
+                            }
+                        }
+                        else {
+                            if (!itemGroups.ContainsKey(item.Name + "$" + item.CurrentCondition)) {
+                                itemGroups.Add(item.Name + "$" + item.CurrentCondition, 1);
+                            }
+                            else {
+                                itemGroups[item.Name + "$" + item.CurrentCondition] += 1;
+                            }
+                        }
+                    }
+                }
+                 
+                foreach (KeyValuePair<string, int> pair in itemGroups) {
+                    string[] temp = pair.Key.Split('$');
+                    sb.Append(temp[0] + " is laying here");
+                    if (temp.Count() > 1 && !string.Equals(temp[1], "NONE", StringComparison.InvariantCultureIgnoreCase)) {
+                        if (temp[1].Contains("[Opened]") || temp[1].Contains("[Closed]") || temp[1].Contains("[container]")) {
+                            sb.AppendLine(". " + (temp[1] == "[container]" ? "" : temp[1]) + (pair.Value > 1 ? (" [x" + pair.Value + "]") : ""));
+                        }
+                        else {
+                            sb.AppendLine(" in " + temp[1].Replace("_", " ").ToLower() + " condition." + (pair.Value > 1 ? ("[x" + pair.Value + "]") : ""));
+                        }
+                    }
+                    else {
+                        sb.AppendLine(".");
+                    }
+                }
+            }
+            else {
+                int count = 0;
+                foreach (string id in itemsInRoom) {
+                    Items.Iitem item = Items.Items.GetByID(id);
+                    if (item != null) {
+                        count++;
+                    }
+                }
+                
+                if (count == 1) {
+                    sb.AppendLine("Something is laying here.");
+                }
+                else if (count > 1) {
+                    sb.AppendLine("Somethings are laying here.");
+                }
+            }
+
+            return sb.ToString();
+        }
+        //called from the LOOK command
+        private static string HintCheck(User.User player) {
+            StringBuilder sb = new StringBuilder();
+            //let's display the room hints if the player passes the check
+            foreach (RoomModifier mod in Rooms.Room.GetModifiers(player.Player.Location)) {
+                foreach (Dictionary<string, string> dic in mod.Hints) {
+                    if (player.Player.GetAttributeValue(dic["Attribute"]) >= int.Parse(dic["ValueToPass"])) {
+                        sb.AppendLine(dic["Display"]);
+                    }
+                }
+            }
+            return sb.ToString();
+        }
+
+        //called from the MOVE command
+        private static void ApplyRoomModifier(User.User player) {
+            StringBuilder sb = new StringBuilder();
+            //Todo:  Build a dictionary with what the player is immune/has resistance to and for how much to then calculate the actual
+            //       damage/buff value that will be applied to the player
+            foreach (Dictionary<string, string> modifier in Rooms.Room.GetModifierEffects(player.Player.Location)) {
+                player.Player.ApplyEffectOnAttribute("Hitpoints", double.Parse(modifier["Value"]));
+
+                double positiveValue = double.Parse(modifier["Value"]);
+                if (positiveValue < 0) {
+                    positiveValue *= -1;
+                }
+
+                sb.Append(String.Format(modifier["DescriptionSelf"], positiveValue));
+                if (!player.Player.IsNPC) {
+                    player.MessageHandler("\r" + sb.ToString());
+                }
+                sb.Clear();
+                sb.Append(String.Format(modifier["DescriptionOthers"], player.Player.FirstName,
+                           player.Player.Gender.ToString() == "Male" ? "he" : "she", positiveValue));
+                Rooms.Room.InformPlayersInRoom("\r" + sb.ToString(), player.Player.Location, new List<string>(new string[] { player.UserID }));
+            }
+        }
+
+        private static string GetSneakMessage(User.User player, string direction) {
+            //The decision is that the skill level of the player is what will get displayed to the other players in the room
+            //there is no check for sneaking since well, the person had to go into hiding first.  Any action taken that has to be performed 
+            //from a sneaking state will perform a check though, ex: assasinate, steal, etc.
+            //If you want to perform a check against every player this is where you would loop through each other player in the room and
+            //compare stats.
+
+            string result = null;
+            string messageOthers = null;
+            string who = player.Player.FirstName;
+
+            MongoUtils.MongoData.ConnectToDatabase();
+            MongoDatabase db = MongoUtils.MongoData.GetDatabase("Messages");
+            MongoCollection skills = db.GetCollection("Skills");
+            var skillMastery = skills.FindOneAs<BsonDocument>(Query.EQ("_id", "Sneak"));
+
+            SkillLevel masteryLevel = SkillLevel.NONE;
+            double playerSkill = GetHide(player.Player.GetSubAttributes()["Agility"], player.Player.GetSubAttributes()["Cunning"], player.Player.GetAttributeRank("Dexterity"));
+            
+            //going prone lets you sneak around much better doesn't it? Less noise, less visibility...
+            if (player.Player.StanceState == CharacterEnums.CharacterStanceState.PRONE) {
+                playerSkill += 2;
+            }
+
+            foreach (BsonDocument doc in skillMastery["Message"].AsBsonArray) {
+                if (playerSkill >= doc["min"].AsInt32 && playerSkill < doc["max"].AsInt32) {
+                    result = doc["msg"].AsString;
+                    messageOthers = string.Format(doc["msgOthers"].AsString, Room.IsDark(player.Player.Location) ? "someone" : player.Player.FirstName, direction).FontColor(Utils.FontForeColor.YELLOW);
+                    masteryLevel = (SkillLevel)doc["mastery"].AsInt32;
+                    break;
+
+                }
+            }
+
+            if (masteryLevel == SkillLevel.NEWBIE) {
+                foreach (string id in Room.GetPlayersInRoom(player.Player.Location)) {
+                    if (id != player.UserID) {
+                        //1 in 2 chance to be detected
+                        if (Extensions.RandomNumber.GetRandomNumber().NextNumber(0, 2) == 1) {
+                            User.User temp = MySockets.Server.GetAUser(id);
+                            temp.MessageHandler(messageOthers);
+                            player.MessageHandler(string.Format(result, Room.IsDark(player.Player.Location) ? "someone" : temp.Player.FirstName).FontColor(Utils.FontForeColor.YELLOW));
+                        }
+                    }
+                }
+            }
+
+            if (masteryLevel == SkillLevel.APPRENTICE) {
+                foreach (string id in Room.GetPlayersInRoom(player.Player.Location)) {
+                    if (id != player.UserID) {
+                        //1 in 3 chance to be detected
+                        if (Extensions.RandomNumber.GetRandomNumber().NextNumber(0, 4) == 1) {
+                            User.User temp = MySockets.Server.GetAUser(id);
+                            temp.MessageHandler(messageOthers);
+                            player.MessageHandler(string.Format(result, Room.IsDark(player.Player.Location) ? "someone" : temp.Player.FirstName).FontColor(Utils.FontForeColor.YELLOW));
+                        }
+                    }
+                }
+            }
+
+            if (masteryLevel == SkillLevel.JOURNEYMAN) {
+                foreach (string id in Room.GetPlayersInRoom(player.Player.Location)) {
+                    if (id != player.UserID) {
+                        //1 in 5 chance to be detected
+                        if (Extensions.RandomNumber.GetRandomNumber().NextNumber(0, 6) == 1) {
+                            User.User temp = MySockets.Server.GetAUser(id);
+                            temp.MessageHandler(messageOthers);
+                            player.MessageHandler(string.Format(result, Room.IsDark(player.Player.Location) ? "someone" : temp.Player.FirstName).FontColor(Utils.FontForeColor.YELLOW));
+                        }
+                    }
+                }
+            }
+
+            //Masters never get detected
+
+            return null;
+        }
+
+        //could be an item or an npc, we'll figure it out
+        private static string GetObjectInPosition(int position, string name, int location) {
+            string result = "";
+
+            string[] parsedName = name.Split('.');
+            //TODO: do the same for items at some point
+
+            MongoUtils.MongoData.ConnectToDatabase();
+            MongoDatabase db = MongoUtils.MongoData.GetDatabase("Characters");
+            MongoCollection npcs = db.GetCollection("NPCCharacters");
+            List<string> npcIds = Room.GetNPCsInRoom(location);
+
+            int count = 1;
+
+            foreach (string ids in npcIds) {
+                IMongoQuery query = Query.EQ("_id", ObjectId.Parse(ids));
+                BsonDocument npc = npcs.FindOneAs<BsonDocument>(query);
+                if (string.Equals(npc["FirstName"].AsString, parsedName[0], StringComparison.InvariantCultureIgnoreCase) && count == position) {
+                    result = ids;
+                    break;
+                }
+                else {
+                    count++;
+                    continue;
+                }
+            }
+
+            return result;
+        }
+    }
+}

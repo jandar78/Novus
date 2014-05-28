@@ -1,0 +1,475 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using CharacterEnums;
+using CharacterFactory;
+using MongoDB;
+using MongoDB.Driver;
+using MongoDB.Bson;
+using MongoDB.Driver.Builders;
+using Extensions;
+
+namespace Character {
+
+   //Todo:  Anything that needs to be added as a future feature should go here so it's easy for anyone to find when they're looking for something
+	//to work on.  If you're going to be working on it update this saying it's being worked on.
+
+	public class Character : Actor {
+
+        public Equipment equipment;
+        private int points = 0;
+
+		#region  Properties
+        public string Password {
+            get;
+            set;
+        }
+
+        public long Experience {
+            get;
+            set;
+        }
+
+        public long NextLevelExperience {
+            get;
+            set;
+        }
+
+        public bool Leveled {
+            get;
+            set;
+        }
+
+        public bool IsLevelUp {
+            get {
+                if (Leveled || Experience >= NextLevelExperience) {
+                    return true;
+                }
+                return false;
+            }
+        }
+
+		#endregion Properties
+
+		#region Constructors
+		public Character(): this(CharacterRace.HUMAN, CharacterClass.FIGHTER, Genders.MALE, Languages.COMMON, SkinColors.FAIR, CharacterEnums.SkinType.FLESH, HairColors.BLACK, EyeColors.BROWN, BodyBuild.ATHLETIC) {}
+        
+        /// <summary>
+        /// Deep copy constructor
+        /// </summary>
+        /// <param name="copy"></param>
+        public Character(Character copy) { //copy constructor
+            _class = copy._class;
+            _race = copy._race;
+            _gender = copy._gender;
+            _skinColor = copy._skinColor;
+            _skinType = copy._skinType;
+            _hairColor = copy._hairColor;
+            _eyeColor = copy._eyeColor;
+            _build = copy._build;
+            _koCount = new Tuple<int, DateTime>(0, DateTime.Now);
+            _actionState = CharacterActionState.NONE;
+            _stanceState = CharacterStanceState.STANDING;
+
+            _primaryLanguage = copy._primaryLanguage;
+            KnownLanguages = new HashSet<Languages>();
+            foreach (CharacterEnums.Languages lang in copy.KnownLanguages) {
+                KnownLanguages.Add(lang);
+            }
+
+            FirstName = copy.FirstName;
+            LastName = copy.LastName;
+            Description = copy.Description;
+            Age = copy.Age;   //Do we want an age? And are we going to advance it every in game year?  Players could be 400+ years old rather quick.
+            Weight = copy.Weight; //pounds or kilos?
+            Height = copy.Height;  //inches or centimeters?
+            Location = 1000;
+            InCombat = false;
+            LastCombatTime = DateTime.MinValue.ToUniversalTime();
+            IsNPC = false;
+            Leveled = false;
+            NextLevelExperience = 300;
+            Level = 1;
+            Experience = 0;
+            PointsToSpend = 0;
+            MainHand = "WIELD_RIGHT";
+
+
+            Attributes = new Dictionary<string, Attribute>();
+
+            foreach (KeyValuePair<string, Attribute> attrib in copy.Attributes){
+                Attributes.Add(attrib.Key, attrib.Value);
+            }
+            
+            SubAttributes = new Dictionary<string, double>();
+
+            foreach (KeyValuePair<string, double> subAttrib in copy.SubAttributes) {
+                SubAttributes.Add(subAttrib.Key, subAttrib.Value);
+            }
+
+            Inventory = new Equipment();
+
+
+            this.Save();
+        }
+
+		public Character(CharacterRace race, CharacterClass characterClass, Genders gender, Languages language, SkinColors skinColor, SkinType skinType, HairColors hairColor, EyeColors eyeColor, BodyBuild build) {
+			_class = characterClass;
+			_race = race;
+			_gender = gender;
+            _skinColor = skinColor;
+            _skinType = skinType;
+            _hairColor = hairColor;
+            _eyeColor = eyeColor;
+            _build = build;
+
+			_koCount = new Tuple<int, DateTime>(0, DateTime.Now);
+			_actionState = CharacterActionState.NONE;
+			_stanceState = CharacterStanceState.STANDING;
+            
+            _primaryLanguage = language;
+            KnownLanguages = new HashSet<Languages>();
+            KnownLanguages.Add(_primaryLanguage);
+
+			FirstName = "";
+			LastName = "";
+			Description = "";
+			Age = 17;   //Do we want an age? And are we going to advance it every in game year?  Players could be 400+ years old rather quick.
+			Weight = 180; //pounds or kilos?
+			Height = 70;  //inches or centimeters?
+			Location = 1000;
+			InCombat = false;
+			LastCombatTime = DateTime.MinValue.ToUniversalTime();
+            IsNPC = false;
+            Leveled = false;
+            MainHand = "WIELD_RIGHT";
+            NextLevelExperience = 300;
+            Level = 1;
+            Experience = 0;
+            PointsToSpend = 0;
+
+            Inventory = new Equipment();
+
+			Attributes = new Dictionary<string, Attribute>();
+
+			Attributes.Add("Hitpoints", new Attribute(150, "Hitpoints", 150, 0.1, 1));
+			Attributes.Add("Dexterity", new Attribute(10, "Dexterity", 10, 0, 1));
+			Attributes.Add("Strength", new Attribute(10, "Strength", 10, 0, 1));
+			Attributes.Add("Intelligence", new Attribute(10, "Intelligence", 10, 0, 1));
+			Attributes.Add("Endurance", new Attribute(10, "Endurance", 10, 0, 1));
+			Attributes.Add("Charisma", new Attribute(10, "Charisma", 10, 0, 1));
+
+			SubAttributes = new Dictionary<string, double>();
+
+			SubAttributes.Add("Agility", 10);
+			SubAttributes.Add("Toughness", 10);
+			SubAttributes.Add("Cunning", 10);
+			SubAttributes.Add("Wisdom", 10);
+			SubAttributes.Add("Leadership", 10);
+		}
+		#endregion Constructors
+
+		public override void Save() {
+			MongoUtils.MongoData.ConnectToDatabase();
+			MongoDatabase characterDB = MongoUtils.MongoData.GetDatabase("Characters");
+            if (this.ID == null) {
+                this.ID = new MongoDB.Bson.ObjectId().ToString();
+            }; //new character
+			MongoCollection characterCollection = characterDB.GetCollection<BsonDocument>("PlayerCharacter");
+			IMongoQuery search = Query.EQ("_id", ObjectId.Parse(this.ID));
+			BsonDocument playerCharacter = characterCollection.FindOneAs<BsonDocument>(search);
+
+			if (playerCharacter == null) {
+				//this is the players first save, create everything from scratch
+				playerCharacter = new BsonDocument {
+					//no _id let MongoDB assign it one so we don't have to deal with duplicate values logic
+					{"FirstName", this.FirstName.ToLower()},
+					{"LastName", this.LastName.ToLower()},
+					{"Race", this.Race.CamelCaseWord()},
+					{"Class", this.Class.CamelCaseWord()},
+					{"Gender", this.Gender.CamelCaseWord()},
+                    {"SkinColor", this.SkinColor.CamelCaseWord()},
+                    {"SkinType", this.SkinType.CamelCaseWord()},
+                    {"HairColor", this.HairColor.CamelCaseWord()},
+                    {"EyeColor", this.EyeColor.CamelCaseWord()},
+                    {"Weight", this.Weight},
+                    {"Height", this.Height},
+                    {"ActionState", this.ActionState.ToString().CamelCaseWord()},
+					{"StanceState", this.StanceState.ToString().CamelCaseWord()},
+					{"Description", this.Description},
+					{"Location", this.Location},
+                    {"Password", this.Password},
+                    {"IsNPC", this.IsNPC},
+                    {"Experience", this.Experience},
+                    {"NextLevelExperience", this.NextLevelExperience},
+                    {"PointsToSpend", this.PointsToSpend},
+                    {"Level", this.Level},
+                    {"Leveled", this.Leveled},
+                    {"MainHand", this.MainHand}
+
+				};
+
+				BsonDocument attributes = new BsonDocument{
+					{"Name",""},
+					{"Value",""},
+					{"Max",""},
+					{"RegenRate",""},
+                    {"Rank",""}
+				};
+
+				BsonArray attributeList = new BsonArray();
+
+				foreach (Attribute a in this.Attributes.Values) {
+					attributes["Name"] = a.Name;
+					attributes["Value"] = (BsonValue)a.Value;
+					attributes["Max"] = (BsonValue)a.Max;
+					attributes["RegenRate"] = (BsonValue)a.RegenRate;
+                    attributes["Rank"] = (BsonValue)a.Rank;
+
+					attributeList.Add(attributes);
+				}
+
+				playerCharacter.Add("Attributes", attributeList);
+
+                BsonArray Inventory = new BsonArray();
+                playerCharacter.Add("Inventory", Inventory);
+
+                BsonArray Equipment = new BsonArray();
+                playerCharacter.Add("Equipment", Equipment);
+
+			}
+			else {
+				playerCharacter["FirstName"] = this.FirstName.ToLower();
+				playerCharacter["LastName"] = this.LastName.ToLower();
+				playerCharacter["Race"] = this.Race;
+				playerCharacter["Class"] = this.Class;
+                playerCharacter["Gender"] = this.Gender.CamelCaseWord();
+                playerCharacter["SkinColor"] = this.SkinColor.CamelCaseWord();
+                playerCharacter["SkinType"] = this.SkinType.CamelCaseWord();
+                playerCharacter["HairColor"] = this.HairColor.CamelCaseWord();
+                playerCharacter["EyeColor"] = this.EyeColor.CamelCaseWord();
+                playerCharacter["Weight"] = this.Weight;
+                playerCharacter["Height"] = this.Height;
+				playerCharacter["Description"] = this.Description;
+				playerCharacter["Location"] = this.Location;
+				playerCharacter["ActionState"] = this.ActionState.ToString().CamelCaseWord();
+				playerCharacter["StanceState"] = this.StanceState.ToString().CamelCaseWord();
+                playerCharacter["Password"] = this.Password;
+                playerCharacter["IsNPC"] = this.IsNPC;
+                playerCharacter["Experience"] = this.Experience;
+                playerCharacter["NextLevelExperience"] = this.NextLevelExperience;
+                playerCharacter["PointsToSpend"] = this.PointsToSpend;
+                playerCharacter["Level"] = this.Level;
+                playerCharacter["Leveled"] = this.Leveled;
+                playerCharacter["MainHand"] = this.MainHand;
+
+                BsonArray attributeList = new BsonArray();
+                BsonArray inventoryList = new BsonArray();
+                BsonArray equipmentList = new BsonArray();
+
+
+
+                foreach (Attribute attrib in Attributes.Values) {
+                    BsonDocument attributes = new BsonDocument{
+					    {"Name",""},
+					    {"Value",""},
+					    {"Max",""},
+					    {"RegenRate",""},
+                        {"Rank",""}
+				    };
+
+                    attributes["Name"] = attrib.Name;
+                    attributes["Value"] = attrib.Value;
+                    attributes["Max"] = attrib.Max;
+                    attributes["RegenRate"] = attrib.RegenRate;
+                    attributes["Rank"] = attrib.Rank;
+
+                    attributeList.Add(attributes);
+                }
+
+                playerCharacter["Attributes"] = attributeList;
+
+                BsonDocument items = new BsonDocument{
+					{"_id",""}
+				};
+
+                //Inventory and equipment
+                
+                foreach (Items.Iitem item in Inventory.inventory) {
+                    items["_id"] = item.Id;
+                    inventoryList.Add(items);
+                }
+
+                playerCharacter["Inventory"] = inventoryList;
+
+                foreach (KeyValuePair<Items.Wearable, Items.Iitem> item in Inventory.equipped) {
+                    items["_id"] = item.Value.Id;
+
+                    equipmentList.Add(items);
+                }
+
+                playerCharacter["Equipment"] = equipmentList;
+			}
+
+           
+
+			characterCollection.Save(playerCharacter);
+
+            if (this.ID == "000000000000000000000000") {
+                this.ID = playerCharacter["_id"].AsObjectId.ToString();
+            }
+            
+		}
+	
+		public override void Load(string id) {
+			MongoUtils.MongoData.ConnectToDatabase();
+			MongoDatabase characterDB = MongoUtils.MongoData.GetDatabase("Characters");
+			MongoCollection characterCollection = characterDB.GetCollection<BsonDocument>("PlayerCharacter");
+			IMongoQuery query = Query.EQ("_id", ObjectId.Parse(id));
+			BsonDocument found = characterCollection.FindOneAs<BsonDocument>(query);
+
+			ID = found["_id"].AsObjectId.ToString();
+			FirstName = found["FirstName"].AsString.CamelCaseWord();
+			LastName = found["LastName"].AsString.CamelCaseWord();
+			_class = (CharacterClass)Enum.Parse(typeof(CharacterClass), found["Class"].AsString.ToUpper());
+			_race = (CharacterRace)Enum.Parse(typeof(CharacterRace), found["Race"].AsString.ToUpper());
+            _gender = (Genders)Enum.Parse(typeof(Genders), found["Gender"].AsString.ToUpper());
+            _skinType = (SkinType)Enum.Parse(typeof(SkinType), found["SkinType"].AsString.ToUpper());
+            _skinColor = (SkinColors)Enum.Parse(typeof(SkinColors), found["SkinColor"].AsString.ToUpper());
+            _skinType = (SkinType)Enum.Parse(typeof(SkinType), found["SkinType"].AsString.ToUpper());
+            _hairColor = (HairColors)Enum.Parse(typeof(HairColors), found["HairColor"].AsString.ToUpper());
+            _eyeColor = (EyeColors)Enum.Parse(typeof(EyeColors), found["EyeColor"].AsString.ToUpper());
+            Height = found["Height"].AsDouble;
+            Weight = found["Weight"].AsDouble;
+			_stanceState = (CharacterStanceState)Enum.Parse(typeof(CharacterStanceState), found["StanceState"].AsString.ToUpper());
+			_actionState = (CharacterActionState)Enum.Parse(typeof(CharacterActionState), found["ActionState"].AsString.ToUpper());
+			Description = found["Description"].AsString;
+			Location = found["Location"].AsInt32;
+            Password = found["Password"].AsString;
+            IsNPC = found["IsNPC"].AsBoolean;
+            Experience = found["Experience"].AsInt64;
+            NextLevelExperience = found["NextLevelExperience"].AsInt64;
+            Level = found["Level"].AsInt32;
+            Leveled = found["Leveled"].AsBoolean;
+            PointsToSpend = found["PointsToSpend"].AsInt32;
+            MainHand = found["MainHand"].AsString != "" ? found["MainHand"].AsString : null;
+
+			BsonArray playerAttributes = found["Attributes"].AsBsonArray;
+            BsonArray inventoryList = found["Inventory"].AsBsonArray;
+            BsonArray equipmentList = found["Equipment"].AsBsonArray; 
+			
+			if (playerAttributes != null) {
+				foreach (BsonDocument attrib in playerAttributes) {
+				
+					if (!this.Attributes.ContainsKey(attrib["Name"].ToString())) {
+						Attribute tempAttrib = new Attribute();
+						tempAttrib.Name = attrib["Name"].ToString();
+						tempAttrib.Value = attrib["Value"].AsDouble;
+						tempAttrib.Max = attrib["Max"].AsDouble ;
+						tempAttrib.RegenRate = attrib["RegenRate"].AsDouble;
+                        tempAttrib.Rank = attrib["Rank"].AsInt32;
+
+						this.Attributes.Add(tempAttrib.Name, tempAttrib);
+					}
+					else {
+						this.Attributes[attrib["Name"].ToString()].Max = attrib["Max"].AsDouble;
+						this.Attributes[attrib["Name"].ToString()].Value = attrib["Value"].AsDouble;
+						this.Attributes[attrib["Name"].ToString()].RegenRate = attrib["RegenRate"].AsDouble;
+                        this.Attributes[attrib["Name"].ToString()].Rank = attrib["Rank"].AsInt32;
+					}
+				}
+			}
+
+            if (inventoryList.Count > 0) {
+                foreach (BsonDocument item in inventoryList) {
+                    Items.Iitem fullItem = Items.Items.GetByID(item["_id"].AsObjectId.ToString());
+                    if (!Inventory.inventory.Contains(fullItem)) {
+                        Inventory.AddInventoryItem(fullItem);
+                    }
+                }
+            }
+
+            if (equipmentList.Count > 0) {
+                foreach (BsonDocument item in equipmentList) {
+                    Items.Iitem fullItem = Items.Items.GetByID(item["_id"].AsObjectId.ToString());
+                    if (!Inventory.equipped.ContainsKey(fullItem.WornOn)) {
+                        Inventory.EquipItem(fullItem);
+                    }
+                }
+            }
+
+		}
+
+        public string Examine() {
+            StringBuilder sb = new StringBuilder();
+            int inches;
+            int.TryParse(Math.Round(Height / 12, 2).ToString().Substring(Math.Round(Height / 12, 2).ToString().Length - 2), out inches);
+
+            if ((Math.Round((double)inches / 100, 1) * 10) < 10) inches = (int)(Math.Round((double)inches / 100, 1) * 10);
+            
+            sb.Append(FirstName + " " + LastName + " is a " + Gender.ToLower() + " " + Race.ToLower() + " " + Class.ToLower() + ".  ");
+            sb.Append(GenderPossesive + " has " + HairColor + " colored hair, with " + EyeColor + " eyes."
+                    + GenderPossesive + " skin is " + SkinColor.ToLower() + " " + SkinType.ToLower());
+            sb.Append(" with a " + Build.ToLower() + " build, weighing " + Weight + " pounds and measuring " + Math.Round(Height / 12, 0) + " feet " + inches + " inches.");
+            
+            return sb.ToString();
+        }
+
+        public override void RewardXP(string id, long xpGained) {
+            MongoUtils.MongoData.ConnectToDatabase();
+            MongoDatabase db = MongoUtils.MongoData.GetDatabase("Characters");
+            MongoCollection npcs = db.GetCollection("NPCCharacters");
+            BsonDocument npc = npcs.FindOneAs<BsonDocument>(Query.EQ("_id", ObjectId.Parse(id)));
+            User.User temp = MySockets.Server.GetAUser(ID);
+            temp.OutBuffer = string.Format("You gain {0:0.##} XP from {1}", xpGained, npc["FirstName"].AsString.CamelCaseWord());
+            Experience += xpGained;
+            if (IsLevelUp && !Leveled){ //we don't want the player to just farm a ton of points and continue to level up, we want them to type the command before we show this message again
+                temp.OutBuffer = "Congratulations! You've leveled up!"; //let's let them know they can level up it's up to them when they actually do level up
+                Character tempChar = temp.Player as Character;
+                Leveled = true;
+                tempChar.NextLevelExperience += (long)(tempChar.NextLevelExperience * 1.25);
+                IncreasePoints();
+                //increase all the attributes to max, small perk of leveling up
+                foreach (KeyValuePair<string, Attribute> attrib in temp.Player.GetAttributes()) {
+                    attrib.Value.Value = attrib.Value.Max;
+                }
+            }
+        }
+
+       
+	}
+
+
+	public static class PlayerExtensionMethods {
+		//Todo: Get these values from database
+		const double HighHealth = 0.75;
+		const double LowHealth = 0.25;
+
+		public static string GetAttributeColorized(this Actor character, string name) {
+			
+			string result = "";
+			name = name.CamelCaseWord();
+
+			double value = character.GetAttributeValue(name);
+			double max = character.GetAttributeMax(name);
+
+			if (value >= max * HighHealth) result = value.ToString().FontColor(Utils.FontForeColor.GREEN);
+			else if (value < max * HighHealth && value >= max * LowHealth) result = value.ToString().FontColor(Utils.FontForeColor.YELLOW);
+			else if (value < max * LowHealth && value > 0) result = value.ToString().FontColor(Utils.FontForeColor.RED);
+			else result = value.ToString().FontColor(Utils.FontForeColor.RED).FontStyle(Utils.FontStyles.BOLD);
+
+			return result;
+		}
+	}
+
+	
+
+    
+
+	public class Feats {
+		public Feats() {
+		}
+	}
+}
