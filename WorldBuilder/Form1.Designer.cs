@@ -65,7 +65,7 @@
             this.label9 = new System.Windows.Forms.Label();
             this.decayRateValue = new System.Windows.Forms.TextBox();
             this.label8 = new System.Windows.Forms.Label();
-            this.button3 = new System.Windows.Forms.Button();
+            this.NewButton = new System.Windows.Forms.Button();
             this.maxConditionValue = new System.Windows.Forms.ComboBox();
             this.label6 = new System.Windows.Forms.Label();
             this.weightLimitValue = new System.Windows.Forms.TextBox();
@@ -153,6 +153,7 @@
             this.isDoorLocked = new System.Windows.Forms.CheckBox();
             this.isDoorBreakable = new System.Windows.Forms.CheckBox();
             this.tabPage4 = new System.Windows.Forms.TabPage();
+            this.byPassTestValue = new System.Windows.Forms.CheckBox();
             this.groupBox8 = new System.Windows.Forms.GroupBox();
             this.label31 = new System.Windows.Forms.Label();
             this.scriptDatabaseValues = new System.Windows.Forms.ListBox();
@@ -172,6 +173,14 @@
             this.toolTip1 = new System.Windows.Forms.ToolTip(this.components);
             this.statusStrip1 = new System.Windows.Forms.StatusStrip();
             this.databaseConnectionStatusValue = new System.Windows.Forms.ToolStripStatusLabel();
+            this.itemTypeGroup = new System.Windows.Forms.GroupBox();
+            this.typeEdibleValue = new System.Windows.Forms.CheckBox();
+            this.typeContainerValue = new System.Windows.Forms.CheckBox();
+            this.typeWeaponValue = new System.Windows.Forms.CheckBox();
+            this.typeClothingValue = new System.Windows.Forms.CheckBox();
+            this.typeIluminationValue = new System.Windows.Forms.CheckBox();
+            this.typeKeyValue = new System.Windows.Forms.CheckBox();
+            this.typeDrinkableValue = new System.Windows.Forms.CheckBox();
             this.tabControl1.SuspendLayout();
             this.tabPage1.SuspendLayout();
             this.groupBox7.SuspendLayout();
@@ -189,6 +198,7 @@
             this.tabPage4.SuspendLayout();
             this.groupBox8.SuspendLayout();
             this.statusStrip1.SuspendLayout();
+            this.itemTypeGroup.SuspendLayout();
             this.SuspendLayout();
             // 
             // tabControl1
@@ -207,12 +217,13 @@
             // 
             // tabPage1
             // 
+            this.tabPage1.Controls.Add(this.itemTypeGroup);
             this.tabPage1.Controls.Add(this.groupBox7);
             this.tabPage1.Controls.Add(this.groupBox6);
             this.tabPage1.Controls.Add(this.groupBox4);
             this.tabPage1.Controls.Add(this.groupBox2);
             this.tabPage1.Controls.Add(this.groupBox1);
-            this.tabPage1.Controls.Add(this.button3);
+            this.tabPage1.Controls.Add(this.NewButton);
             this.tabPage1.Controls.Add(this.maxConditionValue);
             this.tabPage1.Controls.Add(this.label6);
             this.tabPage1.Controls.Add(this.weightLimitValue);
@@ -256,17 +267,17 @@
             this.groupBox7.Controls.Add(this.removeFromContainer);
             this.groupBox7.Controls.Add(this.addToContainer);
             this.groupBox7.Controls.Add(this.itemContentsValue);
-            this.groupBox7.Location = new System.Drawing.Point(833, 19);
+            this.groupBox7.Location = new System.Drawing.Point(824, 19);
             this.groupBox7.Name = "groupBox7";
             this.groupBox7.RightToLeft = System.Windows.Forms.RightToLeft.No;
-            this.groupBox7.Size = new System.Drawing.Size(222, 171);
+            this.groupBox7.Size = new System.Drawing.Size(222, 221);
             this.groupBox7.TabIndex = 56;
             this.groupBox7.TabStop = false;
             this.groupBox7.Text = "Contents";
             // 
             // removeFromContainer
             // 
-            this.removeFromContainer.Location = new System.Drawing.Point(133, 137);
+            this.removeFromContainer.Location = new System.Drawing.Point(133, 174);
             this.removeFromContainer.Name = "removeFromContainer";
             this.removeFromContainer.Size = new System.Drawing.Size(75, 23);
             this.removeFromContainer.TabIndex = 57;
@@ -276,7 +287,7 @@
             // 
             // addToContainer
             // 
-            this.addToContainer.Location = new System.Drawing.Point(12, 137);
+            this.addToContainer.Location = new System.Drawing.Point(12, 174);
             this.addToContainer.Name = "addToContainer";
             this.addToContainer.Size = new System.Drawing.Size(75, 23);
             this.addToContainer.TabIndex = 56;
@@ -289,7 +300,7 @@
             this.itemContentsValue.FormattingEnabled = true;
             this.itemContentsValue.Location = new System.Drawing.Point(12, 20);
             this.itemContentsValue.Name = "itemContentsValue";
-            this.itemContentsValue.Size = new System.Drawing.Size(196, 95);
+            this.itemContentsValue.Size = new System.Drawing.Size(196, 147);
             this.itemContentsValue.TabIndex = 55;
             // 
             // groupBox6
@@ -300,7 +311,7 @@
             this.groupBox6.Controls.Add(this.label4);
             this.groupBox6.Controls.Add(this.filterTypeValue);
             this.groupBox6.Controls.Add(this.button1);
-            this.groupBox6.Location = new System.Drawing.Point(1061, 19);
+            this.groupBox6.Location = new System.Drawing.Point(1052, 19);
             this.groupBox6.Name = "groupBox6";
             this.groupBox6.RightToLeft = System.Windows.Forms.RightToLeft.No;
             this.groupBox6.Size = new System.Drawing.Size(254, 628);
@@ -390,7 +401,7 @@
             this.groupBox4.Controls.Add(this.removeTrigger);
             this.groupBox4.Controls.Add(this.addTrigger);
             this.groupBox4.Controls.Add(this.triggersValue);
-            this.groupBox4.Location = new System.Drawing.Point(545, 16);
+            this.groupBox4.Location = new System.Drawing.Point(536, 16);
             this.groupBox4.Name = "groupBox4";
             this.groupBox4.RightToLeft = System.Windows.Forms.RightToLeft.No;
             this.groupBox4.Size = new System.Drawing.Size(282, 224);
@@ -438,7 +449,7 @@
             this.groupBox2.Controls.Add(this.label15);
             this.groupBox2.Controls.Add(this.maxDefenseValue);
             this.groupBox2.Controls.Add(this.label14);
-            this.groupBox2.Location = new System.Drawing.Point(545, 252);
+            this.groupBox2.Location = new System.Drawing.Point(536, 252);
             this.groupBox2.Name = "groupBox2";
             this.groupBox2.RightToLeft = System.Windows.Forms.RightToLeft.No;
             this.groupBox2.Size = new System.Drawing.Size(244, 317);
@@ -678,15 +689,15 @@
             this.label8.TabIndex = 23;
             this.label8.Text = "Decay Rate";
             // 
-            // button3
+            // NewButton
             // 
-            this.button3.Location = new System.Drawing.Point(315, 600);
-            this.button3.Name = "button3";
-            this.button3.Size = new System.Drawing.Size(75, 23);
-            this.button3.TabIndex = 48;
-            this.button3.Text = "New";
-            this.button3.UseVisualStyleBackColor = true;
-            this.button3.Click += new System.EventHandler(this.button3_Click);
+            this.NewButton.Location = new System.Drawing.Point(432, 603);
+            this.NewButton.Name = "NewButton";
+            this.NewButton.Size = new System.Drawing.Size(75, 23);
+            this.NewButton.TabIndex = 48;
+            this.NewButton.Text = "New";
+            this.NewButton.UseVisualStyleBackColor = true;
+            this.NewButton.Click += new System.EventHandler(this.NewButton_Click);
             // 
             // maxConditionValue
             // 
@@ -1166,7 +1177,7 @@
             // 
             // button2
             // 
-            this.button2.Location = new System.Drawing.Point(499, 600);
+            this.button2.Location = new System.Drawing.Point(616, 603);
             this.button2.Name = "button2";
             this.button2.Size = new System.Drawing.Size(75, 23);
             this.button2.TabIndex = 5;
@@ -1176,7 +1187,7 @@
             // 
             // loadItem
             // 
-            this.loadItem.Location = new System.Drawing.Point(407, 600);
+            this.loadItem.Location = new System.Drawing.Point(524, 603);
             this.loadItem.Name = "loadItem";
             this.loadItem.Size = new System.Drawing.Size(75, 23);
             this.loadItem.TabIndex = 4;
@@ -1561,6 +1572,7 @@
             // 
             // tabPage4
             // 
+            this.tabPage4.Controls.Add(this.byPassTestValue);
             this.tabPage4.Controls.Add(this.groupBox8);
             this.tabPage4.Controls.Add(this.scriptValidatedValue);
             this.tabPage4.Controls.Add(this.scriptTypesValue);
@@ -1577,6 +1589,16 @@
             this.tabPage4.TabIndex = 3;
             this.tabPage4.Text = "Scripts";
             this.tabPage4.UseVisualStyleBackColor = true;
+            // 
+            // byPassTestValue
+            // 
+            this.byPassTestValue.AutoSize = true;
+            this.byPassTestValue.Location = new System.Drawing.Point(75, 303);
+            this.byPassTestValue.Name = "byPassTestValue";
+            this.byPassTestValue.Size = new System.Drawing.Size(84, 17);
+            this.byPassTestValue.TabIndex = 56;
+            this.byPassTestValue.Text = "Bypass Test";
+            this.byPassTestValue.UseVisualStyleBackColor = true;
             // 
             // groupBox8
             // 
@@ -1759,6 +1781,100 @@
             this.databaseConnectionStatusValue.Size = new System.Drawing.Size(103, 17);
             this.databaseConnectionStatusValue.Text = "Database OFFLINE";
             // 
+            // itemTypeGroup
+            // 
+            this.itemTypeGroup.Controls.Add(this.typeDrinkableValue);
+            this.itemTypeGroup.Controls.Add(this.typeKeyValue);
+            this.itemTypeGroup.Controls.Add(this.typeIluminationValue);
+            this.itemTypeGroup.Controls.Add(this.typeClothingValue);
+            this.itemTypeGroup.Controls.Add(this.typeWeaponValue);
+            this.itemTypeGroup.Controls.Add(this.typeContainerValue);
+            this.itemTypeGroup.Controls.Add(this.typeEdibleValue);
+            this.itemTypeGroup.Location = new System.Drawing.Point(786, 252);
+            this.itemTypeGroup.Name = "itemTypeGroup";
+            this.itemTypeGroup.RightToLeft = System.Windows.Forms.RightToLeft.No;
+            this.itemTypeGroup.Size = new System.Drawing.Size(125, 192);
+            this.itemTypeGroup.TabIndex = 59;
+            this.itemTypeGroup.TabStop = false;
+            this.itemTypeGroup.Text = "Item Type";
+            // 
+            // typeEdibleValue
+            // 
+            this.typeEdibleValue.AutoSize = true;
+            this.typeEdibleValue.Location = new System.Drawing.Point(50, 19);
+            this.typeEdibleValue.Name = "typeEdibleValue";
+            this.typeEdibleValue.RightToLeft = System.Windows.Forms.RightToLeft.Yes;
+            this.typeEdibleValue.Size = new System.Drawing.Size(55, 17);
+            this.typeEdibleValue.TabIndex = 13;
+            this.typeEdibleValue.Text = "Edible";
+            this.typeEdibleValue.UseVisualStyleBackColor = true;
+            // 
+            // typeContainerValue
+            // 
+            this.typeContainerValue.AutoSize = true;
+            this.typeContainerValue.Location = new System.Drawing.Point(34, 65);
+            this.typeContainerValue.Name = "typeContainerValue";
+            this.typeContainerValue.RightToLeft = System.Windows.Forms.RightToLeft.Yes;
+            this.typeContainerValue.Size = new System.Drawing.Size(71, 17);
+            this.typeContainerValue.TabIndex = 14;
+            this.typeContainerValue.Text = "Container";
+            this.typeContainerValue.UseVisualStyleBackColor = true;
+            // 
+            // typeWeaponValue
+            // 
+            this.typeWeaponValue.AutoSize = true;
+            this.typeWeaponValue.Location = new System.Drawing.Point(38, 88);
+            this.typeWeaponValue.Name = "typeWeaponValue";
+            this.typeWeaponValue.RightToLeft = System.Windows.Forms.RightToLeft.Yes;
+            this.typeWeaponValue.Size = new System.Drawing.Size(67, 17);
+            this.typeWeaponValue.TabIndex = 15;
+            this.typeWeaponValue.Text = "Weapon";
+            this.typeWeaponValue.UseVisualStyleBackColor = true;
+            // 
+            // typeClothingValue
+            // 
+            this.typeClothingValue.AutoSize = true;
+            this.typeClothingValue.Location = new System.Drawing.Point(41, 113);
+            this.typeClothingValue.Name = "typeClothingValue";
+            this.typeClothingValue.RightToLeft = System.Windows.Forms.RightToLeft.Yes;
+            this.typeClothingValue.Size = new System.Drawing.Size(64, 17);
+            this.typeClothingValue.TabIndex = 16;
+            this.typeClothingValue.Text = "Clothing";
+            this.typeClothingValue.UseVisualStyleBackColor = true;
+            // 
+            // typeIluminationValue
+            // 
+            this.typeIluminationValue.AutoSize = true;
+            this.typeIluminationValue.Location = new System.Drawing.Point(29, 136);
+            this.typeIluminationValue.Name = "typeIluminationValue";
+            this.typeIluminationValue.RightToLeft = System.Windows.Forms.RightToLeft.Yes;
+            this.typeIluminationValue.Size = new System.Drawing.Size(76, 17);
+            this.typeIluminationValue.TabIndex = 17;
+            this.typeIluminationValue.Text = "Ilumination";
+            this.typeIluminationValue.UseVisualStyleBackColor = true;
+            // 
+            // typeKeyValue
+            // 
+            this.typeKeyValue.AutoSize = true;
+            this.typeKeyValue.Location = new System.Drawing.Point(61, 159);
+            this.typeKeyValue.Name = "typeKeyValue";
+            this.typeKeyValue.RightToLeft = System.Windows.Forms.RightToLeft.Yes;
+            this.typeKeyValue.Size = new System.Drawing.Size(44, 17);
+            this.typeKeyValue.TabIndex = 18;
+            this.typeKeyValue.Text = "Key";
+            this.typeKeyValue.UseVisualStyleBackColor = true;
+            // 
+            // typeDrinkableValue
+            // 
+            this.typeDrinkableValue.AutoSize = true;
+            this.typeDrinkableValue.Location = new System.Drawing.Point(34, 42);
+            this.typeDrinkableValue.Name = "typeDrinkableValue";
+            this.typeDrinkableValue.RightToLeft = System.Windows.Forms.RightToLeft.Yes;
+            this.typeDrinkableValue.Size = new System.Drawing.Size(71, 17);
+            this.typeDrinkableValue.TabIndex = 19;
+            this.typeDrinkableValue.Text = "Drinkable";
+            this.typeDrinkableValue.UseVisualStyleBackColor = true;
+            // 
             // Form1
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
@@ -1799,6 +1915,8 @@
             this.groupBox8.PerformLayout();
             this.statusStrip1.ResumeLayout(false);
             this.statusStrip1.PerformLayout();
+            this.itemTypeGroup.ResumeLayout(false);
+            this.itemTypeGroup.PerformLayout();
             this.ResumeLayout(false);
             this.PerformLayout();
 
@@ -1864,7 +1982,7 @@
         private System.Windows.Forms.Label label4;
         private System.Windows.Forms.TextBox filterValue;
         private System.Windows.Forms.Button button1;
-        private System.Windows.Forms.Button button3;
+        private System.Windows.Forms.Button NewButton;
         private System.Windows.Forms.GroupBox groupBox1;
         private System.Windows.Forms.ComboBox lightTypeValue;
         private System.Windows.Forms.TextBox chargeValue;
@@ -1954,6 +2072,15 @@
         private System.Windows.Forms.Label label32;
         private System.Windows.Forms.ComboBox scriptFilterTypeValue;
         private System.Windows.Forms.Button scriptFilterRefresh;
+        private System.Windows.Forms.CheckBox byPassTestValue;
+        private System.Windows.Forms.GroupBox itemTypeGroup;
+        private System.Windows.Forms.CheckBox typeClothingValue;
+        private System.Windows.Forms.CheckBox typeWeaponValue;
+        private System.Windows.Forms.CheckBox typeContainerValue;
+        private System.Windows.Forms.CheckBox typeEdibleValue;
+        private System.Windows.Forms.CheckBox typeKeyValue;
+        private System.Windows.Forms.CheckBox typeIluminationValue;
+        private System.Windows.Forms.CheckBox typeDrinkableValue;
     }
 }
 

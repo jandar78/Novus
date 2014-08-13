@@ -35,9 +35,9 @@ namespace Items {
         public Wearable WornOn { get; set; }
         public int Location { get; set; }
         public bool IsMovable { get; set; }
-        public BsonArray Triggers { get; set;}
-
+        public BsonArray Triggers { get; set; }
         public string Owner { get; set; }
+
         public event EventHandler<ItemEventArgs> Deteriorated;
         public event EventHandler<ItemEventArgs> Improved;
         public event EventHandler<ItemEventArgs> ContainerOpened;
@@ -54,6 +54,9 @@ namespace Items {
         public event EventHandler<ItemEventArgs> Recharged;
         public event EventHandler<ItemEventArgs> Wielded;
 
+
+        private List<ITrigger> _itemTriggers;
+
         public List<ITrigger> ItemTriggers {
             get {
                 return _itemTriggers;
@@ -62,16 +65,17 @@ namespace Items {
                 _itemTriggers = value;
             }
         }
-        private List<ITrigger> _itemTriggers;
-        public List<ITrigger> SpeechTriggers {
-            get {
-                return _speechTriggers;
-            }
-            set {
-                _speechTriggers = value;
-            }
-        }
-        private List<ITrigger> _speechTriggers;
+        
+
+        //public List<ITrigger> SpeechTriggers {
+        //    get {
+        //        return _speechTriggers;
+        //    }
+        //    set {
+        //        _speechTriggers = value;
+        //    }
+        //}
+        //private List<ITrigger> _speechTriggers;
         #endregion Properties
 
         #region Public Static Methods
@@ -147,6 +151,37 @@ namespace Items {
         #endregion Public Static Methods
 
         #region Public Methods
+
+    
+
+        public void DeteriorateCondition() {
+            //TODO: condition should affect item stats as well
+            int newCondition = ((int)CurrentCondition) - 1;
+            if (newCondition >= 1) { //otherwise it can't deteriorate any more and it's broken anyways
+                CurrentCondition = (ItemCondition)newCondition;
+
+            }
+            Save();
+            OnDeteriorated(new ItemEventArgs(ItemEvent.DETERIORATE, this.Id));
+        }
+
+        public void ImproveCondition() {
+            //TODO: condition should affect item stats as well
+            int newCondition = ((int)CurrentCondition) + 1;
+            if (newCondition <= (int)ItemCondition.EXCELLENT) { //can't go higher than Excellent
+                CurrentCondition = (ItemCondition)newCondition;
+            }
+            Save();
+            OnImproved(new ItemEventArgs(ItemEvent.IMPROVE, this.Id));
+        }
+
+        public void Save() {
+           MongoCollection collection = MongoUtils.MongoData.GetCollection("World", "Items");
+           this.ItemTriggers = null; //we don't want to save this when we deserialize and all triggers are saved in Triggers as BsonDocuments and can't be edited within the engine
+           collection.Save<Items>(this);
+
+        }
+        #endregion Public Methods
 
         #region Events
         public void OnDeteriorated(ItemEventArgs e) {
@@ -240,36 +275,6 @@ namespace Items {
         }
         #endregion Events
 
-        public void DeteriorateCondition() {
-            //TODO: condition should affect item stats as well
-            int newCondition = ((int)CurrentCondition) - 1;
-            if (newCondition >= 1) { //otherwise it can't deteriorate any more and it's broken anyways
-                CurrentCondition = (ItemCondition)newCondition;
-
-            }
-            Save();
-            OnDeteriorated(new ItemEventArgs(ItemEvent.DETERIORATE, this.Id));
-        }
-
-        public void ImproveCondition() {
-            //TODO: condition should affect item stats as well
-            int newCondition = ((int)CurrentCondition) + 1;
-            if (newCondition <= (int)ItemCondition.EXCELLENT) { //can't go higher than Excellent
-                CurrentCondition = (ItemCondition)newCondition;
-            }
-            Save();
-            OnImproved(new ItemEventArgs(ItemEvent.IMPROVE, this.Id));
-        }
-
-        public void Save() {
-            MongoUtils.MongoData.ConnectToDatabase();
-            MongoDatabase db = MongoUtils.MongoData.GetDatabase("World");
-            MongoCollection collection = db.GetCollection("Items");
-
-            collection.Save<Items>(this);
-        }
-        #endregion Public Methods
-
         #region Constructor
         public Items() { }
         
@@ -292,9 +297,11 @@ namespace Items {
         }
     }
 
+    #region Public Enumerations
     public enum Wearable { NONE, HEAD, LEFT_EAR, RIGHT_EAR, NECK, BACK, CHEST, SHOULDERS, WAIST, FEET, HANDS, WIELD, WIELD_RIGHT, WIELD_LEFT} //this is enough for now add more later
     public enum ItemCondition {NONE, DESTROYED_BEYOND_REPAIR, DESTROYED, DAMAGED, VERY_WORN, WORN, GOOD, VERY_GOOD, EXCELLENT } //a few item conditions
     public enum ItemsType { WEAPON, CLOTHING, EDIBLE, DRINKABLE, CONTAINER, ILUMINATION, KEY } //a couple of item types
     public enum EdibleType { FOOD, BEVERAGE }
     public enum ItemEvent { OPEN, CLOSE, WEAR, LOOK_IN, STORE, RETRIEVE, DRAIN, RECHARGE, IGNITE, EXTINGUISH, EXAMINE, DETERIORATE, IMPROVE, CONSUME, WIELD }
+    #endregion Public Enumerations
 }

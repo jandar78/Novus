@@ -143,8 +143,8 @@ namespace Commands {
             }
 
             string full = commands[0];
-            commands.RemoveAt(0);
-            commands.RemoveAt(0);
+            commands.RemoveRange(0, 2);
+            
             
             foreach (string word in commands) {
                 itemName.Append(word + " ");
@@ -199,9 +199,8 @@ namespace Commands {
             }
 
             string full = commands[0];
-            commands.RemoveAt(0);
-            commands.RemoveAt(0);
-            
+            commands.RemoveRange(0, 2);
+                        
             foreach (string word in commands) {
                 itemName.Append(word + " ");
             }
@@ -219,6 +218,7 @@ namespace Commands {
                 }
                 
                 player.Player.Wield(item);
+                item.Save();
                 //TODO: check weapon for any wield perks/curses
 
                 string msgOthers = string.Format("{0} wields {1}", player.Player.FirstName, item.Name);
@@ -570,7 +570,7 @@ namespace Commands {
             List<string> message = new List<string>(); ;
             Room room = Room.GetRoom(player.Player.Location);
 
-            if (commands.Count > 2) {
+            if (commands.Count > 0) {
                 itemName = GetItemName(commands, "").ToString();
                 //let's see if player has a lightsource equipped
                 foreach (Items.Iitem item in player.Player.GetEquipment().Values) {
@@ -604,11 +604,10 @@ namespace Commands {
 
             if (lightItem != null) {
                 Items.Iiluminate lightSource = lightItem as Items.Iiluminate;
+                
                 if (lightSource.isLit == false) {
-                    lightSource.isLit = true;
-                    lightItem.Save();
-                    message.Add("You " + command + " " + lightItem.Name.ToLower());
-                    message.Add(player.Player.FirstName + " " + command + "'s " + lightItem.Name.ToLower());
+                    message = lightSource.Ignite();
+                    message[1] = ParseMessage(message[1], player, null);
                 }
                 else {
                     message.Add("It's already on!");
@@ -625,7 +624,7 @@ namespace Commands {
         }
 
         private static void DeActivate(User.User player, List<string> commands) {
-            //used for lighting up a lightSource that can be lit.
+            //used for turning off a lightSource that can be lit.
             Items.Iitem lightItem = null;
             string command = null;
             switch (commands[1]) {
@@ -642,7 +641,7 @@ namespace Commands {
             List<string> message = new List<string>();
             Room room = Room.GetRoom(player.Player.Location);
 
-            if (commands.Count > 2) {
+            if (commands.Count > 0) {
                 itemName = GetItemName(commands, "").ToString();
                 //let's see if player has a lightsource equipped
                 foreach (Items.Iitem item in player.Player.GetEquipment().Values) {
@@ -676,14 +675,9 @@ namespace Commands {
 
             if (lightItem != null) {
                 Items.Iiluminate lightSource = lightItem as Items.Iiluminate;
-                if (lightSource.isLit == true) {
-                    lightSource.isLit = false;
-                    lightItem.Save();
-                    message.Add("You " + command + " " + lightItem.Name.ToLower());
-                    message.Add(player.Player.FirstName + " " + command + "'s " + lightItem.Name.ToLower());
-                }
-                else {
-                    message.Add("It's already off!");
+                message = lightSource.Extinguish();
+                if (message.Count > 1) {
+                    message[1] = string.Format(message[1], player.Player.FirstName);
                 }
             }
             else if (lightItem == null){

@@ -404,8 +404,8 @@ namespace Commands {
         public static bool CloseDoorOverride(int roomID, string doorDirection) {
             Door door = FindDoor(roomID, new List<string>() { doorDirection, doorDirection });
             if (door.Openable) {
-                //we only car thats it's open and not destroyed, we bypass any other check
-                if (!door.Open && !door.Destroyed) {
+                //we only care thats it's open and not destroyed, we bypass any other check
+                if (door.Open && !door.Destroyed) {
                     CloseADoor(door);
                     return true;
                 }

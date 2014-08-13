@@ -10,7 +10,7 @@ using MongoDB.Bson.Serialization;
 using System.Reflection;
 using Commands;
 using System.Threading;
-using Phydeaux.Utilities;
+using LuaInterface;
 
 namespace Rooms {
     public class Exits {
@@ -18,9 +18,7 @@ namespace Rooms {
 		 public Dictionary<string, Room> availableExits;
 		 public Dictionary<string, Door> doors;
 
-        //item1 is the phrase to match, item2 is the action to execute
-
-         public bool HasDoor {
+        public bool HasDoor {
              get {
                  return doors.Count > 0;
              }
@@ -42,9 +40,7 @@ namespace Rooms {
         }
     }
 
-    public class Door {
-        public List<Tuple<string, string, List<object>>> phraseList;
-
+    public class Door {                    
         public string Id { get;  set; }
 
         public string Examine { get;  set; }
@@ -103,9 +99,12 @@ namespace Rooms {
         }
 
         public BsonArray Phrases { get; set; }
+        public BsonArray Triggers { get; set; }
 
         public string Description { get; set; }
         public string DescriptionDestroyed { get; set; }
+
+        private List<Triggers.SpeechTrigger> _speechTriggers = new List<Triggers.SpeechTrigger>();
 
         public Door() { }
 
@@ -118,39 +117,22 @@ namespace Rooms {
 
             if (roomDocument != null) {
                 door = BsonSerializer.Deserialize<Door>(roomDocument);
-                if (door.Listener) door.FillUpPhrases();
+                if (door.Listener) door.LoadTriggers();
             }
 
             return door;
         }
 
-        private void FillUpPhrases() {
-            phraseList = new List<Tuple<string, string, List<object>>>();
-            List<object> parameters = new List<object>();
-            foreach (BsonDocument phrase in Phrases) {
-                foreach (BsonDocument method in phrase["Action"].AsBsonArray.Where(a => a.AsBsonDocument.Count() > 0)) {
-                    foreach (BsonDocument param in method["Parameters"].AsBsonArray.Where(p => p.AsBsonDocument.Count() > 0)) {
-                        switch (param["Param"].BsonType) {
-                            case BsonType.Boolean:
-                                parameters.Add(param["Param"].AsBoolean);
-                                break;
-                            case BsonType.Int32:
-                                parameters.Add(param["Param"].AsInt32);
-                                break;
-                            case BsonType.Double:
-                                parameters.Add(param["Param"].AsDouble);
-                                break;
-                            case BsonType.String:
-                            default:
-                                parameters.Add(param["Param"].AsString);
-                                break;
-                        }
-
-                    }
-                    phraseList.Add(Tuple.Create(phrase["Phrase"].AsString, method["Method"].AsString, new List<object>(parameters)));
-                    parameters.Clear();
+        private void LoadTriggers() {
+            foreach (BsonDocument doc in Triggers) {
+                Triggers.SpeechTrigger trigger = new Triggers.SpeechTrigger(doc);
+                trigger.script.AddVariableForScript(this, "door");
+                if (trigger.MessageOverrideAsString.Count > 0) {
+                    trigger.script.AddVariableForScript(trigger.MessageOverrideAsString, "messageOverride");
+                    trigger.script.LuaScript.RegisterMarkedMethodsOf(new DoorHelpers());
                 }
-            }
+                _speechTriggers.Add(trigger);
+            }          
         }
 
         public List<string> ApplyDamage(double damage) {
@@ -179,9 +161,7 @@ namespace Rooms {
         }
 
         private MongoCollection GetDoorCollection() {
-            MongoUtils.MongoData.ConnectToDatabase();
-            MongoDatabase worldDB = MongoUtils.MongoData.GetDatabase("World");
-            return worldDB.GetCollection("Doors");
+            return MongoUtils.MongoData.GetCollection("World","Doors");
         }
 
         public void UpdateDoorStatus() {
@@ -196,29 +176,20 @@ namespace Rooms {
             GetDoorCollection().Save(door, WriteConcern.Acknowledged);
         }
 
-        public string CheckPhrase(string message, out List<object> paramsOut) {
+        public string CheckPhrase(string message) {
             string result = "";
-            paramsOut = null;
             if (string.IsNullOrEmpty(message)) {
                 return result;
             }
 
-            message = message.Substring(message.IndexOf("says") + 4).Replace("\"", "").Trim();
-            foreach (Tuple<string, string, List<object>> phrase in phraseList) {
-                if (string.Equals(phrase.Item1, message, StringComparison.InvariantCultureIgnoreCase)) { //phrase matches let's perform the action
-                    ThreadPool.QueueUserWorkItem(delegate { IterateThroughActions(phrase.Item1); });
-                    break;
+            message = message.Replace("\"", "").Trim();
+            foreach (Triggers.SpeechTrigger trigger in _speechTriggers) {
+                if (message.Contains(trigger.TriggerOn)) {
+                    trigger.HandleEvent(null, null);
                 }
             }
-            return result;
-        }
 
-        private void IterateThroughActions(string match) {
-            Type type = typeof(Rooms.Room);
-            foreach (Tuple<string, string, List<object>> phrase in phraseList.Where(p => p.Item1 == match)) {
-                var method = Phydeaux.Utilities.Dynamic<DoorHelpers>.Static.Function<object>.Explicit<List<object>>.CreateDelegate(phrase.Item2);
-                method(phrase.Item3); 
-            }
+            return result;
         }
     }
 
@@ -226,61 +197,54 @@ namespace Rooms {
     //These methods below are used to call the appropriate methods without having to cycle through all the classes to find the correct method why dynamically binding them
     //so they are all kept here and make the call to each class that has
     public class DoorHelpers {
-        
-        public static object OpenDoor(List<object> parameters) {
-            if (CommandParser.OpenDoorOverride((int)parameters[1], (string)parameters[0])) {
-                InformAllPlayersInRoom(parameters);
-            }
-            return null;
+        [LuaAccessible]
+        public static void OpenDoor(int roomID, string direction) {
+            CommandParser.OpenDoorOverride(roomID, direction);         
         }
 
-        public static object CloseDoor(List<object> parameters) {
-            if (CommandParser.CloseDoorOverride((int)parameters[1], (string)parameters[0])) {
-                InformAllPlayersInRoom(parameters);
-            }
-            return null;
+        [LuaAccessible]
+        public static void CloseDoor(int roomID, string direction) {
+            CommandParser.CloseDoorOverride(roomID, direction);
         }
 
-        public static object LockDoor(List<object> parameters) {
-            if (CommandParser.LockDoorOverride((int)parameters[1], (string)parameters[0])) {
-                InformAllPlayersInRoom(parameters);
-            }
-            return null;
+        [LuaAccessible]
+        public static void LockDoor(int roomID, string direction) {
+            CommandParser.LockDoorOverride(roomID, direction);
+            
         }
 
-        public static object UnlockDoor(List<object> parameters) {
-            if (CommandParser.UnlockDoorOverride((int)parameters[1], (string)parameters[0])) {
-                InformAllPlayersInRoom(parameters);
-            }
-            return null;
+        [LuaAccessible]
+        public static void UnlockDoor(int roomID, string direction) {
+            CommandParser.UnlockDoorOverride(roomID, direction);
+            
         }
 
-        public static object InformAllPlayersInRoom(List<object> parameters) {
-            Room.GetRoom((int)parameters[1]).InformPlayersInRoom((string)parameters[0], new List<string>(new string[] { "" }));
-            return null;
+        //[LuaAccessible]
+        //public static object InformAllPlayersInRoom(List<object> parameters) {
+        //    Room.GetRoom((int)parameters[1]).InformPlayersInRoom((string)parameters[0], new List<string>(new string[] { "" }));
+        //    return null;
+        //}
+
+        [LuaAccessible]
+        public static void Wait(int seconds) {
+            Thread.Sleep((int)seconds * 1000);
         }
 
-        public static object Wait(List<object> parameters) {
-            Thread.Sleep((int)parameters[0] * 1000);
-            return null;
-        }
-
-        public static object CreateNPC(List<object> parameters) {
-            int mobTypeID = (int)parameters[1];
-            int location = (int)parameters[2];
-            int amount = (int)parameters[0] * Rooms.Room.GetRoom(location).GetObjectsInRoom("PLAYERS").Count;
+        [LuaAccessible]
+        public static void CreateNPC(int mobTypeID, int location, int amount) {
+            amount = amount * Rooms.Room.GetRoom(location).GetObjectsInRoom("PLAYERS").Count;
 
             for (int i = 0; i < amount; i++) {
                 Character.Iactor actor = Character.NPCUtils.CreateNPC(mobTypeID);
                 if (actor != null) {
                     actor.Location = location;
+                    //meh this whole AI stuff may need to be changed depending on how AI will handle triggers
                     actor.LastCombatTime = DateTime.MinValue.ToUniversalTime();
                     Character.Inpc npc = actor as Character.Inpc;
                     npc.Fsm.state = AI.FindTarget.GetState();
                     actor.Save();
                 }
             }
-            return null;
         }
     }
     #endregion

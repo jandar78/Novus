@@ -72,7 +72,9 @@ namespace Calendar {
 
 		public static void AdvanceDate() {
 			BsonDocument calendar = GetCalendarData();
-
+            if (calendar["CurrentMonth"].AsInt32 > calendar["Months"].AsBsonArray.Count - 1) {
+                calendar["CurrentMonth"] = 0;
+            }
 			BsonArray monthArray = calendar["Months"].AsBsonArray;
 			BsonDocument months = monthArray[calendar["CurrentMonth"].AsInt32].AsBsonDocument;
 

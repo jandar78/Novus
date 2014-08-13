@@ -30,7 +30,7 @@ namespace Commands {
         private Dictionary<string, object> DataSet { get; set; }
         private Stack<object> DataStack { get; set; }
 
-        public BsonDocument SkillDocument { get; set; }
+       // public BsonDocument SkillDocument { get; set; }
         public BsonArray CheckPlayersInRoom { get; set; }
         
         public SkillLevel skillLevel { get; set; }
@@ -75,11 +75,11 @@ namespace Commands {
             DataSet = new Dictionary<string, object>();
             DataStack = new Stack<object>();
 
-            MongoCollection col = MongoUtils.MongoData.GetCollection("Messages", "Skills");
-            SkillDocument = col.FindOneAs<BsonDocument>(Query.EQ("_id", commands[1].CamelCaseWord()));
+           // MongoCollection col = MongoUtils.MongoData.GetCollection("Messages", "Skills");
+           // SkillDocument = col.FindOneAs<BsonDocument>(Query.EQ("_id", commands[1].CamelCaseWord()));
             UserCommand = commands;
-            
-            script = new Script(SkillDocument["ScriptID"].AsString);
+
+            script = new Script(commands[1].CamelCaseWord(), "Action");
             script.LuaScript.RegisterMarkedMethodsOf(this);
 
             Player = user;
@@ -131,7 +131,7 @@ namespace Commands {
     
         #region Lua script parsing methods
         public void ExecuteScript() {
-            string path = @"E:\Mud\" + SkillDocument["_id"].AsString + ".lua";
+            //string path = @"E:\Mud\" + SkillDocument["_id"].AsString + ".lua";
             //using (Lua luaParser = new Lua()) {
             //    luaParser.RegisterMarkedMethodsOf(this);
             //    luaParser.DoFile(path);

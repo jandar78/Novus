@@ -42,7 +42,7 @@ namespace MudTime
 		//this is where we kick off all the timers for the game
 		public static void StartUpTimers() {
 			//timer for player driven events that affect stats (regeneration, hunger, poison, etc)
-			MudTimer playerTimer = new MudTimer(30, 120); //every 2 minutes
+			MudTimer playerTimer = new MudTimer(5, 120); //every 2 minutes
 			playerTimer.TimerElapsed += new MudTimer.ElapsedEventHandler(PlayerTimerTick);
 
             MudTimer timeTimer = new MudTimer(1, 60); //1 second in real life is 28 seconds in game time
@@ -63,7 +63,7 @@ namespace MudTime
 
 	
 		private static void PlayerTimerTick(uint playerTicks, EventArgs e) {
-			if (playerTicks % 120 == 0) {
+			if (playerTicks % 10 == 0) {
 				foreach (User.User user in MySockets.Server.GetCurrentUserList()) {
 					foreach (KeyValuePair<string, Character.Attribute> attrib in user.Player.GetAttributes()) {
 						user.Player.ApplyRegen(attrib.Key);

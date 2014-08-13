@@ -7,7 +7,6 @@ using System.IO;
 using MongoDB.Bson;
 using MongoDB.Driver;
 using MongoDB.Driver.Builders;
-using System.Text;
 using LuaInterface;
 using System.Reflection;
 using Rooms;
@@ -22,14 +21,22 @@ namespace Triggers {
         private MemoryStream _memStream;
         private Lua _lua;
 
-        public MemoryStream MemStream {
+        private MemoryStream MemStream {
             get {
+                if (_memStream == null) {
+                    _memStream = new MemoryStream();
+                }
                 return _memStream;
             }
             set {
                 _memStream = value;
             }
         }
+
+        //added this because if we just initialize a the memory stream then we have very serious (crashing) issue when saving the items.
+        //the memory stream causes a "timeout not supported by stream" exception.  It wasn't fun to track down or figure out.
+        private byte[] ScriptByteArray { get; set; }
+
         public Lua LuaScript {
             get {
                 if (_lua == null) {
@@ -44,8 +51,7 @@ namespace Triggers {
 
         public byte[] MemStreamAsByteArray {
             get {
-                _memStream.Position = 0;
-                return _memStream.ToArray();
+                return ScriptByteArray;
             }
         }
 
@@ -61,47 +67,50 @@ namespace Triggers {
         /// </summary>
         /// <param name="scriptID"></param>
         /// <param name="registerMethods"></param>
-        public Script(string scriptID) {
-            MongoCollection collection = MongoUtils.MongoData.GetCollection("Scripts", "Script");
+        public Script(string scriptID, string scriptCollection, bool registerMethods = true) {
+            MongoCollection collection = MongoUtils.MongoData.GetCollection("Scripts", scriptCollection);
             BsonDocument doc = collection.FindOneAs<BsonDocument>(Query.EQ("_id", scriptID));
-            if (doc != null && !string.IsNullOrEmpty(doc["text"].AsString)) {
-                using (MemStream = new MemoryStream(ASCIIEncoding.ASCII.GetBytes(doc["Text"].AsString))) {
-                    //  if (registerMethods) {
+            if (doc != null && doc["Bytes"].AsBsonBinaryData != null) {
+                ScriptByteArray = (byte[])doc["Bytes"].AsBsonBinaryData;
+                if (registerMethods) {
                     LuaScript.RegisterMarkedMethodsOf(this);
-                    // }
                 }
             }
         }
 
-        public Script(BsonDocument doc) {
-            MemStream = new MemoryStream(ASCIIEncoding.ASCII.GetBytes(doc["Text"].AsString));
+        public Script(BsonDocument doc, bool registerMethods = true) {
+            MemStream = new MemoryStream((byte[])doc["Bytes"].AsBsonBinaryData);
+            if (registerMethods) {
+                LuaScript.RegisterMarkedMethodsOf(this);
+            }
         }
 
         ~Script(){
-            //_memStream.Dispose();
+            if (_memStream != null) {
+                _memStream.Dispose();
+            }
+            if (_lua != null) {
+                _lua.Dispose();
+            }
         }
         
         public void RunScript() {
+            MemStream = new MemoryStream(ScriptByteArray);
             if (_memStream != null) {
-                using (Lua lua = new Lua()) {
-                    lua.DoFile(MemStreamAsString);
-                }
+               LuaScript.DoString(MemStreamAsString);
             }
         }
 
         public void AddVariableForScript(object variable, string variableName) {
-            LuaScript["variableName"] = variable;
+            LuaScript[variableName] = variable;
         }
 
         public static void SaveScriptToDatabase(string scriptID, string scriptText) {
-            MongoCollection collection = MongoUtils.MongoData.GetCollection("Scripts", "Script");
+            MongoCollection collection = MongoUtils.MongoData.GetCollection("Scripts", "Action");
             BsonDocument doc = collection.FindOneAs<BsonDocument>(Query.EQ("_id", scriptID));
             
-            BsonArray bytesArray = new BsonArray();
-            foreach (byte bytes in ASCIIEncoding.ASCII.GetBytes(scriptText)) {
-                bytesArray.Add(bytes);
-            }
-
+            BsonBinaryData bytesArray = new BsonBinaryData(ASCIIEncoding.ASCII.GetBytes(scriptText)); 
+                
             if (doc == null) {
                 doc.Add("_id", scriptID);
                 doc.Add("Bytes", bytesArray);
@@ -115,11 +124,11 @@ namespace Triggers {
 
         public static string GetScriptFromDatabase(string scriptID) {
             string result = null;
-            MongoCollection collection = MongoUtils.MongoData.GetCollection("Scripts", "Script");
+            MongoCollection collection = MongoUtils.MongoData.GetCollection("Scripts", "Action");
             BsonDocument doc = collection.FindOneAs<BsonDocument>(Query.EQ("_id", scriptID));
 
             if (doc != null) {
-                result = ASCIIEncoding.ASCII.GetString(doc["Bytes"].AsByteArray);
+                result = ASCIIEncoding.ASCII.GetString((byte[])doc["Bytes"].AsBsonBinaryData);
             }
 
             return result;
@@ -182,8 +191,8 @@ namespace Triggers {
 
         [LuaAccessible]
         public object GetMethodResult(string className, string methodName, object table) {
-            Type t = GetClassType(className);
-            MethodInfo m = t.GetMethod(methodName, BindingFlags.Public | BindingFlags.Static | BindingFlags.NonPublic);
+            Type t = GetClassType(className);         
+            MethodInfo m = t.GetMethod(methodName, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static);
 
             LuaTable luaTable = (LuaTable)table;
             ParameterInfo[] p = m.GetParameters();
@@ -209,6 +218,27 @@ namespace Triggers {
         public Type GetObjectType(object o) {
             Type t = o.GetType();
             switch (t.Name) {
+                case "bool":
+                    t = typeof(System.Boolean);
+                    break;
+                case "int":
+                    t = typeof(System.Int32);
+                    break;
+                case "double":
+                    t = typeof(System.Double);
+                    break;
+                case "string":
+                default:
+                    t = typeof(System.String);
+                    break;
+            }
+            return t;
+        }
+
+        [LuaAccessible]
+        public Type GetType(string typeToReturn) {
+            Type t = null;
+            switch (typeToReturn) {
                 case "bool":
                     t = typeof(System.Boolean);
                     break;
@@ -326,6 +356,23 @@ namespace Triggers {
 
             return o;
         }
+
+        [LuaAccessible]
+        public List<object> Table2List(LuaInterface.LuaTable table) {
+            List<object> list = new List<object>();
+            foreach (DictionaryEntry e in table) {
+                list.Add(e.Value);
+            }
+            
+            return list;
+        }
+
+        [LuaAccessible]
+        public object[] Table2Array(LuaInterface.LuaTable table) {
+            return Table2List(table).ToArray();
+        }
+
+        
         #endregion Lua methods
 
     }

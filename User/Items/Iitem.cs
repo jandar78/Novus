@@ -11,7 +11,7 @@ using Triggers;
 namespace Items {
    public interface Iitem {
         List<ITrigger> ItemTriggers { get; set; }
-        List<ITrigger> SpeechTriggers { get; set; }
+      //  List<ITrigger> SpeechTriggers { get; set; }
         ObjectId Id { get; set; }
         string Name { get; set; }
         string Description { get; set; }

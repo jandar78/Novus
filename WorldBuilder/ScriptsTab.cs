@@ -100,16 +100,23 @@ namespace WorldBuilder {
         private void testScript_Click(object sender, EventArgs e) {
             Lua lua = new Lua();
             lua.RegisterMarkedMethodsOf(this);
-           
-            try {
-                lua.DoString(scriptValue.Text);
-                ScriptError = false;
-                scriptValidatedValue.Visible = true;
+            //add some variables so we can pass tests
+            lua["item"] = Items.ItemFactory.CreateItem(ObjectId.Parse("5383dc8531b6bd11c4095993"));
+
+            if (byPassTestValue.Visible) {
+                ScriptError = !byPassTestValue.Checked;
             }
-            catch (LuaException lex) {
-                MessageBox.Show(lex.Message, "Lua Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                ScriptError = true;
-                scriptValidatedValue.Visible = false;
+            else {
+                try {
+                    lua.DoString(scriptValue.Text);
+                    ScriptError = false;
+                    scriptValidatedValue.Visible = true;
+                }
+                catch (LuaException lex) {
+                    MessageBox.Show(lex.Message, "Lua Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    ScriptError = true;
+                    scriptValidatedValue.Visible = false;
+                }
             }
         }
 
@@ -128,6 +135,11 @@ namespace WorldBuilder {
         [LuaAccessible]
         public double ParseAndCalculateCheckOther(object player) {
            return 0.0d;
+        }
+
+        [LuaAccessible]
+        public void SendMessage(string playerID, string message) {
+            
         }
 
         [LuaAccessible]

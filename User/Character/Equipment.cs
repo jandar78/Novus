@@ -85,12 +85,10 @@ namespace Character {
 
             if (!equipped.ContainsKey(Items.Wearable.WIELD_RIGHT)) {
                 item.WornOn = Items.Wearable.WIELD_RIGHT;
-                item.Save();
                 wielded = true;    
             }
             else if (!equipped.ContainsKey(Items.Wearable.WIELD_LEFT)) {
                 item.WornOn = Items.Wearable.WIELD_LEFT;
-                item.Save();
                 wielded = true;
             }
 

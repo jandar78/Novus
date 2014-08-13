@@ -33,6 +33,7 @@ namespace WorldBuilder {
             _itemTriggers = new BsonArray();
             tabControl1.Enabled = false;
             ScriptError = true;
+
             CheckConnectionStatus();
         }
 

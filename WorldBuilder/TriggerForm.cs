@@ -17,7 +17,7 @@ namespace WorldBuilder {
             InitializeComponent();
             if (trigger != null) {
                 triggerValue.Text = trigger["Trigger"].AsString;
-                chanceToTriggerValue.Text = trigger["ChanceToTrigger"].AsDouble.ToString();
+                chanceToTriggerValue.Text = trigger["ChanceToTrigger"].ToString();
                 scriptIdValue.Text = trigger["ScriptID"].AsString;
 
                 foreach (BsonValue msg in trigger["Overrides"].AsBsonArray) {
@@ -36,7 +36,9 @@ namespace WorldBuilder {
             
             BsonArray overrides = new BsonArray();
             foreach (string msg in messageOverrideValue.Items) {
-                overrides.Add(msg);
+                if (msg != "New...") {
+                    overrides.Add(msg);
+                }
             }
 
             doc.Add("Overrides", overrides);

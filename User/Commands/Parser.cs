@@ -25,7 +25,7 @@ namespace Commands{
 		 static public void ParseCommands(User.User player) {
 			 List<string> commands = ParseCommandLine(player.InBufferPeek);
              bool commandFound = false;
-
+             
              foreach (Dictionary<string, CommandDelegate> AvailableCommands in CommandsList) {
                  if (AvailableCommands.ContainsKey(commands[1].ToUpper())) {
                      AvailableCommands[commands[1].ToUpper()](player, commands);

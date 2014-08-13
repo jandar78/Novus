@@ -105,65 +105,75 @@ namespace Commands {
         }
 
 		private static void Look(User.User player, List<string> commands) {
-            if (commands.Contains("in")) {
-                LookIn(player, commands);
-                return;
-            }
-            Room room = Room.GetRoom(player.Player.Location);
-            room.GetRoomExits();
-            List<Exits> exitList = room.RoomExits;
+            List<CharacterEnums.CharacterActionState> NonAllowableStates = new List<CharacterEnums.CharacterActionState> { CharacterEnums.CharacterActionState.DEAD,
+                CharacterEnums.CharacterActionState.ROTTING, CharacterEnums.CharacterActionState.SLEEPING, CharacterEnums.CharacterActionState.UNCONCIOUS };
+            
+            StringBuilder sb = new StringBuilder();
 
-			StringBuilder sb = new StringBuilder();
-			sb.AppendLine(("- " + room.Title  + " -\t\t\t").FontStyle(Utils.FontStyles.BOLD));
-			sb.AppendLine(room.Description);
-
-			string[] vowel = new string[] { "a", "e", "i", "o", "u" };
-			foreach (Exits exit in exitList) {
-
-                if (room.IsDark) {
-                    exit.Description = "something";
+            if (!NonAllowableStates.Contains(player.Player.ActionState)) {
+                if (commands.Contains(" in ")) {
+                    LookIn(player, commands);
+                    return;
                 }
-                
-                if (string.IsNullOrEmpty(exit.Description)) {
-                    exit.Description = exit.availableExits[exit.Direction.CamelCaseWord()].Title.ToLower();
-                }
+                Room room = Room.GetRoom(player.Player.Location);
+                room.GetRoomExits();
+                List<Exits> exitList = room.RoomExits;
 
-                if (exit.Description.Contains("that leads to")) {
-                    exit.Description += exit.availableExits[exit.Direction.CamelCaseWord()].Title.ToLower();
-                }
 
-				string directionCorrected = "To the " + exit.Direction.CamelCaseWord().FontColor(Utils.FontForeColor.CYAN) + " there is ";
+                sb.AppendLine(("- " + room.Title + " -\t\t\t").FontStyle(Utils.FontStyles.BOLD));
+                sb.AppendLine(room.Description);
 
-				if (String.Compare(exit.Direction, "up", true) == 0 || String.Compare(exit.Direction, "down", true) == 0) {
-                    if (!room.IsDark) {
-                        directionCorrected = exit.Description.UppercaseFirstWordInString();
-                    }
-                    else {
-                        directionCorrected = "something";
+                string[] vowel = new string[] { "a", "e", "i", "o", "u" };
+                foreach (Exits exit in exitList) {
+
+                    if (room.IsDark) {
+                        exit.Description = "something";
                     }
 
-					directionCorrected += " leads " + exit.Direction.CamelCaseWord().FontColor(Utils.FontForeColor.CYAN) + " towards ";
-
-                    if (!room.IsDark) {
-                        exit.Description = "somewhere";
-                    }
-                    else {
+                    if (string.IsNullOrEmpty(exit.Description)) {
                         exit.Description = exit.availableExits[exit.Direction.CamelCaseWord()].Title.ToLower();
                     }
-				}
 
-				if (!exit.Description.Contains("somewhere") && vowel.Contains(exit.Description[0].ToString())) {
-					directionCorrected += "an ";
-				}
-				else if (!exit.Description.Contains("somewhere") && exit.Description != "something") {
-					directionCorrected += "a ";
-				}
-				sb.AppendLine(directionCorrected + exit.Description + ".");
-			}
+                    if (exit.Description.Contains("that leads to")) {
+                        exit.Description += exit.availableExits[exit.Direction.CamelCaseWord()].Title.ToLower();
+                    }
 
-            sb.Append(HintCheck(player));
-			sb.Append(DisplayPlayersInRoom(room, player.UserID));
-            sb.Append(DisplayItemsInRoom(room));
+                    string directionCorrected = "To the " + exit.Direction.CamelCaseWord().FontColor(Utils.FontForeColor.CYAN) + " there is ";
+
+                    if (String.Compare(exit.Direction, "up", true) == 0 || String.Compare(exit.Direction, "down", true) == 0) {
+                        if (!room.IsDark) {
+                            directionCorrected = exit.Description.UppercaseFirstWordInString();
+                        }
+                        else {
+                            directionCorrected = "something";
+                        }
+
+                        directionCorrected += " leads " + exit.Direction.CamelCaseWord().FontColor(Utils.FontForeColor.CYAN) + " towards ";
+
+                        if (!room.IsDark) {
+                            exit.Description = "somewhere";
+                        }
+                        else {
+                            exit.Description = exit.availableExits[exit.Direction.CamelCaseWord()].Title.ToLower();
+                        }
+                    }
+
+                    if (!exit.Description.Contains("somewhere") && vowel.Contains(exit.Description[0].ToString())) {
+                        directionCorrected += "an ";
+                    }
+                    else if (!exit.Description.Contains("somewhere") && exit.Description != "something") {
+                        directionCorrected += "a ";
+                    }
+                    sb.AppendLine(directionCorrected + exit.Description + ".");
+                }
+
+                sb.Append(HintCheck(player));
+                sb.Append(DisplayPlayersInRoom(room, player.UserID));
+                sb.Append(DisplayItemsInRoom(room));
+            }
+            else {
+                sb.Append(string.Format("You can't look around when you are {0}!", player.Player.Action));
+            }
 
             if (!(player.Player is Character.NPC)) {
                 player.MessageHandler(sb.ToString());

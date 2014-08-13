@@ -114,8 +114,12 @@ namespace MySockets
 		}
 
 		public static User.User GetAUser(string id) {
-			Dictionary<Socket, User.User> tempList = new Dictionary<Socket, User.User>(clientSocketList);
-			return tempList.Where(c => c.Value.UserID == id).FirstOrDefault().Value;
+            if (clientSocketList != null) {
+                Dictionary<Socket, User.User> tempList = new Dictionary<Socket, User.User>(clientSocketList);
+                return tempList.Where(c => c.Value.UserID == id).FirstOrDefault().Value;
+            }
+
+            return null;
 		}
 
         public static User.User GetAUserFromList(List<string> id) {

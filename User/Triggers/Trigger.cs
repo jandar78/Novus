@@ -11,60 +11,63 @@ using LuaInterface;
 //based on what the trigger is
 
 namespace Triggers {
-    public class ItemTrigger : ITrigger {
+    public class GeneralTrigger : ITrigger {
         public string TriggerOn { get; set; }
         public double ChanceToTrigger { get; set; }
         public BsonArray MessageOverrides { get; set; }
         public List<string> MessageOverrideAsString { get; set; }
         public string StateToExecute { get; set; }
-        public Script script;
+        public Script script; 
 
+        public virtual void HandleEvent(object o, EventArgs e) {
+            ThreadPool.QueueUserWorkItem(delegate { script.RunScript(); });           
+        }
+    }
+
+
+    public class ItemTrigger : GeneralTrigger {
         public ItemTrigger(BsonDocument doc) {
             MessageOverrideAsString = new List<string>();
 
             if (doc != null && doc.ElementCount > 0) {
-                TriggerOn = doc["TriggerOn"].AsString;
-                ChanceToTrigger = doc["ChanceToTrigger"].AsDouble;
-                script = new Script(doc["ScriptID"].AsString);
-                
+                TriggerOn = doc["Trigger"].AsString;
+                ChanceToTrigger = doc["ChanceToTrigger"].AsInt32;
+                script = new Script(doc["ScriptID"].AsString, "Items");
+                             
                 foreach (var overrides in doc["Overrides"].AsBsonArray) {
                     MessageOverrideAsString.Add(overrides.AsString);
                 }
             }
         }
 
-        public void HandleEvent(object o, EventArgs e) {
-            Items.ItemEventArgs ie = e as Items.ItemEventArgs;
-            if (ie.ItemEvent == (Items.ItemEvent)Enum.Parse(typeof(Items.ItemEvent), TriggerOn)) {
-                ThreadPool.QueueUserWorkItem(delegate { script.RunScript(); });
+        public override void HandleEvent(object o, EventArgs e) {
+            //for items we want to add the item and the owner into the script as variables
+            var item = Items.Items.GetByID(((Items.ItemEventArgs)e).ItemID.ToString());
+            script.AddVariableForScript(item, "item");
+
+            User.User player = MySockets.Server.GetAUser(item.Owner);
+            if (player != null) {//the owner could be another item and not a player
+                script.AddVariableForScript(player.Player, "player");
             }
+            ThreadPool.QueueUserWorkItem(delegate { script.RunScript(); });
         }
+
+
     }
 
-    public class SpeechTrigger : ITrigger {
-        public string TriggerOn { get; set; }
-        public double ChanceToTrigger { get; set; }
-        public BsonArray MessageOverrides { get; set; }
-        public List<string> MessageOverrideAsString { get; set; }
-        public string StateToExecute { get; set; }
-        public Script script;
-
+    public class SpeechTrigger : GeneralTrigger {
         public SpeechTrigger(BsonDocument doc) {
             MessageOverrideAsString = new List<string>();
 
             if (doc != null && doc.ElementCount > 0) {
                 TriggerOn = doc["TriggerOn"].AsString;
                 ChanceToTrigger = (double)doc["ChanceToTrigger"].AsInt32;
-                script = new Script(doc["ScriptID"].AsString);
+                script = new Script(doc["ScriptID"].AsString, "Door");
 
                 foreach (var overrides in doc["Overrides"].AsBsonArray) {
                     MessageOverrideAsString.Add(overrides.AsString);
                 }
             }
-        }
-
-        public void HandleEvent(object o, EventArgs e) {
-            ThreadPool.QueueUserWorkItem(delegate { script.RunScript(); });
-        }
+        } 
     }
 }

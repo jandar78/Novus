@@ -145,6 +145,20 @@ namespace Rooms {
             RoomExits = exitList;
         }
 
+        public string GetDirectionOfDoor(int doorId) {
+            GetRoomExits(); //populate the Exit list
+            string direction = null;
+            //only get the exits that have doors
+            foreach(Exits exit in RoomExits){
+                if (!exit.HasDoor) {
+                    continue;
+                }
+              direction = exit.doors.Where(d => d.Value.Id.Contains(doorId.ToString())).Select(d => d.Key).SingleOrDefault();
+            }
+
+            return direction;
+        }
+
         public RoomTypes GetRoomType() {
             string[] types = Type.Split(' ');
             RoomTypes roomType = RoomTypes.NONE;
@@ -222,11 +236,17 @@ namespace Rooms {
             return lightSource;
         }
 
+        //just an overload since Lua will return any of our lists as objects. We just cast and call the real method.
+        //I tried just using generic methods like Table2List<T>() but it didn't work out, Lua still complained.
+        public void InformPlayersInRoom(string message, List<object> ignoreId) {
+            InformPlayersInRoom(message, ignoreId.Select(s => s.ToString()).ToList());
+        }
+
         public void InformPlayersInRoom(string message, List<string> ignoreId) {
             if (!string.IsNullOrEmpty(message)) {
                 GetPlayersInRoom();
                 foreach (string id in players) {
-                    if (!ignoreId.Contains(id)) {
+                    if (!ignoreId.Contains(id)) { 
                         User.User otherUser = MySockets.Server.GetAUser(id);
                         if (otherUser != null && otherUser.CurrentState == User.User.UserState.TALKING) {
                             otherUser.MessageHandler(message);
@@ -245,11 +265,12 @@ namespace Rooms {
                 }
 
                 //send whatever the message was to the doors to consume
-                List<object> paramsOut = null;
+                //List<object> paramsOut = null; //why the fuck do I need these here?
+                GetRoomExits();
                 if (RoomExits != null) {
                     foreach (Exits exit in RoomExits) {
                         if (exit.doors.Count > 0 && exit.doors[exit.Direction.CamelCaseWord()].Listener) {
-                            string methodToCall = exit.doors[exit.Direction.CamelCaseWord()].CheckPhrase(message, out paramsOut);
+                            string methodToCall = exit.doors[exit.Direction.CamelCaseWord()].CheckPhrase(message);
                         }
                     }
                 }

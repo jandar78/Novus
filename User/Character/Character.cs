@@ -527,7 +527,6 @@ namespace Character{
             }
         }
 
-
         #region General
         public string ID {
             get;
@@ -779,8 +778,6 @@ namespace Character{
         }
         #endregion Combat
 
-        
-
         public void SetActionState(CharacterActionState state) {
             _actionState = state;
         }
@@ -860,7 +857,7 @@ namespace Character{
                     this.SetActionState(CharacterActionState.UNCONCIOUS);
                 }
                 else if (Attributes[attribute].Value > 0) {
-                    this.SetActionState(CharacterActionState.UNCONCIOUS);
+                    this.SetActionState(CharacterActionState.NONE);
                     this.SetStanceState(CharacterStanceState.PRONE);
                 }
             }

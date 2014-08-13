@@ -17,7 +17,7 @@ namespace ServerConsole {
 			//start the Mongodatabase if the server is running
 			//Todo: Update the path to where the DB will eventually be when this releases.
 
-            //System.Diagnostics.Process.Start(@"C:\MongoDB\bin\Mongod.exe");
+            System.Diagnostics.Process.Start(@"E:\MongoDB\bin\Mongod.exe");
 
 			Console.WriteLine(">>> MongoDB initialized <<<");
 
@@ -148,7 +148,7 @@ namespace ServerConsole {
                     catch (Exception ex) {
                         User.User temp = new User.User(true);
                         temp.UserID = "Internal";
-                        CommandParser.ReportBug(temp, new List<string>(new string[] { "Bug Internal Error: " + ex.Message + "\n" + ex.StackTrace }));
+                       // CommandParser.ReportBug(temp, new List<string>(new string[] { "Bug Internal Error: " + ex.Message + "\n" + ex.StackTrace }));
                     }
 				}
 

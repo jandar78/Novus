@@ -60,9 +60,9 @@ namespace Items {
             if (!isLit) {
                 //TODO: get these messages from the DB based on fuel source or type
                 msg.Add("You turn on " + Name + " and can now see in the dark.");
-                msg.Add("{0} turns on " + Name + ".");
+                msg.Add("{attacker} turns on " + Name + ".");
                 isLit = true;
-                Save();
+                this.Save();
                 OnIgnited(new ItemEventArgs(ItemEvent.IGNITE, this.Id));
             }
             else {

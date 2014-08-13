@@ -50,7 +50,7 @@ namespace Commands {
             foreach (Items.Iitem item in inventoryList) {
                 Items.Icontainer container = item as Items.Icontainer;
                 if (!grouping.ContainsKey(item.Name)) {
-                    if (container == null) {
+                    if (!item.ItemType.ContainsKey(Items.ItemsType.CONTAINER)) {
                         grouping.Add(item.Name, 1);
                     }
                     else{
@@ -59,7 +59,7 @@ namespace Commands {
                     }
                 }
                 else {
-                    if (container == null) {
+                    if (!item.ItemType.ContainsKey(Items.ItemsType.CONTAINER)) {
                         grouping[item.Name] += 1;
                     }
                     else {
@@ -140,6 +140,7 @@ namespace Commands {
                 }
             }
             Room room = Room.GetRoom(player.Player.Location);
+            player.MessageHandler("You say \"" + temp + "\"");
 			room.InformPlayersInRoom((room.IsDark == true ? "Someone" : player.Player.FirstName) + " says \"" + temp + "\"",
 				new List<string>(new string[] { player.UserID })); 
 		}

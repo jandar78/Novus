@@ -90,6 +90,7 @@ namespace WorldBuilder {
         }
 
         private void FillControls(BsonDocument item) {
+            ClearItemCreateForm();
             idValue.Text = item["_id"].AsObjectId.ToString();
             nameValue.Text = item["Name"].AsString;
             descriptionValue.Text = item["Description"].AsString;
@@ -107,7 +108,39 @@ namespace WorldBuilder {
                 maxConditionValue.Text = ((Items.ItemCondition)item["MaxCondition"].AsInt32).ToString();
             }
             if (item.Contains("Weight") && !item["Weight"].IsBsonNull) {
-                weightValue.Text = item["Weight"].AsDouble.ToString();
+                if (item["Weight"].IsDouble) {
+                    weightValue.Text = item["Weight"].AsDouble.ToString();
+                }
+                else {
+                    weightValue.Text = item["Weight"].AsInt32.ToString();
+                }
+            }
+            if (!item["ItemType"].IsBsonNull){
+                foreach (BsonDocument value in item["ItemType"].AsBsonArray) {
+                    switch (value["k"].AsInt32) {
+                        case 0:
+                            typeWeaponValue.Checked = true;
+                            break;
+                        case 1:
+                            typeClothingValue.Checked = true;
+                            break;
+                        case 2:
+                            typeEdibleValue.Checked = true;
+                            break;
+                        case 3:
+                            typeDrinkableValue.Checked = true;
+                            break;
+                        case 4:
+                            typeContainerValue.Checked = true;
+                            break;
+                        case 5:
+                            typeIluminationValue.Checked = true;
+                            break;
+                        case 6:
+                            typeKeyValue.Checked = true;
+                            break;
+                    }
+                }
             }
             if (item.Contains("IsMovable") && !item["IsMovable"].IsBsonNull) {
                 isMovable.Checked = item["IsMovable"].AsBoolean;
@@ -118,10 +151,20 @@ namespace WorldBuilder {
 
             //container stuff
             if (item.Contains("ReduceCarryWeightBy") && !item["ReduceCarryWeightBy"].IsBsonNull) {
-                reduceWeightValue.Text = item["ReduceCarryWeightBy"].AsDouble.ToString();
+                if (item["ReduceCarryWeightBy"].IsDouble) {
+                    reduceWeightValue.Text = item["ReduceCarryWeightBy"].AsDouble.ToString();
+                }
+                else {
+                    reduceWeightValue.Text = item["ReduceCarryWeightBy"].AsInt32.ToString();
+                }
             }
             if (item.Contains("WeightLimit") && !item["WeightLimit"].IsBsonNull) {
-                weightLimitValue.Text = item["WeightLimit"].AsDouble.ToString();
+                if (item["WeightLimit"].IsDouble) {
+                    weightLimitValue.Text = item["WeightLimit"].AsDouble.ToString();
+                }
+                else {
+                    weightLimitValue.Text = item["WeightLimit"].AsInt32.ToString();
+                }
             }
             if (item.Contains("IsOpenable") && !item["IsOpenable"].IsBsonNull) {
                 isOpenable.Checked = item["IsOpenable"].AsBoolean;
@@ -136,15 +179,37 @@ namespace WorldBuilder {
             }
             //weapon stuff
             if (item.Contains("AttackSpeed") && !item["AttackSpeed"].IsBsonNull) {
-                attackSpeedValue.Text = item["AttackSpeed"].AsDouble.ToString();
+                if (item["AttackSpeed"].IsDouble) {
+                    attackSpeedValue.Text = item["AttackSpeed"].AsDouble.ToString();
+                }
+                else {
+                    attackSpeedValue.Text = item["AttackSpeed"].AsInt32.ToString();
+                }
             }
             if (item.Contains("MaxDamage") && !item["MaxDamage"].IsBsonNull) {
-                maxDamageValue.Text = item["MaxDamage"].AsDouble.ToString();
+                if (item["MaxDamage"].IsDouble) {
+                    maxDamageValue.Text = item["MaxDamage"].AsDouble.ToString();
+                }
+                else {
+                    maxDamageValue.Text = item["MaxDamage"].AsInt32.ToString();
+                }
             }
             if (item.Contains("MinDamage") && !item["MinDamage"].IsBsonNull) {
-                minDamageValue.Text = item["MinDamage"].AsDouble.ToString();
+                if (item["MinDamage"].IsDouble) {
+                    minDamageValue.Text = item["MinDamage"].AsDouble.ToString();
+                }
+                else {
+                    minDamageValue.Text = item["MinDamage"].AsInt32.ToString();
+                }
             }
 
+            //added the triggers here, need to test
+            if (item.Contains("Triggers") && !item["Triggers"].IsBsonNull) {
+                foreach (BsonDocument value in item["Triggers"].AsBsonArray) {
+                    _itemTriggers.Add(value);
+                    triggersValue.Items.Add(value["Trigger"].AsString);
+                }
+            }
 
         }
 
@@ -207,10 +272,13 @@ namespace WorldBuilder {
                     item["WeightLimit"] = double.Parse(weightLimitValue.Text);
                 }
 
+                BsonArray contentsArray = new BsonArray();
                 foreach (string value in itemContentsValue.Items) {
-                    item["Contents"].AsBsonArray.Add(value);
+                    contentsArray.Add(value);
                 }
-
+                if (contentsArray.Count > 0) {
+                    item["Contents"] = contentsArray;
+                }
                 //weapon stuff
                 if (!IsEmpty(attackSpeedValue.Text)) {
                     item["AttackSpeed"] = double.Parse(attackSpeedValue.Text);
@@ -250,15 +318,36 @@ namespace WorldBuilder {
                     item["fuelSource"] = (Items.FuelSource)Enum.Parse(typeof(Items.FuelSource), fuelSourceValue.Text);
                 }
 
+                //item Type
+                BsonArray itemTypeArray = new BsonArray();
+                foreach (CheckBox cb in itemTypeGroup.Controls) {
+                    BsonDocument itemTypeBson = new BsonDocument {
+                        {"k",""},
+                        {"v",""}
+                    };
+                    if (cb.Checked) {
+                        itemTypeBson["k"] = (Items.ItemsType)Enum.Parse(typeof(Items.ItemsType), cb.Text.ToUpper());
+                        itemTypeBson["v"] = 0;
+
+                        itemTypeArray.Add(itemTypeBson);
+                    }
+                }
+                                        
+                item["ItemType"] = itemTypeArray;
+
+                if (_itemTriggers.Count > 0) {
+                    item["Triggers"] = _itemTriggers;
+                }
+
 
                 Items.Iitem result = null;
-
                 result = BsonSerializer.Deserialize<Items.Items>(item);
                 result.Save();
+                GetItemsFromDB();
             }
         }
 
-        private void button3_Click(object sender, EventArgs e) {
+        private void NewButton_Click(object sender, EventArgs e) {
             ClearItemCreateForm();
         }
 
@@ -282,6 +371,7 @@ namespace WorldBuilder {
             weightValue.Text = string.Empty;
             isMovable.Checked = false;
             isWearable.Checked = false;
+            typeClothingValue.Checked = typeContainerValue.Checked = typeEdibleValue.Checked = typeDrinkableValue.Checked = typeIluminationValue.Checked = typeKeyValue.Checked = false;
 
             //container stuff
             reduceWeightValue.Text = string.Empty;
@@ -290,10 +380,16 @@ namespace WorldBuilder {
             isOpened.Checked = false;
             itemContentsValue.Items.Clear();
 
+            foreach (CheckBox cb in itemTypeGroup.Controls) {
+                cb.Checked = false;
+            }
+
             //weapon stuff
+            _itemTriggers.Clear();
             attackSpeedValue.Text = string.Empty;
             maxDamageValue.Text = string.Empty;
             minDamageValue.Text = string.Empty;
+            triggersValue.Items.Clear();
         }
 
         private void locationValue_Leave(object sender, EventArgs e) {
@@ -337,12 +433,9 @@ namespace WorldBuilder {
 
         private void tabControl1_SelectedIndexChanged(object sender, EventArgs e) {
             if (tabControl1.SelectedIndex == 0) {
-                //don't have these set-up in the game yet
-
                 GetItemsFromDB();
             }
         }
-
 
         private void itemsInDBValue_DoubleClick(object sender, EventArgs e) {
             loadItem_Click(null, null);
