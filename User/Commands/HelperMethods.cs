@@ -19,7 +19,7 @@ namespace Commands {
             StringBuilder sb = new StringBuilder();
 
             if (!room.IsDark) {
-                foreach (string id in room.GetObjectsInRoom("PLAYERS")) {
+                foreach (string id in room.GetObjectsInRoom(Room.RoomObjects.Players)) {
                     if (id != ignoreId) {
                         User.User otherUser = MySockets.Server.GetAUser(id);
                         if (otherUser != null && otherUser.CurrentState == User.User.UserState.TALKING) {
@@ -31,7 +31,7 @@ namespace Commands {
                 }
                 Dictionary<string, int> npcGroups = new Dictionary<string, int>();
 
-                foreach (string id in room.GetObjectsInRoom("NPCS")) {
+                foreach (string id in room.GetObjectsInRoom(Room.RoomObjects.Npcs)) {
                     //we don't need to create an npc object here since we can just poll the DB for the info
                     MongoUtils.MongoData.ConnectToDatabase();
                     MongoDatabase db = MongoUtils.MongoData.GetDatabase("Characters");
@@ -54,15 +54,17 @@ namespace Commands {
             }
             else {
                 int count = 0;
-                foreach (string id in room.GetObjectsInRoom("PLAYERS")) {
+                foreach (string id in room.GetObjectsInRoom(Room.RoomObjects.Players)) {
                     if (id != ignoreId) {
                         User.User otherUser = MySockets.Server.GetAUser(id);
                         if (otherUser != null && otherUser.CurrentState == User.User.UserState.TALKING) {
-                            count++;
+                            if (otherUser.Player.ActionState != CharacterEnums.CharacterActionState.HIDING && otherUser.Player.ActionState != CharacterEnums.CharacterActionState.SNEAKING) {  //player should do a spot check this should not be a given
+                                count++;
+                            }
                         }
                     }
                 }
-                count += room.GetObjectsInRoom("NPCS").Count;
+                count += room.GetObjectsInRoom(Room.RoomObjects.Npcs).Count;
 
                 if (count == 1) {
                     sb.AppendLine("Someone is here.");
@@ -143,8 +145,8 @@ namespace Commands {
 
        private static string DisplayItemsInRoom(Room room) {
             StringBuilder sb = new StringBuilder();
-          
-            List<string> itemsInRoom = room.GetObjectsInRoom("ITEMS");
+
+            List<string> itemsInRoom = room.GetObjectsInRoom(Room.RoomObjects.Items);
 
             Dictionary<string, int> itemGroups = new Dictionary<string, int>();
 
@@ -269,7 +271,7 @@ namespace Commands {
             MongoUtils.MongoData.ConnectToDatabase();
             MongoDatabase db = MongoUtils.MongoData.GetDatabase("Characters");
             MongoCollection npcs = db.GetCollection("NPCCharacters");
-            List<string> npcIds = Room.GetRoom(location).GetObjectsInRoom("NPCS");
+            List<string> npcIds = Room.GetRoom(location).GetObjectsInRoom(Room.RoomObjects.Npcs);
 
             int count = 1;
 

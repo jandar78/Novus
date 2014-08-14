@@ -16,7 +16,7 @@ namespace Rooms {
         List<Exits> RoomExits { get; }
 
         Exits GetRoomExit(string direction);
-        List<string> GetObjectsInRoom(string objectName, double percentage);
+        List<string> GetObjectsInRoom(Room.RoomObjects objectType, double percentage);
         RoomTypes GetRoomType();
         void Save();
     }

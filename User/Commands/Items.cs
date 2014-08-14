@@ -512,7 +512,7 @@ namespace Commands {
             retrievedContainer = null;
             Room room = Room.GetRoom(player.Player.Location);
             if (!string.IsNullOrEmpty(containerName.CamelCaseString())) {
-                foreach (string itemID in room.GetObjectsInRoom("ITEMS")) {
+                foreach (string itemID in room.GetObjectsInRoom(Room.RoomObjects.Items)) {
                     Items.Iitem inventoryItem = Items.Items.GetByID(itemID);
 
                     inventoryItem = KeepOpening(containerName.CamelCaseString(), inventoryItem, containerPosition, containerIndex);
@@ -540,7 +540,7 @@ namespace Commands {
                 }
             }
             else {//we are grabbing a container or an item without a specific index
-                foreach (string itemID in room.GetObjectsInRoom("ITEMS")) {
+                foreach (string itemID in room.GetObjectsInRoom(Room.RoomObjects.Items)) {
                     Items.Iitem inventoryItem = Items.Items.GetByID(itemID);
 
                     inventoryItem = KeepOpening(itemName.CamelCaseString(), inventoryItem, itemPosition, itemIndex);
@@ -592,7 +592,7 @@ namespace Commands {
                     }
                 }
                 if (lightItem == null) { //not in players equipment let's check the room, but not in containers
-                    foreach (string itemId in room.GetObjectsInRoom("ITEMS")) {
+                    foreach (string itemId in room.GetObjectsInRoom(Room.RoomObjects.Items)) {
                         lightItem = Items.Items.GetByID(itemId);
                         Items.Iiluminate lightsource = lightItem as Items.Iiluminate;
                         if (lightsource != null && lightsource.isLightable) {
@@ -663,7 +663,7 @@ namespace Commands {
                     }
                 }
                 if (lightItem == null) { //not in players equipment let's check the room, but not in containers
-                    foreach (string itemId in room.GetObjectsInRoom("ITEMS")) {
+                    foreach (string itemId in room.GetObjectsInRoom(Room.RoomObjects.Items)) {
                         lightItem = Items.Items.GetByID(itemId);
                         Items.Iiluminate lightsource = lightItem as Items.Iiluminate;
                         if (lightsource != null && lightsource.isLightable) {

@@ -175,12 +175,12 @@ namespace AI {
             //person attacking us as the target
             //if that gets us nowhere, we need to then just kill the first non npc we find in our same location
             Rooms.Room room = Rooms.Room.GetRoom(actor.Location);
-            List<string> playersAtThisLocation = room.GetObjectsInRoom("PLAYERS");
+            List<string> playersAtThisLocation = room.GetObjectsInRoom(Rooms.Room.RoomObjects.Players);
 
             double minutesSinceLastCombat = (DateTime.Now.ToUniversalTime() - actor.LastCombatTime).TotalMinutes;
             //let's start by seeing if we had a last target and the last combat time has been less than 5 minutes ago, if so and he's here, it's payback time
             if (actor.LastTarget != null && minutesSinceLastCombat < 5) {
-                playersAtThisLocation.AddRange(room.GetObjectsInRoom("NPCS")); //we may have been attacking an npc so let's add them in
+                playersAtThisLocation.AddRange(room.GetObjectsInRoom(Rooms.Room.RoomObjects.Npcs)); //we may have been attacking an npc so let's add them in
                 if (playersAtThisLocation.Contains(actor.LastTarget)) { //yeah our previous target is here
                     actor.CurrentTarget = actor.LastTarget;
                 }

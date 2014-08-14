@@ -209,7 +209,7 @@ namespace Commands {
             int index = 1;
             Room room = Room.GetRoom(location);
             if (location != -1) {//player didn't specify it was in his inventory check room first
-                foreach (string itemID in room.GetObjectsInRoom("ITEMS")) {
+                foreach (string itemID in room.GetObjectsInRoom(Room.RoomObjects.Items)) {
                     Items.Iitem inventoryItem = Items.Items.GetByID(itemID);
                     inventoryItem = KeepOpening(itemNameToGet, inventoryItem, itemPosition);
 
@@ -361,7 +361,7 @@ namespace Commands {
             //specify "inventory" to just do it in their inventory container.
 
             if (location != -1) {//player didn't specify it was in his inventory check room first
-                foreach (string itemID in room.GetObjectsInRoom("ITEMS")) {
+                foreach (string itemID in room.GetObjectsInRoom(Room.RoomObjects.Items)) {
                     Items.Iitem inventoryItem = Items.Items.GetByID(itemID);
                     if (string.Equals(inventoryItem.Name, itemNameToGet, StringComparison.InvariantCultureIgnoreCase)) {
                         if (index == itemPosition) {

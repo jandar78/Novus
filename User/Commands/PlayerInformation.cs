@@ -24,7 +24,7 @@ namespace Commands {
                 sb.AppendLine("Class: " + character.Class);
                 sb.AppendLine("Race: " + character.Race);
                 sb.AppendLine("XP: " + (long)character.Experience);
-                sb.AppendLine("Next Level XP required: " + (long)character.NextLevelExperience);
+                sb.AppendLine("Next Level XP required: " + (long)character.NextLevelExperience + " (Needed: " + (long)(character.NextLevelExperience - character.Experience) + ")");
                 sb.AppendLine("\n[Attributes]");
                 foreach (KeyValuePair<string, Character.Attribute> attrib in player.Player.GetAttributes()) {
                     sb.AppendLine(string.Format("{0,-12}: {1}/{2,-3}    Rank: {3}",attrib.Key.CamelCaseWord(), attrib.Value.Value, attrib.Value.Max, attrib.Value.Rank));

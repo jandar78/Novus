@@ -277,18 +277,18 @@ namespace Rooms {
             }
         }
 
-        public List<string> GetObjectsInRoom(string objectName, double percentage = 100) {
+        public List<string> GetObjectsInRoom(RoomObjects objectType, double percentage = 100) {
             List<string> result = new List<string>();
             object objectList = null;
 
-            switch (objectName.ToUpper()) {
-                case "PLAYERS":
+            switch (objectType) {
+                case RoomObjects.Players:
                     objectList = players;
                     break;
-                case "NPCS":
+                case RoomObjects.Npcs:
                     objectList = npcs;
                     break;
-                case "ITEMS":
+                case RoomObjects.Items:
                     objectList = items;
                     break;
                 default:
@@ -303,6 +303,8 @@ namespace Rooms {
 
             return result;
         }
+
+        public enum RoomObjects { Players, Npcs, Items };
 
         public void Save() {
             BsonDocument roomDoc = new BsonDocument();

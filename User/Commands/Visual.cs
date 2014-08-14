@@ -20,7 +20,7 @@ namespace Commands {
                 //Todo:
                 //the player is trying to examine an item, the order will be room,exit, door, items, player, NPCs
                 //rooms should have a list of items that belong to the room (non removable) but whihc can be interacted with by the player.  For example a loose brick, oven, fridge, closet, etc.
-                //in turn these objects can items that can be removed from the room I.E. food, clothing, weapons, etc.  This is not implemented yet.
+                //in turn these objects can have items that can be removed from the room I.E. food, clothing, weapons, etc.  This is not implemented yet.
 
                 //exits will never, ever, ever be null but just in case you can be teleported to somewhere where there are no exits....
 
@@ -35,14 +35,44 @@ namespace Commands {
                 }
 
 
-                //TODO: items
+                //TODO: For items and players we need to be able to use the dot operator to discern between multiple of the same name.
+                //look in items         
                 if (!foundIt) {
-                    //find me an item
-                    //foundIt = true;
+                    List<string> itemsInRoom = room.GetObjectsInRoom(Room.RoomObjects.Items);
+                    foreach (string id in itemsInRoom) {
+                        Items.Iitem item = Items.ItemFactory.CreateItem(ObjectId.Parse(id));
+                        if (commands[2].ToLower().Contains(item.Name.ToLower())) {
+                            message = item.Examine();
+                            foundIt = true;
+                            break;
+                        }
+                    }
+
+                    if (!foundIt) { //not in room check inventory
+                        List<Items.Iitem> inventory = player.Player.GetInventoryAsItemList();
+                        foreach (Items.Iitem item in inventory) {
+                            if (commands[2].ToLower().Contains(item.Name.ToLower())) {
+                                message = item.Examine();
+                                foundIt = true;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (!foundIt) { //check equipment
+                        Dictionary<Items.Wearable, Items.Iitem> equipment = player.Player.GetEquipment();
+                        foreach (Items.Iitem item in equipment.Values) {
+                            if (commands[2].ToLower().Contains(item.Name.ToLower())) {
+                                message = item.Examine();
+                                foundIt = true;
+                                break;
+                            }
+                        }
+                    }
                 }
 
                 if (!foundIt) {
-                    List<string> chars = room.GetObjectsInRoom("PLAYERS");
+                    List<string> chars = room.GetObjectsInRoom(Room.RoomObjects.Players);
                     foreach (string id in chars) {
                         Character.Character playerChar = MySockets.Server.GetAUser(id).Player as Character.Character;
                         string tempName = playerChar.FirstName + " " + playerChar.LastName;
@@ -54,11 +84,9 @@ namespace Commands {
                     }
                 }
                 if (!foundIt) {
-                    List<string> npcList = room.GetObjectsInRoom("NPCS");
-
-                    MongoUtils.MongoData.ConnectToDatabase();
-                    MongoDatabase db = MongoUtils.MongoData.GetDatabase("Characters");
-                    MongoCollection npcCollection = db.GetCollection("NPCCharacters");
+                    List<string> npcList = room.GetObjectsInRoom(Room.RoomObjects.Npcs);
+                                       
+                    MongoCollection npcCollection = MongoUtils.MongoData.GetCollection("Characters","NPCCharacters");
                     IMongoQuery query = null;
                     
                     foreach (string id in npcList) {
@@ -205,7 +233,7 @@ namespace Commands {
             int index = 1;
 
             if (location != -1) {//player didn't specify it was in his inventory check room first
-                foreach (string itemID in room.GetObjectsInRoom("ITEMS")) {
+                foreach (string itemID in room.GetObjectsInRoom(Room.RoomObjects.Items)) {
                     Items.Iitem inventoryItem = Items.Items.GetByID(itemID);
                     inventoryItem = KeepOpening(itemNameToGet, inventoryItem, itemPosition, index);
 
@@ -267,7 +295,7 @@ namespace Commands {
 			//full, short or whatever combination we feel like allowing the player to grab
 			BsonDocument time = Calendar.Calendar.GetTime();
 			string message = "";
-			if (commands.Count < 3) { commands.Add("SHORT"); } //let's add in the "full" for time full
+			if (commands.Count < 3) { commands.Add("FULL"); } //let's add in the "full" for time full
 
 			string amPm = time["Hour"].AsInt32 > 12 ? "PM" : "AM";
 

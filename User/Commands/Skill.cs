@@ -78,14 +78,21 @@ namespace Commands {
            // MongoCollection col = MongoUtils.MongoData.GetCollection("Messages", "Skills");
            // SkillDocument = col.FindOneAs<BsonDocument>(Query.EQ("_id", commands[1].CamelCaseWord()));
             UserCommand = commands;
-
+            
             script = new Script(commands[1].CamelCaseWord(), "Action");
+            
+            UserCommand.RemoveAt(0);
+            script.LuaScript["UserCommand"] = UserCommand;
+            
             script.LuaScript.RegisterMarkedMethodsOf(this);
 
             Player = user;
-            if (commands.Count > 3) {
-                Target = CommandParser.FindTargetByName(commands[2], user.Player.Location);
-            }
+            script.LuaScript["player"] = Player.Player;
+            
+            //we'll worry about this when we impement CombatSkills, these are just passive skills
+            //if (commands.Count > 3) {
+            //    Target = CommandParser.FindTargetByName(commands[2], user.Player.Location);
+            //}
         }
         
 

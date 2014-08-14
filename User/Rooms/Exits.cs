@@ -40,7 +40,8 @@ namespace Rooms {
         }
     }
 
-    public class Door {                    
+    public class Door {
+        #region Public Properties
         public string Id { get;  set; }
 
         public string Examine { get;  set; }
@@ -103,6 +104,7 @@ namespace Rooms {
 
         public string Description { get; set; }
         public string DescriptionDestroyed { get; set; }
+        #endregion Public Properties
 
         private List<Triggers.SpeechTrigger> _speechTriggers = new List<Triggers.SpeechTrigger>();
 
@@ -193,7 +195,7 @@ namespace Rooms {
         }
     }
 
-    #region Helper Methods for Dynamically bound methods for doors
+    #region Helper Methods for door scripts
     //These methods below are used to call the appropriate methods without having to cycle through all the classes to find the correct method why dynamically binding them
     //so they are all kept here and make the call to each class that has
     public class DoorHelpers {
@@ -232,7 +234,7 @@ namespace Rooms {
 
         [LuaAccessible]
         public static void CreateNPC(int mobTypeID, int location, int amount) {
-            amount = amount * Rooms.Room.GetRoom(location).GetObjectsInRoom("PLAYERS").Count;
+            amount = amount * Rooms.Room.GetRoom(location).GetObjectsInRoom(Room.RoomObjects.Players).Count;
 
             for (int i = 0; i < amount; i++) {
                 Character.Iactor actor = Character.NPCUtils.CreateNPC(mobTypeID);
@@ -247,5 +249,5 @@ namespace Rooms {
             }
         }
     }
-    #endregion
+    #endregion Helper methods for door scripts
 }
