@@ -229,7 +229,7 @@ namespace Commands {
 
 
             if (!itemFound) { //so we didn't find one in the room that matches
-                var playerInventory = player.Player.GetInventoryAsItemList();
+                var playerInventory = player.Player.Inventory.GetInventoryAsItemList();
                 foreach (Items.Iitem inventoryItem in playerInventory) {
                     if (string.Equals(inventoryItem.Name, itemNameToGet, StringComparison.InvariantCultureIgnoreCase)) {
                         //if player didn't specify an index number loop through all items until we find the want we want otherwise we will
@@ -377,7 +377,7 @@ namespace Commands {
 
 
             if (!itemFound) { //so we didn't find one in the room that matches
-                var playerInventory = player.Player.GetInventoryAsItemList();
+                var playerInventory = player.Player.Inventory.GetInventoryAsItemList();
                 foreach (Items.Iitem inventoryItem in playerInventory) {
                     if (string.Equals(inventoryItem.Name, itemNameToGet, StringComparison.InvariantCultureIgnoreCase)) {
                         //if player didn't specify an index number loop through all items until we find the want we want otherwise we will
@@ -488,7 +488,7 @@ namespace Commands {
                     if (door.Lockable) {
                         if (door.RequiresKey) {
                             //let's see if the player has the key in his inventory or a skeleton key (opens any door)
-                            List<Items.Iitem> inventory = player.Player.GetInventoryAsItemList();
+                            List<Items.Iitem> inventory = player.Player.Inventory.GetInventoryAsItemList();
                             List<Items.Iitem> keyList = inventory.Where(i => i.ItemType.ContainsKey(Items.ItemsType.KEY)).ToList();
                             Items.Ikey key = null;
                             foreach (Items.Iitem keys in keyList) {
@@ -553,7 +553,7 @@ namespace Commands {
                     if (door.Lockable) {
                         if (door.RequiresKey) {
                             //let's see if the player has the key in his inventory or a skeleton key (opens any door)
-                            List<Items.Iitem> inventory = player.Player.GetInventoryAsItemList();
+                            List<Items.Iitem> inventory = player.Player.Inventory.GetInventoryAsItemList();
                             List<Items.Iitem> keyList = inventory.Where(i => i.ItemType.ContainsKey(Items.ItemsType.KEY)).ToList();
                             Items.Ikey key = null;
                             foreach (Items.Iitem keys in keyList) {

@@ -32,18 +32,26 @@ namespace Commands {
                 Dictionary<string, int> npcGroups = new Dictionary<string, int>();
 
                 foreach (string id in room.GetObjectsInRoom(Room.RoomObjects.Npcs)) {
-                    //we don't need to create an npc object here since we can just poll the DB for the info
-                    MongoUtils.MongoData.ConnectToDatabase();
-                    MongoDatabase db = MongoUtils.MongoData.GetDatabase("Characters");
-                    MongoCollection npcs = db.GetCollection("NPCCharacters");
-                    IMongoQuery query = Query.EQ("_id", ObjectId.Parse(id));
-                    BsonDocument npc = npcs.FindOneAs<BsonDocument>(query);
+                    //MongoCollection npcs = MongoUtils.MongoData.GetCollection("Characters", "NPCCharacters"); //wtf is this here for? doesn't the for loop get all the NPC's?
+                   // IMongoQuery query = Query.EQ("_id", ObjectId.Parse(id));
+                   // BsonDocument npc = npcs.FindOneAs<BsonDocument>(query);
+
+                    var npc = Character.NPCUtils.GetAnNPCByID(id);
+
+
                     //let's create groups for easy display
-                    if (!npcGroups.ContainsKey(npc["FirstName"].AsString + "$" + npc["LastName"].AsString + "$" + npc["StanceState"])) {
-                        npcGroups.Add(npc["FirstName"].AsString + "$" + npc["LastName"].AsString + "$" + npc["StanceState"], 1);
+                    //if (!npcGroups.ContainsKey(npc.["FirstName"].AsString + "$" + npc["LastName"].AsString + "$" + npc["StanceState"])) {
+                    //    npcGroups.Add(npc["FirstName"].AsString + "$" + npc["LastName"].AsString + "$" + npc["StanceState"], 1);
+                    //}
+                    //else {
+                    //    npcGroups[npc["FirstName"].AsString + "$" + npc["LastName"].AsString + "$" + npc["StanceState"]] += 1;
+                    //}
+
+                    if (!npcGroups.ContainsKey(npc.FirstName + "$" + npc.LastName + "$" + npc.StanceState)) {
+                        npcGroups.Add(npc.FirstName + "$" + npc.LastName + "$" + npc.StanceState, 1);
                     }
                     else {
-                        npcGroups[npc["FirstName"].AsString + "$" + npc["LastName"].AsString + "$" + npc["StanceState"]] += 1;
+                        npcGroups[npc.FirstName + "$" + npc.LastName + "$" + npc.StanceState] += 1;
                     }
                 }
 
@@ -67,81 +75,81 @@ namespace Commands {
                 count += room.GetObjectsInRoom(Room.RoomObjects.Npcs).Count;
 
                 if (count == 1) {
-                    sb.AppendLine("Someone is here.");
+                    sb.AppendLine("A presence is here.");
                 }
                 else if (count > 1) {
-                    sb.AppendLine("Some persons are here.");
+                    sb.AppendLine("Several presences are here.");
                 }
             }
 
             return sb.ToString();
         }
 
-        private static string PassesHideCheck(User.User target, string playerID, out bool spotted) {
-            string message = null;
-            spotted = true;
+        //private static string PassesHideCheck(User.User target, string playerID, out bool spotted) {
+        //    string message = null;
+        //    spotted = true;
 
-            if (target.Player.ActionState == CharacterEnums.CharacterActionState.HIDING || target.Player.ActionState == CharacterEnums.CharacterActionState.SNEAKING) {
-                User.User player = MySockets.Server.GetAUser(playerID);              
+        //    if (target.Player.ActionState == CharacterEnums.CharacterActionState.HIDING || target.Player.ActionState == CharacterEnums.CharacterActionState.SNEAKING) {
+        //        User.User player = MySockets.Server.GetAUser(playerID);              
 
-                MongoUtils.MongoData.ConnectToDatabase();
-                MongoDatabase db = MongoUtils.MongoData.GetDatabase("Messages");
-                MongoCollection col = db.GetCollection("Skills");
-                var skill = col.FindOneAs<BsonDocument>(Query.EQ("_id", "Spot"));
-                List<string> attributes = new List<string>();
-                foreach (BsonValue attrib in skill["Attributes"].AsBsonArray){
-                    attributes.Add(attrib.AsString);
-                }
+        //        MongoUtils.MongoData.ConnectToDatabase();
+        //        MongoDatabase db = MongoUtils.MongoData.GetDatabase("Messages");
+        //        MongoCollection col = db.GetCollection("Skills");
+        //        var skill = col.FindOneAs<BsonDocument>(Query.EQ("_id", "Spot"));
+        //        List<string> attributes = new List<string>();
+        //        foreach (BsonValue attrib in skill["Attributes"].AsBsonArray){
+        //            attributes.Add(attrib.AsString);
+        //        }
 
-                double result = 0; // CalculateSkillLevel(target, attributes) - CalculateSkillLevel(player, attributes);
+        //        double result = 0; // CalculateSkillLevel(target, attributes) - CalculateSkillLevel(player, attributes);
 
-                foreach (BsonDocument doc in skill["Message"].AsBsonArray) {
-                    if (result >= doc["min"].AsInt32 && result < doc["max"].AsInt32) {
-                        message = string.Format(doc["Msg"].AsString, target.Player.FirstName).FontColor(Utils.FontForeColor.YELLOW);
-                        target.MessageHandler(string.Format(doc["MsgTarget"].AsString, player.Player.FirstName).FontColor(Utils.FontForeColor.YELLOW));
-                        spotted = doc["spotted"].AsBoolean;
-                        break;
-                    }
-                }
-            }
-            if (spotted) return null;
-            else return "You fail to spot anyone hiding here.";
-        }
+        //        foreach (BsonDocument doc in skill["Message"].AsBsonArray) {
+        //            if (result >= doc["min"].AsInt32 && result < doc["max"].AsInt32) {
+        //                message = string.Format(doc["Msg"].AsString, target.Player.FirstName).FontColor(Utils.FontForeColor.YELLOW);
+        //                target.MessageHandler(string.Format(doc["MsgTarget"].AsString, player.Player.FirstName).FontColor(Utils.FontForeColor.YELLOW));
+        //                spotted = doc["spotted"].AsBoolean;
+        //                break;
+        //            }
+        //        }
+        //    }
+        //    if (spotted) return null;
+        //    else return "You fail to spot anyone hiding here.";
+        //}
 
-        private static string PassSneakCheck(User.User target, string playerID, out bool spotted) {
-            User.User player = MySockets.Server.GetAUser(playerID);
-            string message = null;
-            string msgOther = null;
-            spotted = false;
+        //private static string PassSneakCheck(User.User target, string playerID, out bool spotted) {
+        //    User.User player = MySockets.Server.GetAUser(playerID);
+        //    string message = null;
+        //    string msgOther = null;
+        //    spotted = false;
 
-            MongoUtils.MongoData.ConnectToDatabase();
-            MongoDatabase db = MongoUtils.MongoData.GetDatabase("Messages");
-            MongoCollection col = db.GetCollection("Skills");
-            var mastery = col.FindOneAs<BsonDocument>(Query.EQ("_id", "SpotSneak"));
+        //    MongoUtils.MongoData.ConnectToDatabase();
+        //    MongoDatabase db = MongoUtils.MongoData.GetDatabase("Messages");
+        //    MongoCollection col = db.GetCollection("Skills");
+        //    var mastery = col.FindOneAs<BsonDocument>(Query.EQ("_id", "SpotSneak"));
 
-            double hide = 0; //GetHide(target.Player.GetSubAttributes()["Agility"], target.Player.GetSubAttributes()["Cunning"], target.Player.GetAttributeRank("Dexterity"));
-            double spot = 0; //GetHide(player.Player.GetSubAttributes()["Agility"], player.Player.GetSubAttributes()["Cunning"], player.Player.GetAttributeRank("Dexterity"));
+        //    double hide = 0; //GetHide(target.Player.GetSubAttributes()["Agility"], target.Player.GetSubAttributes()["Cunning"], target.Player.GetAttributeRank("Dexterity"));
+        //    double spot = 0; //GetHide(player.Player.GetSubAttributes()["Agility"], player.Player.GetSubAttributes()["Cunning"], player.Player.GetAttributeRank("Dexterity"));
 
-            double result = hide - spot;
+        //    double result = hide - spot;
 
-            foreach (BsonDocument doc in mastery["Message"].AsBsonArray) {
-                if (result >= doc["min"].AsInt32 && result < doc["max"].AsInt32) {
-                    message = string.Format(doc["msg"].AsString, target.Player.FirstName).FontColor(Utils.FontForeColor.YELLOW);
-                    spotted = doc["spotted"].AsBoolean;
-                    break;
-                }
-            }
+        //    foreach (BsonDocument doc in mastery["Message"].AsBsonArray) {
+        //        if (result >= doc["min"].AsInt32 && result < doc["max"].AsInt32) {
+        //            message = string.Format(doc["msg"].AsString, target.Player.FirstName).FontColor(Utils.FontForeColor.YELLOW);
+        //            spotted = doc["spotted"].AsBoolean;
+        //            break;
+        //        }
+        //    }
 
-            foreach (BsonDocument doc in mastery["MessageOthers"].AsBsonArray) {
-                if (result >= doc["min"].AsInt32 && result < doc["max"].AsInt32) {
-                    msgOther = string.Format(doc["msg"].AsString, player.Player.FirstName).FontColor(Utils.FontForeColor.YELLOW);
-                    target.MessageHandler(string.Format(msgOther));
-                    break;
-                }
-            }
+        //    foreach (BsonDocument doc in mastery["MessageOthers"].AsBsonArray) {
+        //        if (result >= doc["min"].AsInt32 && result < doc["max"].AsInt32) {
+        //            msgOther = string.Format(doc["msg"].AsString, player.Player.FirstName).FontColor(Utils.FontForeColor.YELLOW);
+        //            target.MessageHandler(string.Format(msgOther));
+        //            break;
+        //        }
+        //    }
 
-            return message;
-        }
+        //    return message;
+        //}
 
        private static string DisplayItemsInRoom(Room room) {
             StringBuilder sb = new StringBuilder();
@@ -221,6 +229,7 @@ namespace Commands {
 
             return sb.ToString();
         }
+
         //called from the LOOK command
         private static string HintCheck(User.User player) {
             StringBuilder sb = new StringBuilder();

@@ -41,7 +41,7 @@ namespace Commands {
 		}
 
         private static void Inventory(User.User player, List<string> commands){
-            List<Items.Iitem> inventoryList = player.Player.GetInventoryAsItemList();
+            List<Items.Iitem> inventoryList = player.Player.Inventory.GetInventoryAsItemList();
             StringBuilder sb = new StringBuilder();
 
             Dictionary<string, int> grouping = new Dictionary<string, int>();
@@ -84,7 +84,7 @@ namespace Commands {
         }
 
         private static void Equipment(User.User player, List<string> commands) {
-            Dictionary<Items.Wearable, Items.Iitem> equipmentList = player.Player.GetEquipment();
+            Dictionary<Items.Wearable, Items.Iitem> equipmentList = player.Player.Equipment.GetEquipment();
             StringBuilder sb = new StringBuilder();
 
             if (equipmentList.Count > 0) {

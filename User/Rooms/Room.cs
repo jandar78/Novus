@@ -182,7 +182,7 @@ namespace Rooms {
             //check th eplayers and see if anyones equipment is a lightsource
             foreach (string id in players) {
                 User.User temp = MySockets.Server.GetAUser(id);
-                Dictionary<Items.Wearable, Items.Iitem> equipped = temp.Player.GetEquipment();
+                Dictionary<Items.Wearable, Items.Iitem> equipped = temp.Player.Equipment.GetEquipment();
                 foreach (Items.Iitem item in equipped.Values) {
                     Items.Iiluminate light = item as Items.Iiluminate;
                     if (light != null && light.isLit) {
@@ -197,7 +197,7 @@ namespace Rooms {
             if (!lightSource) {
                 foreach (string id in npcs) {
                     Character.Iactor actor = Character.NPCUtils.GetAnNPCByID(id);
-                    Dictionary<Items.Wearable, Items.Iitem> equipped = actor.GetEquipment();
+                    Dictionary<Items.Wearable, Items.Iitem> equipped = actor.Equipment.GetEquipment();
                     foreach (Items.Iitem item in equipped.Values) {
                         Items.Iiluminate light = item as Items.Iiluminate;
                         if (light != null && light.isLit) {

@@ -17,9 +17,26 @@ namespace Character{
 	//to work on.  If you're going to be working on it update this saying it's being worked on.
 
 	public class Character : Iactor {
+        private Inventory _inventory;
+        private Equipment _equipment;
+
         #region Public Members
-        public Equipment Inventory;
-        public Equipment equipment;
+        public Inventory Inventory {
+            get {
+                return _inventory;
+            }
+            set {
+                _inventory = value;
+            }
+        }
+        public Equipment Equipment {
+            get {
+                return _equipment;
+            }
+            set {
+                _equipment = value;
+            }
+        }
         #endregion Public Members
 
         #region Protected Members
@@ -125,7 +142,11 @@ namespace Character{
             Experience = 0;
             PointsToSpend = 0;
 
-            Inventory = new Equipment();
+            Inventory = new Inventory();
+            Equipment = new Equipment();
+
+            Inventory.player = this;
+            Equipment.player = this;
 
             Attributes = new Dictionary<string, Attribute>();
 
@@ -198,7 +219,7 @@ namespace Character{
                 SubAttributes.Add(subAttrib.Key, subAttrib.Value);
             }
 
-            Inventory = new Equipment();
+            Inventory = new Inventory();
 
 
             this.Save();
@@ -226,8 +247,8 @@ namespace Character{
 			LastName = "";
 			Description = "";
 			Age = 17;   //Do we want an age? And are we going to advance it every in game year?  Players could be 400+ years old rather quick.
-			Weight = 180; //pounds or kilos?
-			Height = 70;  //inches or centimeters?
+			Weight = 180.0d; //pounds or kilos?
+			Height = 70.0d;  //inches or centimeters?
 			Location = 1000;
 			InCombat = false;
 			LastCombatTime = DateTime.MinValue.ToUniversalTime();
@@ -239,7 +260,7 @@ namespace Character{
             Experience = 0;
             PointsToSpend = 0;
 
-            Inventory = new Equipment();
+            Inventory = new Inventory();
 
 			Attributes = new Dictionary<string, Attribute>();
 
@@ -283,8 +304,8 @@ namespace Character{
                     {"SkinType", this.SkinType.CamelCaseWord()},
                     {"HairColor", this.HairColor.CamelCaseWord()},
                     {"EyeColor", this.EyeColor.CamelCaseWord()},
-                    {"Weight", this.Weight},
-                    {"Height", this.Height},
+                    {"Weight", (double)this.Weight},
+                    {"Height", (double)this.Height},
                     {"ActionState", this.ActionState.ToString().CamelCaseWord()},
 					{"StanceState", this.StanceState.ToString().CamelCaseWord()},
 					{"Description", this.Description},
@@ -312,10 +333,10 @@ namespace Character{
 
 				foreach (Attribute a in this.Attributes.Values) {
 					attributes["Name"] = a.Name;
-					attributes["Value"] = (BsonValue)a.Value;
-					attributes["Max"] = (BsonValue)a.Max;
-					attributes["RegenRate"] = (BsonValue)a.RegenRate;
-                    attributes["Rank"] = (BsonValue)a.Rank;
+					attributes["Value"] = (double)a.Value;
+                    attributes["Max"] = (double)a.Max;
+					attributes["RegenRate"] = (double)a.RegenRate;
+                    attributes["Rank"] = (double)a.Rank;
 
 					attributeList.Add(attributes);
 				}
@@ -393,7 +414,7 @@ namespace Character{
 
                 playerCharacter["Inventory"] = inventoryList;
 
-                foreach (KeyValuePair<Items.Wearable, Items.Iitem> item in Inventory.equipped) {
+                foreach (KeyValuePair<Items.Wearable, Items.Iitem> item in Equipment.equipped) {
                     items["_id"] = item.Value.Id;
 
                     equipmentList.Add(items);
@@ -475,7 +496,7 @@ namespace Character{
                 foreach (BsonDocument item in inventoryList) {
                     Items.Iitem fullItem = Items.Items.GetByID(item["_id"].AsObjectId.ToString());
                     if (!Inventory.inventory.Contains(fullItem)) {
-                        Inventory.AddInventoryItem(fullItem);
+                        Inventory.AddItemToInventory(fullItem);
                     }
                 }
             }
@@ -483,8 +504,8 @@ namespace Character{
             if (equipmentList.Count > 0) {
                 foreach (BsonDocument item in equipmentList) {
                     Items.Iitem fullItem = Items.Items.GetByID(item["_id"].AsObjectId.ToString());
-                    if (!Inventory.equipped.ContainsKey(fullItem.WornOn)) {
-                        Inventory.EquipItem(fullItem);
+                    if (!Equipment.equipped.ContainsKey(fullItem.WornOn)) {
+                        Equipment.EquipItem(fullItem);
                     }
                 }
             }
@@ -946,133 +967,10 @@ namespace Character{
             return false;
         }
 
-        public void AddItemToInventory(Items.Iitem item) {
-            item.Owner = this.ID.ToString();
-            item.Save();
-            Inventory.AddInventoryItem(item);
-            Save();
-        }
-
-        public void RemoveItemFromInventory(Items.Iitem item) {
-            Inventory.RemoveInventoryItem(item);
-            Save();
-        }
-
-        public void EquipItem(Items.Iitem item) {
-            Inventory.EquipItem(item);
-            Save();
-        }
-
-        public void UnequipItem(Items.Iitem item) {
-            string resultHand = null;
-            Inventory.UnequipItem(item, out resultHand, MainHand);
-            if (!string.IsNullOrEmpty(resultHand)) {
-                MainHand = resultHand;
-            }
-            Save();
-        }
-
-        public void UpdateInventoryFromDatabase() {
-           MongoCollection col = MongoUtils.MongoData.GetCollection("World", "Items");
-           var docs = col.FindAs<BsonDocument>(Query.EQ("Owner", this.ID));
-           foreach (BsonDocument dbItem in docs) {
-               ObjectId itemID = dbItem["_id"].AsObjectId;
-               Items.Iitem temp = Inventory.inventory.Where(i => i.Id == itemID).SingleOrDefault();
-               if (temp != null){
-                   Inventory.inventory.Remove(temp);
-                   Inventory.inventory.Add(Items.Items.GetByID(dbItem["_id"].AsObjectId.ToString()));
-               }
-           }
-        }
-
-        public List<Items.Iitem> GetInventoryAsItemList() {
-            UpdateInventoryFromDatabase();
-            return Inventory.inventory.ToList();
-        }
-
-        public List<string> GetInventoryList() {
-            UpdateInventoryFromDatabase();
-            List<string> result = new List<string>();
-            Dictionary<string, int> itemGroups = new Dictionary<string, int>();
-
-            foreach (Items.Iitem item in GetInventoryAsItemList()) {
-                if (item != null) {
-                    Items.Icontainer containerItem = item as Items.Icontainer;
-                    if (containerItem != null) {
-                        if (!itemGroups.ContainsKey(item.Name + "$" + (containerItem.Opened ? "[Opened]" : "[Closed]"))) {
-                            itemGroups.Add(item.Name + "$" + (containerItem.Opened ? "[Opened]" : "[Closed]"), 1);
-                        }
-                        else {
-                            itemGroups[item.Name + "$" + (containerItem.Opened ? "[Opened]" : "[Closed]")] += 1;
-                        }
-                    }
-                    else {
-                        if (!itemGroups.ContainsKey(item.Name + "$" + item.CurrentCondition)) {
-                            itemGroups.Add(item.Name + "$" + item.CurrentCondition, 1);
-                        }
-                        else {
-                            itemGroups[item.Name + "$" + item.CurrentCondition] += 1;
-                        }
-                    }
-                }
-            }
-
-            foreach (KeyValuePair<string, int> pair in itemGroups) {
-                string[] temp = pair.Key.Split('$');
-                if (!string.Equals(temp[1], "NONE", StringComparison.InvariantCultureIgnoreCase)) {
-                    if (temp[1].Contains("[Opened]") || temp[1].Contains("[Closed]")) {
-                        result.Add(temp[0] + " " + temp[1] + (pair.Value > 1 ? (" [x" + pair.Value + "]") : ""));
-                    }
-                    else {
-                        result.Add(temp[0] + " (" + temp[1].Replace("_", " ").ToLower() + " condition)" + (pair.Value > 1 ? ("[x" + pair.Value + "]") : ""));
-                    }
-                }
-            }
-
-            return result;
-        }
-
-        public void UpdateEquipmentFromDatabase() {
-            if (this.ID != null) {
-                MongoCollection col = MongoUtils.MongoData.GetCollection("World", "Items");
-                var docs = col.FindAs<BsonDocument>(Query.EQ("Owner", this.ID));
-                foreach (BsonDocument dbItem in docs) {
-                    ObjectId itemID = dbItem["_id"].AsObjectId;
-                    Items.Iitem temp = Inventory.equipped.Where(i => i.Value.Id == itemID).SingleOrDefault().Value;
-                    if (temp != null) {
-                        Inventory.equipped[temp.WornOn] = Items.Items.GetByID(dbItem["_id"].AsObjectId.ToString());
-                    }
-                }
-            }
-        }
-
-        public Dictionary<Items.Wearable, Items.Iitem> GetEquipment() {
-            UpdateEquipmentFromDatabase();
-            return Inventory.equipped;
-        }
-
-        public void Wield(Items.Iitem item) {
-            Inventory.WieldItem(item);
-            Save();
-        }
-
-        public List<Items.Iitem> GetWieldedWeapons() {
-            List<Items.Iitem> result = new List<Items.Iitem>();
-            if (Inventory.equipped.ContainsKey(Items.Wearable.WIELD_RIGHT)) {
-                result.Add((Items.Iitem)Items.ItemFactory.CreateItem(Inventory.equipped[Items.Wearable.WIELD_RIGHT].Id));
-            }
-            if (Inventory.equipped.ContainsKey(Items.Wearable.WIELD_LEFT)) {
-                result.Add((Items.Iitem)Items.ItemFactory.CreateItem(Inventory.equipped[Items.Wearable.WIELD_LEFT].Id));
-            }
-
-            return result;
-        }
-
         public Items.Wearable GetMainHandWeapon() {
             if (MainHand != null) {
                 return (Items.Wearable)Enum.Parse(typeof(Items.Wearable), MainHand);
             }
-
             return Items.Wearable.NONE;
         }
 
@@ -1082,9 +980,9 @@ namespace Character{
                 StringBuilder sb = new StringBuilder();
                 if (commands.Contains("all")) {
                     sb.AppendLine("You loot the following items from " + FirstName + ":");
-                    GetInventoryAsItemList().ForEach(i => {
+                    Inventory.GetInventoryAsItemList().ForEach(i => {
                         sb.AppendLine(i.Name);
-                        looter.Player.AddItemToInventory(i);
+                        looter.Player.Inventory.AddItemToInventory(i);
                     });
                 }
                 else if (commands.Count > 2) { //the big one, should allow to loot individual item from the inventory
@@ -1096,9 +994,9 @@ namespace Character{
                         int.TryParse(positionString[positionString.Count() - 1], out position);
                     }
 
-                    GetInventoryAsItemList().ForEach(i => {
+                    Inventory.GetInventoryAsItemList().ForEach(i => {
                         if (string.Equals(i.Name, itemName, StringComparison.InvariantCultureIgnoreCase) && index == position) {
-                            looter.Player.AddItemToInventory(i);
+                            looter.Player.Inventory.AddItemToInventory(i);
                             sb.AppendLine("You loot " + i.Name + " from " + FirstName);
                             index = -1; //we found it and don't need this to match anymore
                             //no need to break since we are checking on index and I doubt a player will have so many items in their inventory that it will
@@ -1111,7 +1009,7 @@ namespace Character{
                 }
                 else {
                     sb.AppendLine(FirstName + " is carrying: ");
-                    GetInventoryAsItemList().ForEach(i => sb.AppendLine(i.Name));
+                    Inventory.GetInventoryAsItemList().ForEach(i => sb.AppendLine(i.Name));
                 }
             }
         }

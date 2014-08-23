@@ -14,6 +14,8 @@ namespace Character {
     //TODO: Convert this to an interface rather than an abstract class, same with Character and Actor
     public interface Iactor {
         #region  Properties
+        Inventory Inventory { get;}
+        Equipment Equipment { get;}
         #region General
         string Password { get; set; }
         long Experience { get; set; }
@@ -84,7 +86,7 @@ namespace Character {
         bool IsDead();
         void ClearTarget();
         void UpdateTarget(string targetID);
-        void Wield(Items.Iitem item);
+        //void Wield(Items.Iitem item);
 
         #endregion Combat Methods
 
@@ -110,21 +112,22 @@ namespace Character {
         #endregion Language Stuff
 
         #region Inventory/Equipment Wrappers
-        void AddItemToInventory(Items.Iitem item);
-        void RemoveItemFromInventory(Items.Iitem item);
+        //void AddItemToInventory(Items.Iitem item);
+        //void RemoveItemFromInventory(Items.Iitem item);
 
-        void EquipItem(Items.Iitem item);
-        void UnequipItem(Items.Iitem item);
+        //void EquipItem(Items.Iitem item);
+        //void UnequipItem(Items.Iitem item);
 
-        List<Items.Iitem> GetInventoryAsItemList();
-        List<string> GetInventoryList();
-        Dictionary<Items.Wearable, Items.Iitem> GetEquipment();
-        List<Items.Iitem> GetWieldedWeapons();
+        //List<Items.Iitem> GetInventoryAsItemList();
+        //List<string> GetInventoryList();
+        //Dictionary<Items.Wearable, Items.Iitem> GetEquipment();
+        //List<Items.Iitem> GetWieldedWeapons();
+        //List<Items.Iitem> GetAllItemsToWear();
         #endregion Inventory/Equipment Wrappers
 
         #endregion Public Methods
 
-        Items.Wearable GetMainHandWeapon();
+       // Items.Wearable GetMainHandWeapon();
 
         void Loot(User.User looter, List<string> commands);
     }

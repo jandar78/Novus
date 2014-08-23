@@ -20,8 +20,6 @@ namespace Commands{
 		 private static List<string> punctuation = new List<string>(new string[] { ",", ";", "\'", "\"", ":", "|", "\\", "!", "@", "#", "$", "%", "^", "&", "*", "(", ")", "[", "]", "{", "}", "=", "+", "-", "_" });
 		 private static List<string> uselessWords = new List<string>(new string[] { "and", "or", "if", "for", "yet", "nor", "but", "because", "so", "the", "to", "then", "that"});
 
-		
-
 		 static public void ParseCommands(User.User player) {
 			 List<string> commands = ParseCommandLine(player.InBufferPeek);
              bool commandFound = false;

@@ -52,10 +52,10 @@ namespace Commands {
 
             TargetEachOther(player, enemy);
 
-            Items.Wearable mainHand = player.Player.GetMainHandWeapon();
+            Items.Wearable mainHand = player.Player.Equipment.GetMainHandWeapon();
 
             WeaponHandAttack(player, enemy); //pass in also which hand they're attacking with? Yes. Main hand attack
-            if (player.Player.GetWieldedWeapons().Count == 2) {
+            if (player.Player.Equipment.GetWieldedWeapons().Count == 2) {
                 //if they are wielding a weapon in their opposite hand then attack with it.
                 WeaponHandAttack(player, enemy, true); //off-hand attack
             }
@@ -226,7 +226,7 @@ namespace Commands {
 
         private static double WeaponDamage(User.User player, bool offhand = false) {
             double result = 0.0d;
-            List<Items.Iitem> weapons = player.Player.GetWieldedWeapons();
+            List<Items.Iitem> weapons = player.Player.Equipment.GetWieldedWeapons();
             if (weapons.Count > 0) {
                 Items.Iweapon weapon;
                 if (!offhand) {

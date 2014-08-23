@@ -110,8 +110,8 @@ namespace Items {
                 }
             }
             OnDrained(new ItemEventArgs(ItemEvent.DRAIN, this.Id));
-            temp.Player.GetInventoryAsItemList(); //this will force an update on the inventory items 
-            temp.Player.GetEquipment(); //this will force an update on the equipment
+            temp.Player.Inventory.GetInventoryAsItemList(); //this will force an update on the inventory items 
+            temp.Player.Equipment.GetEquipment(); //this will force an update on the equipment
             this.Save();
         }
 

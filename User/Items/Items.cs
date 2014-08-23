@@ -285,6 +285,57 @@ namespace Items {
             return Description;
         }
 
+        public static Iitem GetBestItem(List<Iitem> set) {
+            Iitem bestItem = null;
+            if (set.Count() > 0) {
+                bestItem = set[0];
+                foreach (Iitem comparee in set) {
+                    if (bestItem == comparee) {
+                        continue;
+                    }
+                    bestItem = CompareItems(bestItem, comparee);
+                }
+            }
+            return bestItem;
+        }
+
+        //we are going to base the best item on an accumulation of points based on every stat difference for the item
+        private static Iitem CompareItems(Iitem bestItem, Iitem comparee) {
+            List<int> scores = new List<int>();
+            List<Iitem> bothItems = new List<Iitem> { bestItem, comparee };
+            
+            int index = 0;
+            foreach (Iitem item in bothItems) {
+                Iclothing clothing = item as Iclothing;
+                Iweapon weapon = item as Iweapon;
+                Icontainer container = item as Icontainer;
+
+                if (clothing != null) {
+                    scores[index] += (int)clothing.CurrentDefense;
+                }
+                
+                if (weapon != null) {
+                    scores[index] += (int)(weapon.CurrentMaxDamage - weapon.CurrentMinDamage);
+                    scores[index] += (int)weapon.AttackSpeed;
+                    //TODO: will need to figure out wear effects and player/target attack effects
+                }
+
+                if (container != null) {
+                    //TODO: hmmm need to normalize these values prior to adding to the score tally
+                    scores[index] += (int)container.WeightLimit / 100;
+                    scores[index] += (int)container.ReduceCarryWeightBy * 100;
+                }
+
+                index++;
+            }
+
+            if (scores[1] > scores[0]) {
+                bestItem = bothItems[1];
+            }
+
+            return bestItem;
+        }
+
     }
 
     public class ItemEventArgs : EventArgs {

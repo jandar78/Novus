@@ -14,9 +14,27 @@ using Triggers;
 namespace Character {
     public class NPC : Iactor, Inpc {
         private Dictionary<string, double> damageTracker;
+
+        private Inventory _inventory;
+        private Equipment _equipment;
+
         #region Public Members
-        public Equipment Inventory;
-        public Equipment equipment;
+        public Inventory Inventory {
+            get {
+                return _inventory;
+            }
+            set {
+                _inventory = value;
+            }
+        }
+        public Equipment Equipment {
+            get {
+                return _equipment;
+            }
+            set {
+                _equipment = value;
+            }
+        }
         public Queue<string> Messages;
         public List<ITrigger> Triggers;
         #endregion Public Members
@@ -387,7 +405,7 @@ namespace Character {
             KnownLanguages = new HashSet<Languages>();
             KnownLanguages.Add(_primaryLanguage);
 
-            Inventory = new Equipment();
+            Inventory = new Inventory();
             damageTracker = new Dictionary<string, double>();
             Triggers = new List<ITrigger>();
 
@@ -408,6 +426,12 @@ namespace Character {
             Experience = 0;
             PointsToSpend = 0;
             IsMob = false;
+
+            Inventory = new Inventory();
+            Equipment = new Equipment();
+
+            Inventory.player = this;
+            Equipment.player = this;
 
 			Attributes = new Dictionary<string, Attribute>();
 
@@ -865,114 +889,15 @@ namespace Character {
             return false;
         }
 
-        public void AddItemToInventory(Items.Iitem item) {
-            Inventory.AddInventoryItem(item);
-            Save();
-        }
-
-        public void RemoveItemFromInventory(Items.Iitem item) {
-            Inventory.RemoveInventoryItem(item);
-            Save();
-        }
-
-        public void EquipItem(Items.Iitem item) {
-            Inventory.EquipItem(item);
-            Save();
-        }
-
-        public void UnequipItem(Items.Iitem item) {
-            string resultHand = null;
-            Inventory.UnequipItem(item, out resultHand, MainHand);
-            if (!string.IsNullOrEmpty(resultHand)) {
-                MainHand = resultHand;
-            }
-            Save();
-        }
-
-        public List<Items.Iitem> GetInventoryAsItemList() {
-            return Inventory.inventory.ToList();
-        }
-
-        public List<string> GetInventoryList() {
-            List<string> result = new List<string>();
-            Dictionary<string, int> itemGroups = new Dictionary<string, int>();
-
-            foreach (Items.Iitem item in GetInventoryAsItemList()) {
-                if (item != null) {
-                    Items.Icontainer containerItem = item as Items.Icontainer;
-                    if (containerItem != null) {
-                        if (!itemGroups.ContainsKey(item.Name + "$" + (containerItem.Opened ? "[Opened]" : "[Closed]"))) {
-                            itemGroups.Add(item.Name + "$" + (containerItem.Opened ? "[Opened]" : "[Closed]"), 1);
-                        }
-                        else {
-                            itemGroups[item.Name + "$" + (containerItem.Opened ? "[Opened]" : "[Closed]")] += 1;
-                        }
-                    }
-                    else {
-                        if (!itemGroups.ContainsKey(item.Name + "$" + item.CurrentCondition)) {
-                            itemGroups.Add(item.Name + "$" + item.CurrentCondition, 1);
-                        }
-                        else {
-                            itemGroups[item.Name + "$" + item.CurrentCondition] += 1;
-                        }
-                    }
-                }
-            }
-
-            foreach (KeyValuePair<string, int> pair in itemGroups) {
-                string[] temp = pair.Key.Split('$');
-                if (!string.Equals(temp[1], "NONE", StringComparison.InvariantCultureIgnoreCase)) {
-                    if (temp[1].Contains("[Opened]") || temp[1].Contains("[Closed]")) {
-                        result.Add(temp[0] + " " + temp[1] + (pair.Value > 1 ? (" [x" + pair.Value + "]") : ""));
-                    }
-                    else {
-                        result.Add(temp[0] + " (" + temp[1].Replace("_", " ").ToLower() + " condition)" + (pair.Value > 1 ? ("[x" + pair.Value + "]") : ""));
-                    }
-                }
-            }
-
-            return result;
-        }
-
-        public Dictionary<Items.Wearable, Items.Iitem> GetEquipment() {
-            return Inventory.equipped;
-        }
-
-        public void Wield(Items.Iitem item) {
-            Inventory.WieldItem(item);
-            Save();
-        }
-
-        public List<Items.Iitem> GetWieldedWeapons() {
-            List<Items.Iitem> result = new List<Items.Iitem>();
-            if (Inventory.equipped.ContainsKey(Items.Wearable.WIELD_RIGHT)) {
-                result.Add((Items.Iitem)Items.ItemFactory.CreateItem(Inventory.equipped[Items.Wearable.WIELD_RIGHT].Id));
-            }
-            if (Inventory.equipped.ContainsKey(Items.Wearable.WIELD_LEFT)) {
-                result.Add((Items.Iitem)Items.ItemFactory.CreateItem(Inventory.equipped[Items.Wearable.WIELD_LEFT].Id));
-            }
-
-            return result;
-        }
-
-        public Items.Wearable GetMainHandWeapon() {
-            if (MainHand != null) {
-                return (Items.Wearable)Enum.Parse(typeof(Items.Wearable), MainHand);
-            }
-
-            return Items.Wearable.NONE;
-        }
-
         public void Loot(User.User looter, List<string> commands) {
             if (IsDead()) {
                 List<Items.Iitem> result = new List<Items.Iitem>();
                 StringBuilder sb = new StringBuilder();
                 if (commands.Contains("all")) {
                     sb.AppendLine("You loot the following items from " + FirstName + ":");
-                    GetInventoryAsItemList().ForEach(i => {
+                    Inventory.GetInventoryAsItemList().ForEach(i => {
                         sb.AppendLine(i.Name);
-                        looter.Player.AddItemToInventory(Inventory.RemoveInventoryItem(i));
-                        
+                        looter.Player.Inventory.AddItemToInventory(Inventory.RemoveInventoryItem(i));
                     });
                 }
                 else if (commands.Count > 2) { //the big one, should allow to loot individual item from the inventory
@@ -984,10 +909,12 @@ namespace Character {
                         int.TryParse(positionString[positionString.Count() - 1], out position);
                     }
 
-                    GetInventoryAsItemList().ForEach(i => {
+                    Inventory.GetInventoryAsItemList().ForEach(i => {
                         if (string.Equals(i.Name, itemName, StringComparison.InvariantCultureIgnoreCase) && index == position) {
-                            looter.Player.AddItemToInventory(Inventory.RemoveInventoryItem(i));
+                            looter.Player.Inventory.AddItemToInventory(Inventory.RemoveInventoryItem(i));
+     
                             sb.AppendLine("You loot " + i.Name + " from " + FirstName);
+                            Rooms.Room.GetRoom(looter.Player.Location).InformPlayersInRoom(string.Format("{0} loots {1} from {3}'s lifeless body.", looter.Player.FirstName, i.Name, FirstName), new List<string>() { ID });
                             index = -1; //we found it and don't need this to match anymore
                             //no need to break since we are checking on index and I doubt a player will have so many items in their inventory that it will
                             //take a long time to go through each of them
@@ -998,9 +925,11 @@ namespace Character {
                     });
                 }
                 else {
-                    sb.AppendLine(FirstName + " is carrying: ");
-                    GetInventoryAsItemList().ForEach(i => sb.AppendLine(i.Name));
+                    sb.AppendLine(FirstName + " was carrying: ");
+                    Inventory.GetInventoryAsItemList().ForEach(i => sb.AppendLine(i.Name));
                 }
+
+                looter.MessageHandler(sb.ToString());
             }
         }
 
