@@ -23,7 +23,7 @@ namespace ServerConsole {
 
 			ClientHandling.MessageBuffer messageHandler = new ClientHandling.MessageBuffer("Server");
 
-			MySockets.Server server = MySockets.Server.GetServer();
+			MySockets.Server server = MySockets.Server.GetServer();         
 			
             //get script singletons
             Scripts.Login loginScript = Scripts.Login.GetScript();
@@ -41,10 +41,12 @@ namespace ServerConsole {
 
 			try {
 				server.StartServer();
-				StringBuilder sb = new StringBuilder();
-                double speed = 0.0D;
 
-                
+                Console.WriteLine(">>> Listening at IP: " + server.IPAddress + " <<<");
+                Console.WriteLine(">>> Port: " + server.Port + " <<<");
+
+				StringBuilder sb = new StringBuilder();
+                double speed = 0.0D;               
 
 				while (true) {
 					if (Console.KeyAvailable) {

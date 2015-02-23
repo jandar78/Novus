@@ -156,8 +156,8 @@ namespace Commands {
         }
 
 		private static void Look(User.User player, List<string> commands) {
-            List<CharacterEnums.CharacterActionState> NonAllowableStates = new List<CharacterEnums.CharacterActionState> { CharacterEnums.CharacterActionState.DEAD,
-                CharacterEnums.CharacterActionState.ROTTING, CharacterEnums.CharacterActionState.SLEEPING, CharacterEnums.CharacterActionState.UNCONCIOUS };
+            List<CharacterEnums.CharacterActionState> NonAllowableStates = new List<CharacterEnums.CharacterActionState> { CharacterEnums.CharacterActionState.Dead,
+                CharacterEnums.CharacterActionState.Rotting, CharacterEnums.CharacterActionState.Sleeping, CharacterEnums.CharacterActionState.Unconcious };
             
             StringBuilder sb = new StringBuilder();
 

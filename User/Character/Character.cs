@@ -19,7 +19,7 @@ namespace Character{
 	public class Character : Iactor {
         private Inventory _inventory;
         private Equipment _equipment;
-
+       
         #region Public Members
         public Inventory Inventory {
             get {
@@ -44,6 +44,7 @@ namespace Character{
         protected Dictionary<string, double> SubAttributes;
         protected HashSet<CharacterEnums.Languages> KnownLanguages; //this will hold all the languages the player can understand
         protected double _levelModifier;
+        protected StatBonuses Bonuses;
         
         #region Stances
         protected CharacterStanceState _stanceState;
@@ -108,27 +109,27 @@ namespace Character{
 		#region Constructors
 
         public Character() {
-            _class = CharacterEnums.CharacterClass.EXPLORER;
+            _class = CharacterEnums.CharacterClass.Explorer;
             _race = CharacterEnums.CharacterRace.HUMAN;
-            _gender = CharacterEnums.Genders.FEMALE;
-            _skinColor = CharacterEnums.SkinColors.FAIR;
-            _skinType = CharacterEnums.SkinType.FLESH;
-            _hairColor = CharacterEnums.HairColors.BLACK;
-            _eyeColor = CharacterEnums.EyeColors.BROWN;
-            _build = CharacterEnums.BodyBuild.MEDIUM;
+            _gender = CharacterEnums.Genders.Female;
+            _skinColor = CharacterEnums.SkinColors.Fair;
+            _skinType = CharacterEnums.SkinType.Flesh;
+            _hairColor = CharacterEnums.HairColors.Black;
+            _eyeColor = CharacterEnums.EyeColors.Brown;
+            _build = CharacterEnums.BodyBuild.Medium;
 
             _koCount = new Tuple<int, DateTime>(0, DateTime.Now);
-            _actionState = CharacterActionState.NONE;
-            _stanceState = CharacterStanceState.STANDING;
+            _actionState = CharacterActionState.None;
+            _stanceState = CharacterStanceState.Standing;
 
-            _primaryLanguage = CharacterEnums.Languages.COMMON;
+            _primaryLanguage = CharacterEnums.Languages.Common;
             KnownLanguages = new HashSet<Languages>();
             KnownLanguages.Add(_primaryLanguage);
 
             FirstName = "";
             LastName = "";
             Description = "";
-            Age = 17;   //Do we want an age? And are we going to advance it every in game year?  Players could be 400+ years old rather quick.
+            Age = 17;   //Do we want an age? And are we going to advance it every in game year?  We'll need a birthdate for this.
             Weight = 180; //pounds or kilos?
             Height = 70;  //inches or centimeters?
             Location = 1000;
@@ -144,6 +145,7 @@ namespace Character{
 
             Inventory = new Inventory();
             Equipment = new Equipment();
+            Bonuses = new StatBonuses();
 
             Inventory.player = this;
             Equipment.player = this;
@@ -180,8 +182,8 @@ namespace Character{
             _eyeColor = copy._eyeColor;
             _build = copy._build;
             _koCount = new Tuple<int, DateTime>(0, DateTime.Now);
-            _actionState = CharacterActionState.NONE;
-            _stanceState = CharacterStanceState.STANDING;
+            _actionState = CharacterActionState.None;
+            _stanceState = CharacterStanceState.Standing;
 
             _primaryLanguage = copy._primaryLanguage;
             KnownLanguages = new HashSet<Languages>();
@@ -236,8 +238,8 @@ namespace Character{
             _build = build;
 
 			_koCount = new Tuple<int, DateTime>(0, DateTime.Now);
-			_actionState = CharacterActionState.NONE;
-			_stanceState = CharacterStanceState.STANDING;
+			_actionState = CharacterActionState.None;
+			_stanceState = CharacterStanceState.Standing;
             
             _primaryLanguage = language;
             KnownLanguages = new HashSet<Languages>();
@@ -246,7 +248,7 @@ namespace Character{
 			FirstName = "";
 			LastName = "";
 			Description = "";
-			Age = 17;   //Do we want an age? And are we going to advance it every in game year?  Players could be 400+ years old rather quick.
+			Age = 17;   //Do we want an age? And are we going to advance it every in game year?
 			Weight = 180.0d; //pounds or kilos?
 			Height = 70.0d;  //inches or centimeters?
 			Location = 1000;
@@ -261,6 +263,7 @@ namespace Character{
             PointsToSpend = 0;
 
             Inventory = new Inventory();
+            Bonuses = new StatBonuses();
 
 			Attributes = new Dictionary<string, Attribute>();
 
@@ -349,6 +352,8 @@ namespace Character{
                 BsonArray Equipment = new BsonArray();
                 playerCharacter.Add("Equipment", Equipment);
 
+                playerCharacter.Add("Bonuses", Bonuses.GetBson());
+
 			}
 			else {
 				playerCharacter["FirstName"] = this.FirstName.ToLower();
@@ -421,6 +426,8 @@ namespace Character{
                 }
 
                 playerCharacter["Equipment"] = equipmentList;
+
+                playerCharacter["Bonuses"] = Bonuses.GetBson();
 			}
 
            
@@ -468,8 +475,9 @@ namespace Character{
 
 			BsonArray playerAttributes = found["Attributes"].AsBsonArray;
             BsonArray inventoryList = found["Inventory"].AsBsonArray;
-            BsonArray equipmentList = found["Equipment"].AsBsonArray; 
-			
+            BsonArray equipmentList = found["Equipment"].AsBsonArray;
+            BsonArray bonusesList = found["Bonuses"].AsBsonArray;
+           
 			if (playerAttributes != null) {
 				foreach (BsonDocument attrib in playerAttributes) {
 				
@@ -508,6 +516,10 @@ namespace Character{
                         Equipment.EquipItem(fullItem);
                     }
                 }
+            }
+
+            if (bonusesList.Count > 0) {
+                Bonuses.LoadFromBson(bonusesList);
             }
 
 		}
@@ -748,9 +760,9 @@ namespace Character{
                 }
                 //if no longer unconcious, remove the state
                 else if (health > 0) {
-                    if (ActionState == CharacterActionState.UNCONCIOUS) {
-                        SetActionState(CharacterActionState.NONE);
-                        SetStanceState(CharacterStanceState.PRONE);
+                    if (ActionState == CharacterActionState.Unconcious) {
+                        SetActionState(CharacterActionState.None);
+                        SetStanceState(CharacterStanceState.Prone);
                     }
                 }
 
@@ -830,17 +842,17 @@ namespace Character{
         public bool IsUnconcious() {
             bool result = false;
             if (CheckUnconscious) {
-                SetActionState(CharacterEnums.CharacterActionState.UNCONCIOUS);
-                SetStanceState(CharacterStanceState.LAYING_UNCONCIOUS);
+                SetActionState(CharacterEnums.CharacterActionState.Unconcious);
+                SetStanceState(CharacterStanceState.Laying_Unconcious);
                 ClearTarget();
                 result = true;
             }
             else {
-                if (ActionState == CharacterActionState.UNCONCIOUS) {
-                    SetActionState(CharacterActionState.NONE);
+                if (ActionState == CharacterActionState.Unconcious) {
+                    SetActionState(CharacterActionState.None);
                 }
-                if (StanceState == CharacterStanceState.LAYING_UNCONCIOUS) {
-                    SetStanceState(CharacterStanceState.PRONE);
+                if (StanceState == CharacterStanceState.Laying_Unconcious) {
+                    SetStanceState(CharacterStanceState.Prone);
                 }
             }
 
@@ -850,8 +862,8 @@ namespace Character{
         public bool IsDead() {
             bool result = false;
             if (CheckDead) {
-                SetActionState(CharacterActionState.DEAD);
-                SetStanceState(CharacterStanceState.LAYING_DEAD);
+                SetActionState(CharacterActionState.Dead);
+                SetStanceState(CharacterStanceState.Laying_Dead);
                 ClearTarget();
                 result = true;
             }
@@ -875,11 +887,11 @@ namespace Character{
             //if we recovered health let's no longer be dead or unconcious
             if (applied && String.Compare(attribute, "hitpoints", true) == 0) {
                 if (Attributes[attribute.CamelCaseWord()].Value > -10 && Attributes[attribute.CamelCaseWord()].Value <= 0) {
-                    this.SetActionState(CharacterActionState.UNCONCIOUS);
+                    this.SetActionState(CharacterActionState.Unconcious);
                 }
                 else if (Attributes[attribute].Value > 0) {
-                    this.SetActionState(CharacterActionState.NONE);
-                    this.SetStanceState(CharacterStanceState.PRONE);
+                    this.SetActionState(CharacterActionState.None);
+                    this.SetStanceState(CharacterStanceState.Prone);
                 }
             }
         }
@@ -1012,6 +1024,40 @@ namespace Character{
                     Inventory.GetInventoryAsItemList().ForEach(i => sb.AppendLine(i.Name));
                 }
             }
+        }
+
+
+        /// <summary>
+        /// Add a bonus for the passed in type.  Adding to an already existing type increases the amount/time.
+        /// Passing in a negative number reduces it by that amount. To just increase time pass zero for amount.
+        /// </summary>
+        /// <param name="type"></param>
+        /// <param name="name"></param>
+        /// <param name="amount"></param>
+        /// <param name="time"></param>
+        public void AddBonus(BonusTypes type, string name, double amount, int time = 0) {
+            Bonuses.Add(type, amount, time);
+        }
+        
+        /// <summary>
+        /// Remove a bonus for the type passed in.
+        /// </summary>
+        /// <param name="type"></param>
+        /// <param name="name"></param>
+        /// <param name="bonus"></param>
+        public void RemoveBonus(BonusTypes type, string name, double bonus) {
+            Bonuses.Remove(type);
+        }
+
+        /// <summary>
+        /// Removes any bonuses whose time has expired.
+        /// </summary>
+        public void CleanupBonuses() {
+            Bonuses.Cleanup();
+        }
+
+        public double GetBonus(BonusTypes type) {
+            return Bonuses.GetBonus(type);
         }
     }
 

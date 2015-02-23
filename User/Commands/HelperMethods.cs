@@ -23,7 +23,7 @@ namespace Commands {
                     if (id != ignoreId) {
                         User.User otherUser = MySockets.Server.GetAUser(id);
                         if (otherUser != null && otherUser.CurrentState == User.User.UserState.TALKING) {
-                            if (otherUser.Player.ActionState != CharacterEnums.CharacterActionState.HIDING && otherUser.Player.ActionState != CharacterEnums.CharacterActionState.SNEAKING){  //(string.IsNullOrEmpty(PassesHideCheck(otherUser, ignoreId, out spot))) { //player should do a spot check this should not be a given
+                            if (otherUser.Player.ActionState != CharacterEnums.CharacterActionState.Hiding && otherUser.Player.ActionState != CharacterEnums.CharacterActionState.Sneaking){  //(string.IsNullOrEmpty(PassesHideCheck(otherUser, ignoreId, out spot))) { //player should do a spot check this should not be a given
                                 sb.AppendLine(otherUser.Player.FirstName + " is " + otherUser.Player.StanceState.ToString().ToLower() + " here.");
                             }  
                         }
@@ -66,7 +66,7 @@ namespace Commands {
                     if (id != ignoreId) {
                         User.User otherUser = MySockets.Server.GetAUser(id);
                         if (otherUser != null && otherUser.CurrentState == User.User.UserState.TALKING) {
-                            if (otherUser.Player.ActionState != CharacterEnums.CharacterActionState.HIDING && otherUser.Player.ActionState != CharacterEnums.CharacterActionState.SNEAKING) {  //player should do a spot check this should not be a given
+                            if (otherUser.Player.ActionState != CharacterEnums.CharacterActionState.Hiding && otherUser.Player.ActionState != CharacterEnums.CharacterActionState.Sneaking) {  //player should do a spot check this should not be a given
                                 count++;
                             }
                         }
@@ -84,72 +84,6 @@ namespace Commands {
 
             return sb.ToString();
         }
-
-        //private static string PassesHideCheck(User.User target, string playerID, out bool spotted) {
-        //    string message = null;
-        //    spotted = true;
-
-        //    if (target.Player.ActionState == CharacterEnums.CharacterActionState.HIDING || target.Player.ActionState == CharacterEnums.CharacterActionState.SNEAKING) {
-        //        User.User player = MySockets.Server.GetAUser(playerID);              
-
-        //        MongoUtils.MongoData.ConnectToDatabase();
-        //        MongoDatabase db = MongoUtils.MongoData.GetDatabase("Messages");
-        //        MongoCollection col = db.GetCollection("Skills");
-        //        var skill = col.FindOneAs<BsonDocument>(Query.EQ("_id", "Spot"));
-        //        List<string> attributes = new List<string>();
-        //        foreach (BsonValue attrib in skill["Attributes"].AsBsonArray){
-        //            attributes.Add(attrib.AsString);
-        //        }
-
-        //        double result = 0; // CalculateSkillLevel(target, attributes) - CalculateSkillLevel(player, attributes);
-
-        //        foreach (BsonDocument doc in skill["Message"].AsBsonArray) {
-        //            if (result >= doc["min"].AsInt32 && result < doc["max"].AsInt32) {
-        //                message = string.Format(doc["Msg"].AsString, target.Player.FirstName).FontColor(Utils.FontForeColor.YELLOW);
-        //                target.MessageHandler(string.Format(doc["MsgTarget"].AsString, player.Player.FirstName).FontColor(Utils.FontForeColor.YELLOW));
-        //                spotted = doc["spotted"].AsBoolean;
-        //                break;
-        //            }
-        //        }
-        //    }
-        //    if (spotted) return null;
-        //    else return "You fail to spot anyone hiding here.";
-        //}
-
-        //private static string PassSneakCheck(User.User target, string playerID, out bool spotted) {
-        //    User.User player = MySockets.Server.GetAUser(playerID);
-        //    string message = null;
-        //    string msgOther = null;
-        //    spotted = false;
-
-        //    MongoUtils.MongoData.ConnectToDatabase();
-        //    MongoDatabase db = MongoUtils.MongoData.GetDatabase("Messages");
-        //    MongoCollection col = db.GetCollection("Skills");
-        //    var mastery = col.FindOneAs<BsonDocument>(Query.EQ("_id", "SpotSneak"));
-
-        //    double hide = 0; //GetHide(target.Player.GetSubAttributes()["Agility"], target.Player.GetSubAttributes()["Cunning"], target.Player.GetAttributeRank("Dexterity"));
-        //    double spot = 0; //GetHide(player.Player.GetSubAttributes()["Agility"], player.Player.GetSubAttributes()["Cunning"], player.Player.GetAttributeRank("Dexterity"));
-
-        //    double result = hide - spot;
-
-        //    foreach (BsonDocument doc in mastery["Message"].AsBsonArray) {
-        //        if (result >= doc["min"].AsInt32 && result < doc["max"].AsInt32) {
-        //            message = string.Format(doc["msg"].AsString, target.Player.FirstName).FontColor(Utils.FontForeColor.YELLOW);
-        //            spotted = doc["spotted"].AsBoolean;
-        //            break;
-        //        }
-        //    }
-
-        //    foreach (BsonDocument doc in mastery["MessageOthers"].AsBsonArray) {
-        //        if (result >= doc["min"].AsInt32 && result < doc["max"].AsInt32) {
-        //            msgOther = string.Format(doc["msg"].AsString, player.Player.FirstName).FontColor(Utils.FontForeColor.YELLOW);
-        //            target.MessageHandler(string.Format(msgOther));
-        //            break;
-        //        }
-        //    }
-
-        //    return message;
-        //}
 
        private static string DisplayItemsInRoom(Room room) {
             StringBuilder sb = new StringBuilder();

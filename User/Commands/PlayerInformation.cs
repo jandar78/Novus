@@ -13,7 +13,7 @@ using Extensions;
 namespace Commands {
 	public partial class CommandParser {
 
-		//Todo: this needs more work done and also need to figure out a nice way to display it to the user
+		//TODO: this needs more work done and also need to figure out a nice way to display it to the user
 		private static void DisplayStats(User.User player, List<string> commands) {
             Character.Character character = player.Player as Character.Character;
             if (character != null) {
@@ -146,6 +146,7 @@ namespace Commands {
 		}
 
 		//a whisper is a private message but with a chance that other players may hear what was said, other player has to be in the same room
+        //TODO: need to add the ability for others to listen in on the whisper if they have the skill
 		private static void Whisper(User.User player, List<string> commands){
 			List<User.User> toPlayerList = new List<User.User>();
             Room room = Room.GetRoom(player.Player.Location);

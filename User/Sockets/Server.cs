@@ -15,7 +15,7 @@ namespace MySockets
 		#region Public Properties
 		public string IPAddress {
 			get {
-				return _ipAddress.ToString();
+                return _ipAddress.ToString();
 			}
 		   set {
 				System.Net.IPAddress.TryParse(value, out _ipAddress);
@@ -146,9 +146,9 @@ namespace MySockets
 
 		public void StartServer() {
 			try {
-				this.ServerSocket.Bind(new System.Net.IPEndPoint(System.Net.IPAddress.Any, Port));
+				this.ServerSocket.Bind(new System.Net.IPEndPoint(System.Net.IPAddress.Parse(IPAddress), Port));
 				this.ServerSocket.Listen(1);
-				serverLogger.Log(">>>Server started at IP: " + IPAddress.ToString() + "   Port: " + Port + " <<<");
+				serverLogger.Log(">>>Server started at IP: " + _ipAddress + "   Port: " + Port + " <<<");
 				this.ServerSocket.BeginAccept(new AsyncCallback(AcceptCallback), null);
 				serverLogger.Log(">>>Server is listening for incoming connections<<<");
 			}

@@ -13,10 +13,12 @@ using Triggers;
 
 namespace Character {
     public class NPC : Iactor, Inpc {
+        #region private things
         private Dictionary<string, double> damageTracker;
-
         private Inventory _inventory;
         private Equipment _equipment;
+        
+        #endregion private things
 
         #region Public Members
         public Inventory Inventory {
@@ -44,7 +46,7 @@ namespace Character {
         protected Dictionary<string, double> SubAttributes;
         protected HashSet<CharacterEnums.Languages> KnownLanguages; //this will hold all the languages the player can understand
         protected double _levelModifier;
-        
+        private StatBonuses Bonuses;
 
         #region Stances
         protected CharacterStanceState _stanceState;
@@ -329,9 +331,9 @@ namespace Character {
                 }
                 //if no longer unconcious, remove the state
                 else if (health > 0) {
-                    if (ActionState == CharacterActionState.UNCONCIOUS) {
-                        SetActionState(CharacterActionState.NONE);
-                        SetStanceState(CharacterStanceState.PRONE);
+                    if (ActionState == CharacterActionState.Unconcious) {
+                        SetActionState(CharacterActionState.None);
+                        SetStanceState(CharacterStanceState.Prone);
                     }
                 }
 
@@ -398,8 +400,8 @@ namespace Character {
             _build = build;
 
 			_koCount = new Tuple<int, DateTime>(0, DateTime.Now);
-			_actionState = CharacterActionState.NONE;
-			_stanceState = CharacterStanceState.STANDING;
+			_actionState = CharacterActionState.None;
+			_stanceState = CharacterStanceState.Standing;
             
             _primaryLanguage = language;
             KnownLanguages = new HashSet<Languages>();
@@ -408,6 +410,7 @@ namespace Character {
             Inventory = new Inventory();
             damageTracker = new Dictionary<string, double>();
             Triggers = new List<ITrigger>();
+            Bonuses = new StatBonuses();
 
 			FirstName = "";
             LastName = "";
@@ -524,6 +527,8 @@ namespace Character {
                 }
 
                 npcCharacter.Add("XpTracker", xpTracker);
+
+                npcCharacter.Add("Bonuses", Bonuses.GetBson());
             }
             else {
                 npcCharacter["FirstName"] = this.FirstName;
@@ -587,6 +592,8 @@ namespace Character {
                 }
 
                 npcCharacter["XpTracker"] = xpTracker;
+
+                npcCharacter["Bonuses"] = Bonuses.GetBson();
             }
 
             characterCollection.Save(npcCharacter);
@@ -638,6 +645,7 @@ namespace Character {
             BsonArray playerAttributes = found["Attributes"].AsBsonArray;
             BsonArray xpTracker = found["XpTracker"].AsBsonArray;
             BsonDocument triggers = found["Triggers"].AsBsonDocument;
+            BsonArray bonusesList = found["Bonuses"].AsBsonArray;
 
             if (playerAttributes != null) {
                 foreach (BsonDocument attrib in playerAttributes) {
@@ -669,6 +677,10 @@ namespace Character {
 
             ITrigger trigger = new SpeechTrigger(triggers);
             Triggers.Add(trigger);
+
+            if (bonusesList.Count > 0) {
+                Bonuses.LoadFromBson(bonusesList);
+            }
         }
 
         public void CalculateXP() {
@@ -752,17 +764,17 @@ namespace Character {
         public bool IsUnconcious() {
             bool result = false;
             if (CheckUnconscious) {
-                SetActionState(CharacterEnums.CharacterActionState.UNCONCIOUS);
-                SetStanceState(CharacterStanceState.LAYING_UNCONCIOUS);
+                SetActionState(CharacterEnums.CharacterActionState.Unconcious);
+                SetStanceState(CharacterStanceState.Laying_Unconcious);
                 ClearTarget();
                 result = true;
             }
             else {
-                if (ActionState == CharacterActionState.UNCONCIOUS) {
-                    SetActionState(CharacterActionState.NONE);
+                if (ActionState == CharacterActionState.Unconcious) {
+                    SetActionState(CharacterActionState.None);
                 }
-                if (StanceState == CharacterStanceState.LAYING_UNCONCIOUS) {
-                    SetStanceState(CharacterStanceState.PRONE);
+                if (StanceState == CharacterStanceState.Laying_Unconcious) {
+                    SetStanceState(CharacterStanceState.Prone);
                 }
             }
 
@@ -772,8 +784,8 @@ namespace Character {
         public bool IsDead() {
             bool result = false;
             if (CheckDead) {
-                SetActionState(CharacterActionState.DEAD);
-                SetStanceState(CharacterStanceState.LAYING_DEAD);
+                SetActionState(CharacterActionState.Dead);
+                SetStanceState(CharacterStanceState.Laying_Dead);
                 ClearTarget();
                 result = true;
             }
@@ -797,11 +809,11 @@ namespace Character {
             //if we recovered health let's no longer be dead or unconcious
             if (applied && String.Compare(attribute, "hitpoints", true) == 0) {
                 if (Attributes[attribute.CamelCaseWord()].Value > -10 && Attributes[attribute.CamelCaseWord()].Value <= 0) {
-                    this.SetActionState(CharacterActionState.UNCONCIOUS);
+                    this.SetActionState(CharacterActionState.Unconcious);
                 }
                 else if (Attributes[attribute].Value > 0) {
-                    this.SetActionState(CharacterActionState.UNCONCIOUS);
-                    this.SetStanceState(CharacterStanceState.PRONE);
+                    this.SetActionState(CharacterActionState.Unconcious);
+                    this.SetStanceState(CharacterStanceState.Prone);
                 }
             }
         }
@@ -893,6 +905,7 @@ namespace Character {
             if (IsDead()) {
                 List<Items.Iitem> result = new List<Items.Iitem>();
                 StringBuilder sb = new StringBuilder();
+                
                 if (commands.Contains("all")) {
                     sb.AppendLine("You loot the following items from " + FirstName + ":");
                     Inventory.GetInventoryAsItemList().ForEach(i => {
@@ -933,8 +946,41 @@ namespace Character {
             }
         }
 
-        void Iactor.RewardXP(string id, long amount) {
+        public void RewardXP(string id, long amount) {
             throw new NotImplementedException();
+        }
+
+        /// <summary>
+        /// Add a bonus for the passed in type.  Adding to an already existing type increases the amount/time.
+        /// Passing in a negative number reduces it by that amount. To just increase time pass zero for amount.
+        /// </summary>
+        /// <param name="type"></param>
+        /// <param name="name"></param>
+        /// <param name="amount"></param>
+        /// <param name="time"></param>
+        public void AddBonus(BonusTypes type, string name, double amount, int time = 0) {
+            Bonuses.Add(type, amount, time);
+        }
+
+        /// <summary>
+        /// Remove a bonus for the type passed in.
+        /// </summary>
+        /// <param name="type"></param>
+        /// <param name="name"></param>
+        /// <param name="bonus"></param>
+        public void RemoveBonus(BonusTypes type, string name, double bonus) {
+            Bonuses.Remove(type);
+        }
+
+        /// <summary>
+        /// Removes any bonuses whose time has expired.
+        /// </summary>
+        public void CleanupBonuses() {
+            Bonuses.Cleanup();
+        }
+
+        public double GetBonus(BonusTypes type) {
+            return Bonuses.GetBonus(type);
         }
     }
 

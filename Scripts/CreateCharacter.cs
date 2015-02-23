@@ -9,508 +9,506 @@ using MongoDB.Bson;
 using MongoDB.Driver.Builders;
 using Extensions;
 
-namespace Scripts
-{
-    public class CreateCharacter
-    {
-		 private static MongoCollection _generalCollection;
-         private static MongoCollection _scriptCollection;
+namespace Scripts {
+    public class CreateCharacter {
+        private static MongoCollection _generalCollection;
+        private static MongoCollection _scriptCollection;
 
-         private static List<TempChar> usersCreatingChars = new List<TempChar>();
+        private static List<TempChar> usersCreatingChars = new List<TempChar>();
 
-		 public static CreateCharacter creationScript = null;
+        public static CreateCharacter creationScript = null;
 
-         public static CreateCharacter GetScript() {
-             return creationScript ?? (creationScript = new CreateCharacter());
-		 }
+        public static CreateCharacter GetScript() {
+            return creationScript ?? (creationScript = new CreateCharacter());
+        }
 
-		 public void AddUserToScript(User.User user){
-             usersCreatingChars.Add(new TempChar(user));
-		 }
+        public void AddUserToScript(User.User user) {
+            usersCreatingChars.Add(new TempChar(user));
+        }
 
-         private CreateCharacter() {
-             MongoUtils.MongoData.ConnectToDatabase();
-             MongoDatabase db = MongoUtils.MongoData.GetDatabase("Characters");
-             _generalCollection = db.GetCollection("General");
+        private CreateCharacter() {
+            MongoUtils.MongoData.ConnectToDatabase();
+            MongoDatabase db = MongoUtils.MongoData.GetDatabase("Characters");
+            _generalCollection = db.GetCollection("General");
 
-             db = MongoUtils.MongoData.GetDatabase("Scripts");
-             _scriptCollection = db.GetCollection("CreateCharacter");
+            db = MongoUtils.MongoData.GetDatabase("Scripts");
+            _scriptCollection = db.GetCollection("CreateCharacter");
 
-         }
-		 public User.User.UserState InsertResponse(string response, string userId) {
-			 User.User.UserState state = User.User.UserState.CREATING_CHARACTER;
+        }
+        public User.User.UserState InsertResponse(string response, string userId) {
+            User.User.UserState state = User.User.UserState.CREATING_CHARACTER;
 
-             if (string.IsNullOrEmpty(response)) return state; 
+            if (string.IsNullOrEmpty(response)) return state;
 
-             TempChar specificUser = usersCreatingChars.Where(u => u.user.UserID == userId).SingleOrDefault();
+            TempChar specificUser = usersCreatingChars.Where(u => u.user.UserID == userId).SingleOrDefault();
 
-             //Get the confirmation from the previous selection
-             if (specificUser.confirmStep != CreateCharSteps.NONE) {
-                 if (!ConfirmSelection(response)) {
-                     specificUser.currentStep = specificUser.confirmStep; //go back to the previous selection
-                     specificUser.lastStep = CreateCharSteps.NONE;
-                 }
-                 else {
-                     specificUser.currentStep = specificUser.nextStep;
-                 }
-                 specificUser.confirmStep = CreateCharSteps.NONE;
-                 return state; 
-             }
+            //Get the confirmation from the previous selection
+            if (specificUser.confirmStep != CreateCharSteps.NONE) {
+                if (!ConfirmSelection(response)) {
+                    specificUser.currentStep = specificUser.confirmStep; //go back to the previous selection
+                    specificUser.lastStep = CreateCharSteps.NONE;
+                }
+                else {
+                    specificUser.currentStep = specificUser.nextStep;
+                }
+                specificUser.confirmStep = CreateCharSteps.NONE;
+                return state;
+            }
 
 
-             if (specificUser != null && specificUser.currentStep == CreateCharSteps.AWAITINGRESPONSE) {
-				 
-				 switch (specificUser.lastStep) {
-                     case CreateCharSteps.FIRST_NAME:
-                         specificUser.FirstName = response;
-                         specificUser.currentStep = CreateCharSteps.LAST_NAME;
-                         specificUser.lastStep = CreateCharSteps.AWAITINGRESPONSE;
-						 break;
-                     case CreateCharSteps.LAST_NAME:
-                         if (ValidatePlayerName(specificUser.user.UserID, response)) {
-                             if (String.Compare(response, "name", true) != 0) {
-                                 specificUser.LastName = response;
-                                 specificUser.currentStep = CreateCharSteps.PASSWORD;
-                                 specificUser.lastStep = CreateCharSteps.AWAITINGRESPONSE;
-                             }
-                             else {
-                                 specificUser.currentStep = CreateCharSteps.FIRST_NAME;
-                                 specificUser.lastStep = CreateCharSteps.AWAITINGRESPONSE;
-                             }
-                         }
-                         else {
-                             specificUser.currentStep = CreateCharSteps.FIRST_NAME;
-                             specificUser.lastStep = CreateCharSteps.AWAITINGRESPONSE;
-                         }
-                         break;
-                     case CreateCharSteps.PASSWORD:
-                         specificUser.Password = response;
-                         specificUser.currentStep = CreateCharSteps.PASSWORD_CHECK;
-                         specificUser.lastStep = CreateCharSteps.AWAITINGRESPONSE;
-						 break;
+            if (specificUser != null && specificUser.currentStep == CreateCharSteps.AWAITINGRESPONSE) {
 
-                     case CreateCharSteps.PASSWORD_CHECK:
-                         if (ValidatePlayerPassword(specificUser.user.UserID, response)) {
-                             specificUser.Password = response;
-                             specificUser.currentStep = CreateCharSteps.CLASS;
-                             specificUser.lastStep = CreateCharSteps.AWAITINGRESPONSE;
-                         }
-                         else {
-                             specificUser.currentStep = CreateCharSteps.PASSWORD;
-                             specificUser.lastStep = CreateCharSteps.PASSWORD;
-                         }
-                         break;
-                     case CreateCharSteps.CLASS: {
-                         if (String.Compare(response.Substring(0, 1), "b", true) != 0) {
-                             int selection = 0;
-                             int.TryParse(response, out selection);
-                             int max = (GetMaxEnum<CharacterEnums.CharacterClass>() / 8) + 1;
-                             if (selection >= 1 && selection <= max) {
-                                 specificUser.Class = (CharacterEnums.CharacterClass)(1 << selection);
-                                 specificUser.confirmStep = CreateCharSteps.CLASS;
-                                 specificUser.currentStep = CreateCharSteps.CLASS;
-                                 specificUser.nextStep = CreateCharSteps.GENDER;
-                                 specificUser.lastStep = CreateCharSteps.AWAITINGRESPONSE;
-                             }
-                             else {
-                                 specificUser.currentStep = CreateCharSteps.CLASS;
-                                 specificUser.lastStep = CreateCharSteps.CLASS;
-                             }
-                         }
-                         else {
-                             specificUser.currentStep = CreateCharSteps.FIRST_NAME;
-                             specificUser.lastStep = CreateCharSteps.AWAITINGRESPONSE;
-                         }
-                             break;
-                         }
-                     case CreateCharSteps.GENDER: {
-                         if (String.Compare(response.Substring(0, 1), "b", true) != 0) {
-                             int selection = 0;
-                             int.TryParse(response, out selection);
-                             selection--;
-                             if (selection >= 0 && selection <= GetMaxEnum<CharacterEnums.Genders>()) {
-                                 specificUser.Gender = (CharacterEnums.Genders)selection;
-                                 specificUser.currentStep = CreateCharSteps.RACE;
-                                 specificUser.lastStep = CreateCharSteps.AWAITINGRESPONSE;
-                             }
-                             else {
-                                 specificUser.currentStep = CreateCharSteps.GENDER;
-                                 specificUser.lastStep = CreateCharSteps.GENDER;
-                             }
-                         }
-                         else {
-                             specificUser.currentStep = CreateCharSteps.CLASS;
-                             specificUser.lastStep = CreateCharSteps.AWAITINGRESPONSE;
-                         }
-                             break;
-                         }
-                     case CreateCharSteps.RACE: {
-                         if (String.Compare(response.Substring(0, 1), "b", true) != 0) {
-                             int selection = 0;
-                             int.TryParse(response, out selection);
-                             selection--;
-                             if (selection >= 0 && selection <= GetMaxEnum<CharacterEnums.CharacterRace>()) {
-                                 specificUser.Race = (CharacterEnums.CharacterRace)selection;
-                                 specificUser.confirmStep = CreateCharSteps.RACE;
-                                 specificUser.currentStep = CreateCharSteps.RACE;
-                                 specificUser.nextStep = CreateCharSteps.LANGUAGE;
-                                 specificUser.lastStep = CreateCharSteps.AWAITINGRESPONSE;
-                             }
-                             else {
-                                 specificUser.currentStep = CreateCharSteps.RACE;
-                                 specificUser.lastStep = CreateCharSteps.RACE;
-                             }
-                         }
-                         else {
-                             specificUser.currentStep = CreateCharSteps.GENDER;
-                             specificUser.lastStep = CreateCharSteps.AWAITINGRESPONSE;
-                         }
+                switch (specificUser.lastStep) {
+                    case CreateCharSteps.FIRST_NAME:
+                        specificUser.FirstName = response;
+                        specificUser.currentStep = CreateCharSteps.LAST_NAME;
+                        specificUser.lastStep = CreateCharSteps.AWAITINGRESPONSE;
+                        break;
+                    case CreateCharSteps.LAST_NAME:
+                        if (ValidatePlayerName(specificUser.user.UserID, response)) {
+                            if (String.Compare(response, "name", true) != 0) {
+                                specificUser.LastName = response;
+                                specificUser.currentStep = CreateCharSteps.PASSWORD;
+                                specificUser.lastStep = CreateCharSteps.AWAITINGRESPONSE;
+                            }
+                            else {
+                                specificUser.currentStep = CreateCharSteps.FIRST_NAME;
+                                specificUser.lastStep = CreateCharSteps.AWAITINGRESPONSE;
+                            }
+                        }
+                        else {
+                            specificUser.currentStep = CreateCharSteps.FIRST_NAME;
+                            specificUser.lastStep = CreateCharSteps.AWAITINGRESPONSE;
+                        }
+                        break;
+                    case CreateCharSteps.PASSWORD:
+                        specificUser.Password = response;
+                        specificUser.currentStep = CreateCharSteps.PASSWORD_CHECK;
+                        specificUser.lastStep = CreateCharSteps.AWAITINGRESPONSE;
+                        break;
 
-                             break;
-                         }
-                     case CreateCharSteps.LANGUAGE: {
-                         if (String.Compare(response.Substring(0, 1), "b", true) != 0) {
-                             int selection = 0;
-                             int.TryParse(response, out selection);
-                             selection--;
-                             if (selection >= 0 && selection <= GetMaxEnum<CharacterEnums.Languages>()) {
-                                 specificUser.Language = (CharacterEnums.Languages)selection;
-                                 specificUser.currentStep = CreateCharSteps.SKIN_TYPE;
-                                 specificUser.lastStep = CreateCharSteps.AWAITINGRESPONSE;
-                             }
-                             else {
-                                 specificUser.currentStep = CreateCharSteps.LANGUAGE;
-                                 specificUser.lastStep = CreateCharSteps.LANGUAGE;
-                             }
-                         }
-                         else {
-                             specificUser.currentStep = CreateCharSteps.RACE;
-                             specificUser.lastStep = CreateCharSteps.AWAITINGRESPONSE;
-                         }
-                             break;
-                         }
-                     case CreateCharSteps.SKIN_TYPE: {
-                         if (String.Compare(response.Substring(0, 1), "b", true) != 0) {
-                             int selection = 0;
-                             int.TryParse(response, out selection);
-                             selection--;
-                             if (selection >= 0 && selection <= GetMaxEnum<CharacterEnums.SkinType>()) {
-                                 specificUser.SkinType = (CharacterEnums.SkinType)selection;
-                                 specificUser.currentStep = CreateCharSteps.SKIN_COLOR;
-                                 specificUser.lastStep = CreateCharSteps.AWAITINGRESPONSE;
-                             }
-                             else {
-                                 specificUser.currentStep = CreateCharSteps.SKIN_TYPE;
-                                 specificUser.lastStep = CreateCharSteps.SKIN_TYPE;
-                             }
-                         }
-                         else {
-                             specificUser.currentStep = CreateCharSteps.LANGUAGE;
-                             specificUser.lastStep = CreateCharSteps.AWAITINGRESPONSE;
-                         }
-                             break;
-                         }
-                     case CreateCharSteps.SKIN_COLOR: {
-                         if (String.Compare(response.Substring(0, 1), "b", true) != 0) {
-                             int selection = 0;
-                             int.TryParse(response, out selection);
-                             selection--;
-                             if (selection >= 0 && selection <= GetMaxEnum<CharacterEnums.SkinColors>()) {
-                                 specificUser.SkinColor = (CharacterEnums.SkinColors)selection;
-                                 specificUser.currentStep = CreateCharSteps.HAIR_COLOR;
-                                 specificUser.lastStep = CreateCharSteps.AWAITINGRESPONSE;
-                             }
-                             else {
-                                 specificUser.currentStep = CreateCharSteps.SKIN_COLOR;
-                                 specificUser.lastStep = CreateCharSteps.SKIN_COLOR;
-                             }
-                         }
-                         else {
-                             specificUser.currentStep = CreateCharSteps.SKIN_TYPE;
-                             specificUser.lastStep = CreateCharSteps.AWAITINGRESPONSE;
-                         }
-                             break;
-                         }
-                     case CreateCharSteps.HAIR_COLOR: {
-                         if (String.Compare(response.Substring(0, 1), "b", true) != 0) {
-                             int selection = 0;
-                             int.TryParse(response, out selection);
-                             selection--;
-                             if (selection >= 0 && selection <= GetMaxEnum<CharacterEnums.HairColors>()) {
-                                 specificUser.HairColor = (CharacterEnums.HairColors)selection;
-                                 specificUser.currentStep = CreateCharSteps.EYE_COLOR;
-                                 specificUser.lastStep = CreateCharSteps.AWAITINGRESPONSE;
-                             }
-                             else {
-                                 specificUser.currentStep = CreateCharSteps.HAIR_COLOR;
-                                 specificUser.lastStep = CreateCharSteps.HAIR_COLOR;
-                             }
-                         }
-                         else {
-                             specificUser.currentStep = CreateCharSteps.SKIN_COLOR;
-                             specificUser.lastStep = CreateCharSteps.AWAITINGRESPONSE;
-                         }
-                             break;
-                         }
-                     case CreateCharSteps.EYE_COLOR: {
-                         if (String.Compare(response.Substring(0, 1), "b", true) != 0) {
-                             int selection = 0;
-                             int.TryParse(response, out selection);
-                             selection--;
-                             if (selection >= 0 && selection <= GetMaxEnum<CharacterEnums.EyeColors>()) {
-                                 specificUser.EyeColor = (CharacterEnums.EyeColors)selection;
-                                 specificUser.currentStep = CreateCharSteps.BUILD;
-                                 specificUser.lastStep = CreateCharSteps.AWAITINGRESPONSE;
-                             }
-                             else {
-                                 specificUser.currentStep = CreateCharSteps.EYE_COLOR;
-                                 specificUser.lastStep = CreateCharSteps.EYE_COLOR;
-                             }
-                         }
-                         else {
-                             specificUser.currentStep = CreateCharSteps.HAIR_COLOR;
-                             specificUser.lastStep = CreateCharSteps.AWAITINGRESPONSE;
-                         }
-                             break;
-                         }
-                     case CreateCharSteps.BUILD: {
-                         if (String.Compare(response.Substring(0, 1), "b", true) != 0) {
-                             int selection = 0;
-                             int.TryParse(response, out selection);
-                             selection--;
-                             if (selection >= 0 && selection <= GetMaxEnum<CharacterEnums.BodyBuild>()) {
-                                 specificUser.Build = (CharacterEnums.BodyBuild)selection;
-                                 specificUser.currentStep = CreateCharSteps.WEIGHT;
-                                 specificUser.lastStep = CreateCharSteps.AWAITINGRESPONSE;
-                             }
-                             else {
-                                 specificUser.currentStep = CreateCharSteps.BUILD;
-                                 specificUser.lastStep = CreateCharSteps.BUILD;
-                             }
-                         }
-                         else {
-                             specificUser.currentStep = CreateCharSteps.EYE_COLOR;
-                             specificUser.lastStep = CreateCharSteps.AWAITINGRESPONSE;
-                         }
-                             break;
-                         }
-                     case CreateCharSteps.WEIGHT: {
-                             double temp = 0;
-                             double.TryParse(response, out temp);
-                             BsonDocument doc = _generalCollection.FindOneAs<BsonDocument>(Query.EQ("_id", "BodyWeight")).AsBsonDocument;
-                             BsonArray arr = doc["Genders"].AsBsonArray;
-                             BsonArray arr2 = arr.Where(a => a["type"].AsString == specificUser.Gender.ToString().CamelCaseWord()).SingleOrDefault()["Weights"].AsBsonArray;
-                             doc = arr2.Where(a => a.AsBsonDocument["name"] == specificUser.Build.ToString().CamelCaseWord()).SingleOrDefault().AsBsonDocument;
-                             double min = doc["min"].AsInt32; //these need to be converted to doubles in DB
-                             double max = doc["max"].AsInt32;
+                    case CreateCharSteps.PASSWORD_CHECK:
+                        if (ValidatePlayerPassword(specificUser.user.UserID, response)) {
+                            specificUser.Password = response;
+                            specificUser.currentStep = CreateCharSteps.CLASS;
+                            specificUser.lastStep = CreateCharSteps.AWAITINGRESPONSE;
+                        }
+                        else {
+                            specificUser.currentStep = CreateCharSteps.PASSWORD;
+                            specificUser.lastStep = CreateCharSteps.PASSWORD;
+                        }
+                        break;
+                    case CreateCharSteps.CLASS: {
+                            if (String.Compare(response.Substring(0, 1), "b", true) != 0) {
+                                int selection = 0;
+                                int.TryParse(response, out selection);
+                                int max = (GetMaxEnum<CharacterEnums.CharacterClass>() / 8) + 1;
+                                if (selection >= 1 && selection <= max) {
+                                    specificUser.Class = (CharacterEnums.CharacterClass)(1 << selection);
+                                    specificUser.confirmStep = CreateCharSteps.CLASS;
+                                    specificUser.currentStep = CreateCharSteps.CLASS;
+                                    specificUser.nextStep = CreateCharSteps.GENDER;
+                                    specificUser.lastStep = CreateCharSteps.AWAITINGRESPONSE;
+                                }
+                                else {
+                                    specificUser.currentStep = CreateCharSteps.CLASS;
+                                    specificUser.lastStep = CreateCharSteps.CLASS;
+                                }
+                            }
+                            else {
+                                specificUser.currentStep = CreateCharSteps.FIRST_NAME;
+                                specificUser.lastStep = CreateCharSteps.AWAITINGRESPONSE;
+                            }
+                            break;
+                        }
+                    case CreateCharSteps.GENDER: {
+                            if (String.Compare(response.Substring(0, 1), "b", true) != 0) {
+                                int selection = 0;
+                                int.TryParse(response, out selection);
+                                selection--;
+                                if (selection >= 0 && selection <= GetMaxEnum<CharacterEnums.Genders>()) {
+                                    specificUser.Gender = (CharacterEnums.Genders)selection;
+                                    specificUser.currentStep = CreateCharSteps.RACE;
+                                    specificUser.lastStep = CreateCharSteps.AWAITINGRESPONSE;
+                                }
+                                else {
+                                    specificUser.currentStep = CreateCharSteps.GENDER;
+                                    specificUser.lastStep = CreateCharSteps.GENDER;
+                                }
+                            }
+                            else {
+                                specificUser.currentStep = CreateCharSteps.CLASS;
+                                specificUser.lastStep = CreateCharSteps.AWAITINGRESPONSE;
+                            }
+                            break;
+                        }
+                    case CreateCharSteps.RACE: {
+                            if (String.Compare(response.Substring(0, 1), "b", true) != 0) {
+                                int selection = 0;
+                                int.TryParse(response, out selection);
+                                selection--;
+                                if (selection >= 0 && selection <= GetMaxEnum<CharacterEnums.CharacterRace>()) {
+                                    specificUser.Race = (CharacterEnums.CharacterRace)selection;
+                                    specificUser.confirmStep = CreateCharSteps.RACE;
+                                    specificUser.currentStep = CreateCharSteps.RACE;
+                                    specificUser.nextStep = CreateCharSteps.LANGUAGE;
+                                    specificUser.lastStep = CreateCharSteps.AWAITINGRESPONSE;
+                                }
+                                else {
+                                    specificUser.currentStep = CreateCharSteps.RACE;
+                                    specificUser.lastStep = CreateCharSteps.RACE;
+                                }
+                            }
+                            else {
+                                specificUser.currentStep = CreateCharSteps.GENDER;
+                                specificUser.lastStep = CreateCharSteps.AWAITINGRESPONSE;
+                            }
 
-                             if (temp >= min && temp <= max) {
-                                 specificUser.Weight = temp;
-                                 specificUser.currentStep = CreateCharSteps.HEIGHT;
-                                 specificUser.lastStep = CreateCharSteps.AWAITINGRESPONSE;
-                             }
-                             else {
-                                 specificUser.currentStep = CreateCharSteps.WEIGHT;
-                                 specificUser.lastStep = CreateCharSteps.WEIGHT;
-                             }
-                             break;
-                         }
-                     case CreateCharSteps.HEIGHT: {
-                             double temp = 0;
-                             double.TryParse(response, out temp);
-                             //get the min and max height for each race from DB and validate
-                             BsonDocument doc = _generalCollection.FindOneAs<BsonDocument>(Query.EQ("_id", "Heights")).AsBsonDocument;
-                             BsonArray arr = doc["Types"].AsBsonArray;
-                             double min = 0.0d, max = 0.0d;
+                            break;
+                        }
+                    case CreateCharSteps.LANGUAGE: {
+                            if (String.Compare(response.Substring(0, 1), "b", true) != 0) {
+                                int selection = 0;
+                                int.TryParse(response, out selection);
+                                selection--;
+                                if (selection >= 0 && selection <= GetMaxEnum<CharacterEnums.Languages>()) {
+                                    specificUser.Language = (CharacterEnums.Languages)selection;
+                                    specificUser.currentStep = CreateCharSteps.SKIN_TYPE;
+                                    specificUser.lastStep = CreateCharSteps.AWAITINGRESPONSE;
+                                }
+                                else {
+                                    specificUser.currentStep = CreateCharSteps.LANGUAGE;
+                                    specificUser.lastStep = CreateCharSteps.LANGUAGE;
+                                }
+                            }
+                            else {
+                                specificUser.currentStep = CreateCharSteps.RACE;
+                                specificUser.lastStep = CreateCharSteps.AWAITINGRESPONSE;
+                            }
+                            break;
+                        }
+                    case CreateCharSteps.SKIN_TYPE: {
+                            if (String.Compare(response.Substring(0, 1), "b", true) != 0) {
+                                int selection = 0;
+                                int.TryParse(response, out selection);
+                                selection--;
+                                if (selection >= 0 && selection <= GetMaxEnum<CharacterEnums.SkinType>()) {
+                                    specificUser.SkinType = (CharacterEnums.SkinType)selection;
+                                    specificUser.currentStep = CreateCharSteps.SKIN_COLOR;
+                                    specificUser.lastStep = CreateCharSteps.AWAITINGRESPONSE;
+                                }
+                                else {
+                                    specificUser.currentStep = CreateCharSteps.SKIN_TYPE;
+                                    specificUser.lastStep = CreateCharSteps.SKIN_TYPE;
+                                }
+                            }
+                            else {
+                                specificUser.currentStep = CreateCharSteps.LANGUAGE;
+                                specificUser.lastStep = CreateCharSteps.AWAITINGRESPONSE;
+                            }
+                            break;
+                        }
+                    case CreateCharSteps.SKIN_COLOR: {
+                            if (String.Compare(response.Substring(0, 1), "b", true) != 0) {
+                                int selection = 0;
+                                int.TryParse(response, out selection);
+                                selection--;
+                                if (selection >= 0 && selection <= GetMaxEnum<CharacterEnums.SkinColors>()) {
+                                    specificUser.SkinColor = (CharacterEnums.SkinColors)selection;
+                                    specificUser.currentStep = CreateCharSteps.HAIR_COLOR;
+                                    specificUser.lastStep = CreateCharSteps.AWAITINGRESPONSE;
+                                }
+                                else {
+                                    specificUser.currentStep = CreateCharSteps.SKIN_COLOR;
+                                    specificUser.lastStep = CreateCharSteps.SKIN_COLOR;
+                                }
+                            }
+                            else {
+                                specificUser.currentStep = CreateCharSteps.SKIN_TYPE;
+                                specificUser.lastStep = CreateCharSteps.AWAITINGRESPONSE;
+                            }
+                            break;
+                        }
+                    case CreateCharSteps.HAIR_COLOR: {
+                            if (String.Compare(response.Substring(0, 1), "b", true) != 0) {
+                                int selection = 0;
+                                int.TryParse(response, out selection);
+                                selection--;
+                                if (selection >= 0 && selection <= GetMaxEnum<CharacterEnums.HairColors>()) {
+                                    specificUser.HairColor = (CharacterEnums.HairColors)selection;
+                                    specificUser.currentStep = CreateCharSteps.EYE_COLOR;
+                                    specificUser.lastStep = CreateCharSteps.AWAITINGRESPONSE;
+                                }
+                                else {
+                                    specificUser.currentStep = CreateCharSteps.HAIR_COLOR;
+                                    specificUser.lastStep = CreateCharSteps.HAIR_COLOR;
+                                }
+                            }
+                            else {
+                                specificUser.currentStep = CreateCharSteps.SKIN_COLOR;
+                                specificUser.lastStep = CreateCharSteps.AWAITINGRESPONSE;
+                            }
+                            break;
+                        }
+                    case CreateCharSteps.EYE_COLOR: {
+                            if (String.Compare(response.Substring(0, 1), "b", true) != 0) {
+                                int selection = 0;
+                                int.TryParse(response, out selection);
+                                selection--;
+                                if (selection >= 0 && selection <= GetMaxEnum<CharacterEnums.EyeColors>()) {
+                                    specificUser.EyeColor = (CharacterEnums.EyeColors)selection;
+                                    specificUser.currentStep = CreateCharSteps.BUILD;
+                                    specificUser.lastStep = CreateCharSteps.AWAITINGRESPONSE;
+                                }
+                                else {
+                                    specificUser.currentStep = CreateCharSteps.EYE_COLOR;
+                                    specificUser.lastStep = CreateCharSteps.EYE_COLOR;
+                                }
+                            }
+                            else {
+                                specificUser.currentStep = CreateCharSteps.HAIR_COLOR;
+                                specificUser.lastStep = CreateCharSteps.AWAITINGRESPONSE;
+                            }
+                            break;
+                        }
+                    case CreateCharSteps.BUILD: {
+                            if (String.Compare(response.Substring(0, 1), "b", true) != 0) {
+                                int selection = 0;
+                                int.TryParse(response, out selection);
+                                selection--;
+                                if (selection >= 0 && selection <= GetMaxEnum<CharacterEnums.BodyBuild>()) {
+                                    specificUser.Build = (CharacterEnums.BodyBuild)selection;
+                                    specificUser.currentStep = CreateCharSteps.WEIGHT;
+                                    specificUser.lastStep = CreateCharSteps.AWAITINGRESPONSE;
+                                }
+                                else {
+                                    specificUser.currentStep = CreateCharSteps.BUILD;
+                                    specificUser.lastStep = CreateCharSteps.BUILD;
+                                }
+                            }
+                            else {
+                                specificUser.currentStep = CreateCharSteps.EYE_COLOR;
+                                specificUser.lastStep = CreateCharSteps.AWAITINGRESPONSE;
+                            }
+                            break;
+                        }
+                    case CreateCharSteps.WEIGHT: {
+                            double temp = 0;
+                            double.TryParse(response, out temp);
+                            BsonDocument doc = _generalCollection.FindOneAs<BsonDocument>(Query.EQ("_id", "BodyWeight")).AsBsonDocument;
+                            BsonArray arr = doc["Genders"].AsBsonArray;
+                            BsonArray arr2 = arr.Where(a => a["type"].AsString == specificUser.Gender.ToString().CamelCaseWord()).SingleOrDefault()["Weights"].AsBsonArray;
+                            doc = arr2.Where(a => a.AsBsonDocument["name"] == specificUser.Build.ToString().CamelCaseWord()).SingleOrDefault().AsBsonDocument;
+                            double min = doc["min"].AsInt32; //these need to be converted to doubles in DB
+                            double max = doc["max"].AsInt32;
 
-                             foreach (BsonDocument height in arr) {
-                                 if (height["Name"] == specificUser.Race.ToString().ToUpper()) {
-                                     min = height["Min"].AsDouble; //these need to be converted to doubles in DB
-                                     max = height["Max"].AsDouble;
-                                     break;
-                                 }
-                             }
+                            if (temp >= min && temp <= max) {
+                                specificUser.Weight = temp;
+                                specificUser.currentStep = CreateCharSteps.HEIGHT;
+                                specificUser.lastStep = CreateCharSteps.AWAITINGRESPONSE;
+                            }
+                            else {
+                                specificUser.currentStep = CreateCharSteps.WEIGHT;
+                                specificUser.lastStep = CreateCharSteps.WEIGHT;
+                            }
+                            break;
+                        }
+                    case CreateCharSteps.HEIGHT: {
+                            double temp = 0;
+                            double.TryParse(response, out temp);
+                            //get the min and max height for each race from DB and validate
+                            BsonDocument doc = _generalCollection.FindOneAs<BsonDocument>(Query.EQ("_id", "Heights")).AsBsonDocument;
+                            BsonArray arr = doc["Types"].AsBsonArray;
+                            double min = 0.0d, max = 0.0d;
 
-                             if (temp >= min && temp <= max) {
-                                 specificUser.Height = temp;
-                                 specificUser.currentStep = CreateCharSteps.SUCCEEDED;
-                                 specificUser.lastStep = CreateCharSteps.AWAITINGRESPONSE;
-                             }
-                             else {
-                                 specificUser.currentStep = CreateCharSteps.HEIGHT;
-                                 specificUser.lastStep = CreateCharSteps.HEIGHT;
-                             }
-                             
-                             break;
-                         }
-					 default:
-						 //something has gone terribly wrong if we get here
-						 break;
-				 }
-			 }
-			 return state;
-		 }
+                            foreach (BsonDocument height in arr) {
+                                if (height["Name"] == specificUser.Race.ToString().ToUpper()) {
+                                    min = height["Min"].AsDouble; //these need to be converted to doubles in DB
+                                    max = height["Max"].AsDouble;
+                                    break;
+                                }
+                            }
 
-		 public string ExecuteScript(string userId) {
-			 string message = null;
-             TempChar specificUser = usersCreatingChars.Where(u => u.user.UserID == userId).SingleOrDefault();
+                            if (temp >= min && temp <= max) {
+                                specificUser.Height = temp;
+                                specificUser.currentStep = CreateCharSteps.SUCCEEDED;
+                                specificUser.lastStep = CreateCharSteps.AWAITINGRESPONSE;
+                            }
+                            else {
+                                specificUser.currentStep = CreateCharSteps.HEIGHT;
+                                specificUser.lastStep = CreateCharSteps.HEIGHT;
+                            }
 
-             if (specificUser.confirmStep != CreateCharSteps.NONE && specificUser.currentStep != CreateCharSteps.AWAITINGRESPONSE) {
-                 switch (specificUser.confirmStep) {
-                     case CreateCharSteps.CLASS:
-                         message = DisplayClassInfo(specificUser.Class);
-                         break;
-                     case CreateCharSteps.RACE:
-                         message = DisplayRaceInfo(specificUser.Race);
-                         break;
-                 }
-                 specificUser.currentStep = CreateCharSteps.AWAITINGRESPONSE;
-                 return message;
-             }
+                            break;
+                        }
+                    default:
+                        //something has gone terribly wrong if we get here
+                        break;
+                }
+            }
+            return state;
+        }
 
-			 if (specificUser != null && specificUser.lastStep != specificUser.currentStep) {
-				 switch (specificUser.currentStep) {
-                     case CreateCharSteps.FIRST_NAME:
-						 message = AskForFirstName();
-                         specificUser.currentStep = CreateCharSteps.AWAITINGRESPONSE;
-                         specificUser.lastStep = CreateCharSteps.FIRST_NAME;
-						 break;
-                     case CreateCharSteps.LAST_NAME:
-                         message = AskForLastName();
-                         specificUser.currentStep = CreateCharSteps.AWAITINGRESPONSE;
-                         specificUser.lastStep = CreateCharSteps.LAST_NAME;
-                         break;
-                     case CreateCharSteps.PASSWORD:
-						 message = AskForPassword();
-                         specificUser.currentStep = CreateCharSteps.AWAITINGRESPONSE;
-                         specificUser.lastStep = CreateCharSteps.PASSWORD;
-						 break;
-                     case CreateCharSteps.PASSWORD_CHECK:
-                         message = ReEnterPassword();
-                         specificUser.currentStep = CreateCharSteps.AWAITINGRESPONSE;
-                         specificUser.lastStep = CreateCharSteps.PASSWORD_CHECK;
-                         break;
-                     case CreateCharSteps.CLASS:
-                         message = AskForClass();
-                         specificUser.currentStep = CreateCharSteps.AWAITINGRESPONSE;
-                         specificUser.lastStep = CreateCharSteps.CLASS;
-                         break;
-                     case CreateCharSteps.RACE:
-                         message = AskForRace();
-                         specificUser.currentStep = CreateCharSteps.AWAITINGRESPONSE;
-                         specificUser.lastStep = CreateCharSteps.RACE;
-                         break;
-                     case CreateCharSteps.GENDER:
-                         message = AskForGender();
-                         specificUser.currentStep = CreateCharSteps.AWAITINGRESPONSE;
-                         specificUser.lastStep = CreateCharSteps.GENDER;
-                         break;
-                     case CreateCharSteps.LANGUAGE:
-                         message = AskForLanguage();
-                         specificUser.currentStep = CreateCharSteps.AWAITINGRESPONSE;
-                         specificUser.lastStep = CreateCharSteps.LANGUAGE;
-                         break;
-                     case CreateCharSteps.SKIN_TYPE:
-                         message = AskForSkinType();
-                         specificUser.currentStep = CreateCharSteps.AWAITINGRESPONSE;
-                         specificUser.lastStep = CreateCharSteps.SKIN_TYPE;
-                         break;
-                     case CreateCharSteps.SKIN_COLOR:
-                         message = AskForSkinColor();
-                         specificUser.currentStep = CreateCharSteps.AWAITINGRESPONSE;
-                         specificUser.lastStep = CreateCharSteps.SKIN_COLOR;
-                         break;
-                     case CreateCharSteps.BUILD:
-                         message = AskForBuildType();
-                         specificUser.currentStep = CreateCharSteps.AWAITINGRESPONSE;
-                         specificUser.lastStep = CreateCharSteps.BUILD;
-                         break;
-                     case CreateCharSteps.HAIR_COLOR:
-                         message = AskForHairColor();
-                         specificUser.currentStep = CreateCharSteps.AWAITINGRESPONSE;
-                         specificUser.lastStep = CreateCharSteps.HAIR_COLOR;
-                         break;
-                     case CreateCharSteps.EYE_COLOR:
-                         message = AskForEyeColor();
-                         specificUser.currentStep = CreateCharSteps.AWAITINGRESPONSE;
-                         specificUser.lastStep = CreateCharSteps.EYE_COLOR;
-                         break;
-                     case CreateCharSteps.WEIGHT:
-                         message = AskForWeight(specificUser.Gender, specificUser.Build);
-                         specificUser.currentStep = CreateCharSteps.AWAITINGRESPONSE;
-                         specificUser.lastStep = CreateCharSteps.WEIGHT;
-                         break;
-                     case CreateCharSteps.HEIGHT:
-                         message = AskForHeight(specificUser.Race);
-                         specificUser.currentStep = CreateCharSteps.AWAITINGRESPONSE;
-                         specificUser.lastStep = CreateCharSteps.HEIGHT;
-                         break;
-                     case CreateCharSteps.SUCCEEDED:
-                         Character.Iactor newChar = new Character.Character(specificUser.Race, specificUser.Class, specificUser.Gender, specificUser.Language, specificUser.SkinColor, specificUser.SkinType, specificUser.HairColor, specificUser.EyeColor, specificUser.Build);
-                         newChar.FirstName = specificUser.FirstName;
-                         newChar.LastName = specificUser.LastName;
-                         newChar.Weight = specificUser.Weight;
-                         newChar.Height = specificUser.Height;
-                         newChar.Password = specificUser.Password;
-                         newChar.Save(); //this creates the ID
-                         specificUser.user.Player.ID = newChar.ID;
-                         specificUser.user.UserID = specificUser.user.Player.ID;
-                         
-                         specificUser.user.Player.Load(specificUser.user.UserID);
-                         //TODO: Based on the choices we will take the base stats and alter them accordingly +/-
-                         AssignStatPoints(specificUser.user.Player);
-                         specificUser.user.Player.Save(); //we updated the stats now save them.
-						 message = "Character created!  Welcome " + specificUser.user.Player.FirstName + " " + specificUser.user.Player.LastName + "!";
-						 specificUser.user.CurrentState = User.User.UserState.TALKING;
-						 specificUser.user.InBuffer = "look\r\n";
-                         usersCreatingChars.Remove(specificUser);
-						 break;
-                     case CreateCharSteps.AWAITINGRESPONSE:
-					 default:
-						 break;
-				 }
-			 }
-			 else {
-                 if (specificUser != null) {
-                     if (specificUser.currentStep == CreateCharSteps.LAST_NAME) {
-                         message = "A character with that name combination already exists! Select a different last name or name combination.";
-                     }
-                     else if (specificUser.lastStep == CreateCharSteps.PASSWORD) {
-                         message = "Passwords did not match!  Please try again.";
-                         specificUser.currentStep = CreateCharSteps.PASSWORD;
-                     }
-                     else if (specificUser.currentStep == CreateCharSteps.RACE || specificUser.currentStep == CreateCharSteps.GENDER || specificUser.currentStep == CreateCharSteps.LANGUAGE ||
-                        specificUser.currentStep == CreateCharSteps.SKIN_TYPE || specificUser.currentStep == CreateCharSteps.SKIN_COLOR || specificUser.currentStep == CreateCharSteps.BUILD) {
-                         message = "Invalid selection! Please try again.";
-                     }
-                     else if (specificUser.currentStep == CreateCharSteps.WEIGHT) {
-                         message = "That is an invalid weight for the body type selected! Please choose a weight within the range.";
-                     }
+        public string ExecuteScript(string userId) {
+            string message = null;
+            TempChar specificUser = usersCreatingChars.Where(u => u.user.UserID == userId).SingleOrDefault();
 
-                     specificUser.lastStep = CreateCharSteps.NONE;
-                 }
-			 }
+            if (specificUser.confirmStep != CreateCharSteps.NONE && specificUser.currentStep != CreateCharSteps.AWAITINGRESPONSE) {
+                switch (specificUser.confirmStep) {
+                    case CreateCharSteps.CLASS:
+                        message = DisplayClassInfo(specificUser.Class);
+                        break;
+                    case CreateCharSteps.RACE:
+                        message = DisplayRaceInfo(specificUser.Race);
+                        break;
+                }
+                specificUser.currentStep = CreateCharSteps.AWAITINGRESPONSE;
+                return message;
+            }
 
-			 return message;
-		 }
+            if (specificUser != null && specificUser.lastStep != specificUser.currentStep) {
+                switch (specificUser.currentStep) {
+                    case CreateCharSteps.FIRST_NAME:
+                        message = AskForFirstName();
+                        specificUser.currentStep = CreateCharSteps.AWAITINGRESPONSE;
+                        specificUser.lastStep = CreateCharSteps.FIRST_NAME;
+                        break;
+                    case CreateCharSteps.LAST_NAME:
+                        message = AskForLastName();
+                        specificUser.currentStep = CreateCharSteps.AWAITINGRESPONSE;
+                        specificUser.lastStep = CreateCharSteps.LAST_NAME;
+                        break;
+                    case CreateCharSteps.PASSWORD:
+                        message = AskForPassword();
+                        specificUser.currentStep = CreateCharSteps.AWAITINGRESPONSE;
+                        specificUser.lastStep = CreateCharSteps.PASSWORD;
+                        break;
+                    case CreateCharSteps.PASSWORD_CHECK:
+                        message = ReEnterPassword();
+                        specificUser.currentStep = CreateCharSteps.AWAITINGRESPONSE;
+                        specificUser.lastStep = CreateCharSteps.PASSWORD_CHECK;
+                        break;
+                    case CreateCharSteps.CLASS:
+                        message = AskForClass();
+                        specificUser.currentStep = CreateCharSteps.AWAITINGRESPONSE;
+                        specificUser.lastStep = CreateCharSteps.CLASS;
+                        break;
+                    case CreateCharSteps.RACE:
+                        message = AskForRace();
+                        specificUser.currentStep = CreateCharSteps.AWAITINGRESPONSE;
+                        specificUser.lastStep = CreateCharSteps.RACE;
+                        break;
+                    case CreateCharSteps.GENDER:
+                        message = AskForGender();
+                        specificUser.currentStep = CreateCharSteps.AWAITINGRESPONSE;
+                        specificUser.lastStep = CreateCharSteps.GENDER;
+                        break;
+                    case CreateCharSteps.LANGUAGE:
+                        message = AskForLanguage();
+                        specificUser.currentStep = CreateCharSteps.AWAITINGRESPONSE;
+                        specificUser.lastStep = CreateCharSteps.LANGUAGE;
+                        break;
+                    case CreateCharSteps.SKIN_TYPE:
+                        message = AskForSkinType();
+                        specificUser.currentStep = CreateCharSteps.AWAITINGRESPONSE;
+                        specificUser.lastStep = CreateCharSteps.SKIN_TYPE;
+                        break;
+                    case CreateCharSteps.SKIN_COLOR:
+                        message = AskForSkinColor();
+                        specificUser.currentStep = CreateCharSteps.AWAITINGRESPONSE;
+                        specificUser.lastStep = CreateCharSteps.SKIN_COLOR;
+                        break;
+                    case CreateCharSteps.BUILD:
+                        message = AskForBuildType();
+                        specificUser.currentStep = CreateCharSteps.AWAITINGRESPONSE;
+                        specificUser.lastStep = CreateCharSteps.BUILD;
+                        break;
+                    case CreateCharSteps.HAIR_COLOR:
+                        message = AskForHairColor();
+                        specificUser.currentStep = CreateCharSteps.AWAITINGRESPONSE;
+                        specificUser.lastStep = CreateCharSteps.HAIR_COLOR;
+                        break;
+                    case CreateCharSteps.EYE_COLOR:
+                        message = AskForEyeColor();
+                        specificUser.currentStep = CreateCharSteps.AWAITINGRESPONSE;
+                        specificUser.lastStep = CreateCharSteps.EYE_COLOR;
+                        break;
+                    case CreateCharSteps.WEIGHT:
+                        message = AskForWeight(specificUser.Gender, specificUser.Build);
+                        specificUser.currentStep = CreateCharSteps.AWAITINGRESPONSE;
+                        specificUser.lastStep = CreateCharSteps.WEIGHT;
+                        break;
+                    case CreateCharSteps.HEIGHT:
+                        message = AskForHeight(specificUser.Race);
+                        specificUser.currentStep = CreateCharSteps.AWAITINGRESPONSE;
+                        specificUser.lastStep = CreateCharSteps.HEIGHT;
+                        break;
+                    case CreateCharSteps.SUCCEEDED:
+                        Character.Iactor newChar = new Character.Character(specificUser.Race, specificUser.Class, specificUser.Gender, specificUser.Language, specificUser.SkinColor, specificUser.SkinType, specificUser.HairColor, specificUser.EyeColor, specificUser.Build);
+                        newChar.FirstName = specificUser.FirstName;
+                        newChar.LastName = specificUser.LastName;
+                        newChar.Weight = specificUser.Weight;
+                        newChar.Height = specificUser.Height;
+                        newChar.Password = specificUser.Password;
+                        newChar.Save(); //this creates the ID
+                        specificUser.user.Player.ID = newChar.ID;
+                        specificUser.user.UserID = specificUser.user.Player.ID;
 
-         internal string DisplayConfirmSelection() {
-             return "Confirm this selection? (Y/N)";
-         }
+                        specificUser.user.Player.Load(specificUser.user.UserID);
+                        //TODO: Based on the choices we will take the base stats and alter them accordingly +/-
+                        AssignStatPoints(specificUser.user.Player);
+                        specificUser.user.Player.Save(); //we updated the stats now save them.
+                        message = "Character created!  Welcome " + specificUser.user.Player.FirstName + " " + specificUser.user.Player.LastName + "!";
+                        specificUser.user.CurrentState = User.User.UserState.TALKING;
+                        specificUser.user.InBuffer = "look\r\n";
+                        usersCreatingChars.Remove(specificUser);
+                        break;
+                    case CreateCharSteps.AWAITINGRESPONSE:
+                    default:
+                        break;
+                }
+            }
+            else {
+                if (specificUser != null) {
+                    if (specificUser.currentStep == CreateCharSteps.LAST_NAME) {
+                        message = "A character with that name combination already exists! Select a different last name or name combination.";
+                    }
+                    else if (specificUser.lastStep == CreateCharSteps.PASSWORD) {
+                        message = "Passwords did not match!  Please try again.";
+                        specificUser.currentStep = CreateCharSteps.PASSWORD;
+                    }
+                    else if (specificUser.currentStep == CreateCharSteps.RACE || specificUser.currentStep == CreateCharSteps.GENDER || specificUser.currentStep == CreateCharSteps.LANGUAGE ||
+                       specificUser.currentStep == CreateCharSteps.SKIN_TYPE || specificUser.currentStep == CreateCharSteps.SKIN_COLOR || specificUser.currentStep == CreateCharSteps.BUILD) {
+                        message = "Invalid selection! Please try again.";
+                    }
+                    else if (specificUser.currentStep == CreateCharSteps.WEIGHT) {
+                        message = "That is an invalid weight for the body type selected! Please choose a weight within the range.";
+                    }
 
-         internal bool ConfirmSelection(string response) {
-             if (!string.IsNullOrEmpty(response) && response.ToUpper()[0] == 'Y') return true;
-             return false;
-         }
+                    specificUser.lastStep = CreateCharSteps.NONE;
+                }
+            }
 
-         internal BsonDocument GrabFromDatabase(string database, string collection, string keyMatch, string valueMatch) {
-             MongoUtils.MongoData.ConnectToDatabase();
-             MongoDatabase db = MongoUtils.MongoData.GetDatabase(database);
-             MongoCollection col = db.GetCollection(collection);
-             return col.FindOneAs<BsonDocument>(Query.EQ(keyMatch, valueMatch)); 
-         }
+            return message;
+        }
 
-        internal void AssignStatPoints(Character.Iactor specificUser){
+        internal string DisplayConfirmSelection() {
+            return "Confirm this selection? (Y/N)";
+        }
+
+        internal bool ConfirmSelection(string response) {
+            if (!string.IsNullOrEmpty(response) && response.ToUpper()[0] == 'Y') return true;
+            return false;
+        }
+
+        internal BsonDocument GrabFromDatabase(string database, string collection, string keyMatch, string valueMatch) {
+            MongoUtils.MongoData.ConnectToDatabase();
+            MongoDatabase db = MongoUtils.MongoData.GetDatabase(database);
+            MongoCollection col = db.GetCollection(collection);
+            return col.FindOneAs<BsonDocument>(Query.EQ(keyMatch, valueMatch));
+        }
+
+        internal void AssignStatPoints(Character.Iactor specificUser) {
             MongoUtils.MongoData.ConnectToDatabase();
             MongoDatabase db = MongoUtils.MongoData.GetDatabase("Characters");
             MongoCollection col = db.GetCollection("General");
@@ -564,230 +562,230 @@ namespace Scripts
             }
         }
 
-		 internal bool ValidatePlayerPassword(string userID, string response) {
-             string temp = usersCreatingChars.Where(u => u.user.UserID == userID).Select(u => u.Password).SingleOrDefault();
-             if (String.Compare(temp, response, false) == 0) {
-                 return true;
-             }
+        internal bool ValidatePlayerPassword(string userID, string response) {
+            string temp = usersCreatingChars.Where(u => u.user.UserID == userID).Select(u => u.Password).SingleOrDefault();
+            if (String.Compare(temp, response, false) == 0) {
+                return true;
+            }
 
-			 return false;
-		 }
+            return false;
+        }
 
-		 internal bool ValidatePlayerName(string userID, string response) {
-             string temp = usersCreatingChars.Where(u => u.user.UserID == userID).Select(u => u.FirstName).SingleOrDefault();
+        internal bool ValidatePlayerName(string userID, string response) {
+            string temp = usersCreatingChars.Where(u => u.user.UserID == userID).Select(u => u.FirstName).SingleOrDefault();
 
-			 MongoUtils.MongoData.ConnectToDatabase();
-			 MongoDatabase characterDB = MongoUtils.MongoData.GetDatabase("Characters");
-			 MongoCollection characterCollection = characterDB.GetCollection("PlayerCharacter");
-			 IMongoQuery query = Query.And(Query.EQ("FirstName", temp.ToLower()), Query.EQ("LastName", response.ToLower()));
-			 BsonDocument found = characterCollection.FindOneAs<BsonDocument>(query);
-			
-		    if (found != null) {
-			    return false; //uh-oh someone has that name already
-		    }
+            MongoUtils.MongoData.ConnectToDatabase();
+            MongoDatabase characterDB = MongoUtils.MongoData.GetDatabase("Characters");
+            MongoCollection characterCollection = characterDB.GetCollection("PlayerCharacter");
+            IMongoQuery query = Query.And(Query.EQ("FirstName", temp.ToLower()), Query.EQ("LastName", response.ToLower()));
+            BsonDocument found = characterCollection.FindOneAs<BsonDocument>(query);
 
-			 return true;
-		 }
+            if (found != null) {
+                return false; //uh-oh someone has that name already
+            }
 
-         
+            return true;
+        }
 
-         internal string DisplayClassInfo(CharacterEnums.CharacterClass charClass ) {
-             BsonDocument doc = GrabFromDatabase("Characters", "General", "_id", "ClassInfo");
-             StringBuilder sb = DisplayInfo(doc, charClass.ToString());
-             sb.AppendLine(DisplayConfirmSelection());
 
-             return sb.ToString();
-         }
 
-         internal string DisplayRaceInfo(CharacterEnums.CharacterRace charRace) {
-             BsonDocument doc = GrabFromDatabase("Characters", "General", "_id", "RaceInfo");
-             StringBuilder sb = DisplayInfo(doc, charRace.ToString());
-             
-             sb.AppendLine(DisplayConfirmSelection());
+        internal string DisplayClassInfo(CharacterEnums.CharacterClass charClass) {
+            BsonDocument doc = GrabFromDatabase("Characters", "General", "_id", "ClassInfo");
+            StringBuilder sb = DisplayInfo(doc, charClass.ToString());
+            sb.AppendLine(DisplayConfirmSelection());
 
-             return sb.ToString();
-         }
+            return sb.ToString();
+        }
 
-         internal StringBuilder DisplayInfo(BsonDocument doc, string charInfoToGrab) {
-             StringBuilder sb = new StringBuilder();
+        internal string DisplayRaceInfo(CharacterEnums.CharacterRace charRace) {
+            BsonDocument doc = GrabFromDatabase("Characters", "General", "_id", "RaceInfo");
+            StringBuilder sb = DisplayInfo(doc, charRace.ToString());
 
-             foreach (BsonDocument info in doc["info"].AsBsonArray) {
-                 if (info["Name"].AsString != charInfoToGrab.ToUpper()) {
-                     continue;
-                 }
+            sb.AppendLine(DisplayConfirmSelection());
 
-                 sb.AppendLine("\nDescription:\n\r" + info["Description"].AsString + "\n\r");
-                 foreach (BsonDocument stats in info["Stats"].AsBsonArray) {
-                     sb.AppendLine(stats["Name"].AsString + ": " + (stats["Value"] > 0 ? "+" : "") + stats["Value"]);
-                 }
+            return sb.ToString();
+        }
 
-                 break;
-             }
+        internal StringBuilder DisplayInfo(BsonDocument doc, string charInfoToGrab) {
+            StringBuilder sb = new StringBuilder();
 
-             return sb;
-         }
+            foreach (BsonDocument info in doc["info"].AsBsonArray) {
+                if (info["Name"].AsString != charInfoToGrab.ToUpper()) {
+                    continue;
+                }
 
-         #region Ask for stuff
-         internal string AskForFirstName() {
-             return "Enter a first name: ";
-         }
+                sb.AppendLine("\nDescription:\n\r" + info["Description"].AsString + "\n\r");
+                foreach (BsonDocument stats in info["Stats"].AsBsonArray) {
+                    sb.AppendLine(stats["Name"].AsString + ": " + (stats["Value"] > 0 ? "+" : "") + stats["Value"]);
+                }
 
-         internal string AskForLastName() {
-             return "Enter a last name (Type 'name' to go back to first name): ";
-         }
+                break;
+            }
 
-         internal string AskForPassword() {
-             return "Enter a password: ";
-         }
+            return sb;
+        }
 
-         internal string AskForClass() {
-             StringBuilder sb = new StringBuilder();
-             sb.AppendLine("");
-             sb.AppendLine("Select your class");
-             sb.Append(DisplayChoices<CharacterEnums.CharacterClass>());
-             sb.AppendLine("(B)ack");
-             return sb.ToString();
-         }
+        #region Ask for stuff
+        internal string AskForFirstName() {
+            return "Enter a first name: ";
+        }
 
-         internal string AskForLanguage() {
-             StringBuilder sb = new StringBuilder();
-             sb.AppendLine("");
-             sb.AppendLine("Select your primary language");
-             sb.Append(DisplayChoices<CharacterEnums.Languages>());
-             sb.AppendLine("(B)ack");
-             return sb.ToString();
-         }
+        internal string AskForLastName() {
+            return "Enter a last name (Type 'name' to go back to first name): ";
+        }
 
-         internal string AskForSkinType() {
-             StringBuilder sb = new StringBuilder();
-             sb.AppendLine("");
-             sb.AppendLine("Select your skin type");
-             sb.Append(DisplayChoices<CharacterEnums.SkinType>());
-             sb.AppendLine("(B)ack");
-             return sb.ToString();
-         }
+        internal string AskForPassword() {
+            return "Enter a password: ";
+        }
 
-         internal string AskForSkinColor() {
-             StringBuilder sb = new StringBuilder();
-             sb.AppendLine("");
-             sb.AppendLine("Select your skin color");
-             sb.Append(DisplayChoices<CharacterEnums.SkinColors>());
-             sb.AppendLine("(B)ack");
-             return sb.ToString();
-         }
+        internal string AskForClass() {
+            StringBuilder sb = new StringBuilder();
+            sb.AppendLine("");
+            sb.AppendLine("Select your class");
+            sb.Append(DisplayChoices<CharacterEnums.CharacterClass>());
+            sb.AppendLine("(B)ack");
+            return sb.ToString();
+        }
 
-         internal string AskForBuildType() {
-             StringBuilder sb = new StringBuilder();
-             sb.AppendLine("");
-             sb.AppendLine("Select your body build type");
-             sb.Append(DisplayChoices<CharacterEnums.BodyBuild>());
-             sb.AppendLine("(B)ack");
-             return sb.ToString();
-         }
+        internal string AskForLanguage() {
+            StringBuilder sb = new StringBuilder();
+            sb.AppendLine("");
+            sb.AppendLine("Select your primary language");
+            sb.Append(DisplayChoices<CharacterEnums.Languages>());
+            sb.AppendLine("(B)ack");
+            return sb.ToString();
+        }
 
-         internal string AskForHairColor() {
-             StringBuilder sb = new StringBuilder();
-             sb.AppendLine("");
-             sb.AppendLine("Select your hair color");
-             sb.Append(DisplayChoices<CharacterEnums.HairColors>());
-             sb.AppendLine("(B)ack");
-             return sb.ToString();
-         }
-         internal string AskForEyeColor() {
-             StringBuilder sb = new StringBuilder();
-             sb.AppendLine("");
-             sb.AppendLine("Select your eye color");
-             sb.Append(DisplayChoices<CharacterEnums.EyeColors>());
-             sb.AppendLine("(B)ack");
-             return sb.ToString();
-         }
+        internal string AskForSkinType() {
+            StringBuilder sb = new StringBuilder();
+            sb.AppendLine("");
+            sb.AppendLine("Select your skin type");
+            sb.Append(DisplayChoices<CharacterEnums.SkinType>());
+            sb.AppendLine("(B)ack");
+            return sb.ToString();
+        }
 
-         internal string AskForWeight(CharacterEnums.Genders gender, CharacterEnums.BodyBuild build) {
-             //will probably want to do some logic for the weight ranges and calculate them on the fly based on build, height and race?
-             BsonDocument doc = _generalCollection.FindOneAs<BsonDocument>(Query.EQ("_id", "BodyWeight")).AsBsonDocument;
-             BsonArray arr = doc["Genders"].AsBsonArray;
-             BsonArray arr2 = arr.Where(a => a["type"].AsString == gender.ToString().CamelCaseWord()).SingleOrDefault()["Weights"].AsBsonArray;
-             doc = arr2.Where(a => a.AsBsonDocument["name"] == build.ToString().CamelCaseWord()).SingleOrDefault().AsBsonDocument;
-             double min = doc["min"].AsInt32; //these need to be converted to doubles in DB
-             double max = doc["max"].AsInt32;
-             
-             return "Enter your weight (range:" + min + "-" + max +")";
-         }
+        internal string AskForSkinColor() {
+            StringBuilder sb = new StringBuilder();
+            sb.AppendLine("");
+            sb.AppendLine("Select your skin color");
+            sb.Append(DisplayChoices<CharacterEnums.SkinColors>());
+            sb.AppendLine("(B)ack");
+            return sb.ToString();
+        }
 
-         internal string AskForHeight(CharacterEnums.CharacterRace race) {
-             //will probably want to do some logic for the weight ranges and calculate them on the fly based on build, height and race?
-             BsonDocument doc = _generalCollection.FindOneAs<BsonDocument>(Query.EQ("_id", "Heights")).AsBsonDocument;
-             BsonArray arr = doc["Types"].AsBsonArray;
-             double min = 0.0d, max = 0.0d;
+        internal string AskForBuildType() {
+            StringBuilder sb = new StringBuilder();
+            sb.AppendLine("");
+            sb.AppendLine("Select your body build type");
+            sb.Append(DisplayChoices<CharacterEnums.BodyBuild>());
+            sb.AppendLine("(B)ack");
+            return sb.ToString();
+        }
 
-             foreach (BsonDocument height in arr) {
-                 if (height["Name"] == race.ToString().ToUpper()) {
-                     min = height["Min"].AsDouble; //these need to be converted to doubles in DB
-                     max = height["Max"].AsDouble;
-                     break;
-                 }
-             }
+        internal string AskForHairColor() {
+            StringBuilder sb = new StringBuilder();
+            sb.AppendLine("");
+            sb.AppendLine("Select your hair color");
+            sb.Append(DisplayChoices<CharacterEnums.HairColors>());
+            sb.AppendLine("(B)ack");
+            return sb.ToString();
+        }
+        internal string AskForEyeColor() {
+            StringBuilder sb = new StringBuilder();
+            sb.AppendLine("");
+            sb.AppendLine("Select your eye color");
+            sb.Append(DisplayChoices<CharacterEnums.EyeColors>());
+            sb.AppendLine("(B)ack");
+            return sb.ToString();
+        }
 
-             return "Enter your height (inches)(range:" + min + "-" + max + ")";
-         }
+        internal string AskForWeight(CharacterEnums.Genders gender, CharacterEnums.BodyBuild build) {
+            //will probably want to do some logic for the weight ranges and calculate them on the fly based on build, height and race?
+            BsonDocument doc = _generalCollection.FindOneAs<BsonDocument>(Query.EQ("_id", "BodyWeight")).AsBsonDocument;
+            BsonArray arr = doc["Genders"].AsBsonArray;
+            BsonArray arr2 = arr.Where(a => a["type"].AsString == gender.ToString().CamelCaseWord()).SingleOrDefault()["Weights"].AsBsonArray;
+            doc = arr2.Where(a => a.AsBsonDocument["name"] == build.ToString().CamelCaseWord()).SingleOrDefault().AsBsonDocument;
+            double min = doc["min"].AsInt32; //these need to be converted to doubles in DB
+            double max = doc["max"].AsInt32;
 
-         internal string AskForRace() {
-             StringBuilder sb = new StringBuilder();
-             sb.AppendLine("");
-             sb.AppendLine("Select your race");
-             sb.Append(DisplayChoices<CharacterEnums.CharacterRace>());
-             sb.AppendLine("(B)ack");
-             return sb.ToString();
-         }
+            return "Enter your weight (range:" + min + "-" + max + ")";
+        }
 
-         internal string AskForGender() {
-             StringBuilder sb = new StringBuilder();
-             sb.AppendLine("");
-             sb.AppendLine("Select your gender");
-             sb.Append(DisplayChoices<CharacterEnums.Genders>());
-             sb.AppendLine("(B)ack");
-             return sb.ToString();
-         }
+        internal string AskForHeight(CharacterEnums.CharacterRace race) {
+            //will probably want to do some logic for the weight ranges and calculate them on the fly based on build, height and race?
+            BsonDocument doc = _generalCollection.FindOneAs<BsonDocument>(Query.EQ("_id", "Heights")).AsBsonDocument;
+            BsonArray arr = doc["Types"].AsBsonArray;
+            double min = 0.0d, max = 0.0d;
 
-         internal string ReEnterPassword() {
-             return "Re-enter your password: ";
-         }
-#endregion Ask for stuff
+            foreach (BsonDocument height in arr) {
+                if (height["Name"] == race.ToString().ToUpper()) {
+                    min = height["Min"].AsDouble; //these need to be converted to doubles in DB
+                    max = height["Max"].AsDouble;
+                    break;
+                }
+            }
 
-         #region Enum Utility Functions
-         internal string DisplayChoices<T>() {
-             int i = 1;
-             StringBuilder sb = new StringBuilder();
-             foreach (T choice in Enum.GetValues(typeof(T))) {
-                 sb.AppendLine(String.Format("{0}) {1}", i, choice.ToString().Replace("_","").CamelCaseString()));
-                 i++;
-             }
-             return sb.ToString();
-         }
+            return "Enter your height (inches)(range:" + min + "-" + max + ")";
+        }
 
-         internal IEnumerable<T> GetEnums<T>() {
-             return Enum.GetValues(typeof(T)).Cast<T>(); 
-         }
+        internal string AskForRace() {
+            StringBuilder sb = new StringBuilder();
+            sb.AppendLine("");
+            sb.AppendLine("Select your race");
+            sb.Append(DisplayChoices<CharacterEnums.CharacterRace>());
+            sb.AppendLine("(B)ack");
+            return sb.ToString();
+        }
 
-         internal int GetMaxEnum<T>() {
-              return Enum.GetValues(typeof(T)).Cast<int>().Last();
-         }
-        #endregion  
+        internal string AskForGender() {
+            StringBuilder sb = new StringBuilder();
+            sb.AppendLine("");
+            sb.AppendLine("Select your gender");
+            sb.Append(DisplayChoices<CharacterEnums.Genders>());
+            sb.AppendLine("(B)ack");
+            return sb.ToString();
+        }
+
+        internal string ReEnterPassword() {
+            return "Re-enter your password: ";
+        }
+        #endregion Ask for stuff
+
+        #region Enum Utility Functions
+        internal string DisplayChoices<T>() {
+            int i = 1;
+            StringBuilder sb = new StringBuilder();
+            foreach (T choice in Enum.GetValues(typeof(T))) {
+                sb.AppendLine(String.Format("{0}) {1}", i, choice.ToString().Replace("_", "").CamelCaseString()));
+                i++;
+            }
+            return sb.ToString();
+        }
+
+        internal IEnumerable<T> GetEnums<T>() {
+            return Enum.GetValues(typeof(T)).Cast<T>();
+        }
+
+        internal int GetMaxEnum<T>() {
+            return Enum.GetValues(typeof(T)).Cast<int>().Last();
+        }
+        #endregion
     }
 
-   internal enum CreateCharSteps { FIRST_NAME, LAST_NAME, PASSWORD, PASSWORD_CHECK, RACE, GENDER, LANGUAGE, EYE_COLOR, SKIN_TYPE, SKIN_COLOR, HAIR_COLOR, WEIGHT, HEIGHT, BUILD, CLASS, AWAITINGRESPONSE, SUCCEEDED, CONFIRM, NONE };
+    internal enum CreateCharSteps { FIRST_NAME, LAST_NAME, PASSWORD, PASSWORD_CHECK, RACE, GENDER, LANGUAGE, EYE_COLOR, SKIN_TYPE, SKIN_COLOR, HAIR_COLOR, WEIGHT, HEIGHT, BUILD, CLASS, AWAITINGRESPONSE, SUCCEEDED, CONFIRM, NONE };
 
-	internal class TempChar{
+    internal class TempChar {
         public User.User user = null;
-        public CreateCharSteps currentStep {get; set;}
+        public CreateCharSteps currentStep { get; set; }
         public CreateCharSteps lastStep { get; set; }
         public CreateCharSteps confirmStep { get; set; }
         public CreateCharSteps nextStep { get; set; }
 
-		public string FirstName {get;set;}
-		public string LastName {get;set;}
-		public string Password {get;set;}
-        public CharacterEnums.CharacterRace Race {get;set;}
+        public string FirstName { get; set; }
+        public string LastName { get; set; }
+        public string Password { get; set; }
+        public CharacterEnums.CharacterRace Race { get; set; }
         public CharacterEnums.CharacterClass Class { get; set; }
         public CharacterEnums.Genders Gender { get; set; }
         public CharacterEnums.Languages Language { get; set; }
@@ -806,5 +804,5 @@ namespace Scripts
             confirmStep = CreateCharSteps.NONE;
             nextStep = CreateCharSteps.NONE;
         }
-	}
+    }
 }

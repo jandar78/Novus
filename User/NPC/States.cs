@@ -33,9 +33,9 @@ namespace AI {
         }
 
         public void Execute(Character.NPC actor, ITrigger trigger = null) {
-            if (actor.StanceState != CharacterEnums.CharacterStanceState.LAYING_UNCONCIOUS &&
-                actor.StanceState != CharacterEnums.CharacterStanceState.LAYING_DEAD &&
-                actor.StanceState != CharacterEnums.CharacterStanceState.DECOMPOSING) {
+            if (actor.StanceState != CharacterEnums.CharacterStanceState.Laying_Unconcious &&
+                actor.StanceState != CharacterEnums.CharacterStanceState.Laying_Dead &&
+                actor.StanceState != CharacterEnums.CharacterStanceState.Decomposing) {
                 if (DateTime.Now.ToUniversalTime() > actor.NextAiAction) {//so it's time for this AI state to execute
                     string message = "Hey pal, you looking for trouble?";
                     if (trigger.MessageOverrideAsString.Count > 0) {
@@ -263,10 +263,10 @@ namespace AI {
         }
 
         public void Execute(Character.NPC actor, ITrigger trigger = null) {
-            if (actor.StanceState != CharacterEnums.CharacterStanceState.DECOMPOSING) {
+            if (actor.StanceState != CharacterEnums.CharacterStanceState.Decomposing) {
                 Commands.CommandParser.ExecuteCommand(actor, "EMOTE", "carcass last bit of flesh has rotted away from its dead corpse.");
                 actor.Description = "The only remains of " + actor.FirstName + " are just bones.";
-                actor.SetStanceState(CharacterEnums.CharacterStanceState.DECOMPOSING);
+                actor.SetStanceState(CharacterEnums.CharacterStanceState.Decomposing);
                 actor.NextAiAction = DateTime.Now.AddMinutes(5).ToUniversalTime();
             }
             else {

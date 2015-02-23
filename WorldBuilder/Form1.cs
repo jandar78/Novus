@@ -65,7 +65,7 @@ namespace WorldBuilder {
                         MongoUtils.MongoData.ConnectToDatabase();
                     }
                     catch (Exception ex) {
-                        //squashing things like no tomorrow muahahahaha
+                        //squashing bugs like no tomorrow muahahahaha
                         continue;
                     }
                 }
@@ -91,6 +91,10 @@ namespace WorldBuilder {
         private void DisplayValidationErrorBox(string msg) {
             MessageBox.Show(msg, "Validation error", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
         }
+
+      
+
+       
 
        
     }

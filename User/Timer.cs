@@ -45,7 +45,7 @@ namespace MudTime
 			MudTimer playerTimer = new MudTimer(5, 120); //every 2 minutes
 			playerTimer.TimerElapsed += new MudTimer.ElapsedEventHandler(PlayerTimerTick);
 
-            MudTimer timeTimer = new MudTimer(1, 60); //1 second in real life is 28 seconds in game time
+            MudTimer timeTimer = new MudTimer(1, 60); 
             timeTimer.TimerElapsed += new MudTimer.ElapsedEventHandler(TimeTimerTick);
 
             //MudTimer dayTimer = new MudTimer(900, 25); //every 28 seconds in real life equals 1 second game time (12 hours in game = 3 hours real time)
@@ -56,22 +56,28 @@ namespace MudTime
 		}
 
         private static void TimeTimerTick(uint timeTick, EventArgs e) {
-            Calendar.Calendar.UpdateClock();
+            Calendar.Calendar.UpdateClock(); //1 second in real life is 28 seconds in game time
 
             Items.Items.DeChargeLightSources();
+
+            if (timeTick % 30 == 0) { //30 seconds
+                Rooms.Room.ApplyRoomModifiers((int)timeTick);
+            }
         }
 
 	
 		private static void PlayerTimerTick(uint playerTicks, EventArgs e) {
+            //Every 5 seconds
+            foreach (User.User user in MySockets.Server.GetCurrentUserList()) {
+                user.Player.CleanupBonuses();
+            }
+
 			if (playerTicks % 10 == 0) {
 				foreach (User.User user in MySockets.Server.GetCurrentUserList()) {
 					foreach (KeyValuePair<string, Character.Attribute> attrib in user.Player.GetAttributes()) {
 						user.Player.ApplyRegen(attrib.Key);
 					}
 				}
-			}
-			if (playerTicks % 30 == 0) { //every other player tick
-				Rooms.Room.ApplyRoomModifiers((int)playerTicks);
 			}
 		}
 

@@ -89,10 +89,19 @@ namespace Commands {
             Player = user;
             script.LuaScript["player"] = Player.Player;
             
-            //we'll worry about this when we impement CombatSkills, these are just passive skills
-            //if (commands.Count > 3) {
-            //    Target = CommandParser.FindTargetByName(commands[2], user.Player.Location);
-            //}
+            //if they have a target or they passed one in let's add it to the script variables as well
+            if (Player.Player.CurrentTarget != null || commands.Count > 3){
+                if (Player.Player.CurrentTarget != null && commands.Count <= 3) { //didn't pass a target because they have one
+                    Target = MySockets.Server.GetAUser(Player.Player.CurrentTarget);
+                }
+                else { //they passed in a target
+                    Target = CommandParser.FindTargetByName(commands[2], user.Player.Location);
+                }
+
+                if (Target != null) {
+                    script.LuaScript["target"] = Target.Player;
+                }
+            }
         }
         
 
@@ -138,10 +147,6 @@ namespace Commands {
     
         #region Lua script parsing methods
         public void ExecuteScript() {
-            //string path = @"E:\Mud\" + SkillDocument["_id"].AsString + ".lua";
-            //using (Lua luaParser = new Lua()) {
-            //    luaParser.RegisterMarkedMethodsOf(this);
-            //    luaParser.DoFile(path);
             script.RunScript();
 
                 if (Message != null) {
@@ -153,7 +158,6 @@ namespace Commands {
                 if (MsgOthers != null) {
                     Room.GetRoom(Player.Player.Location).InformPlayersInRoom(MsgOthers, new List<string>(new string[] { Player.UserID }));
                 }
-            //}
         }
         
         //LUA methods need to be public or you'll get "method is nil" exception
@@ -176,7 +180,7 @@ namespace Commands {
                 Character.Iactor actor = (Character.Iactor)o;
 
                 if (!others) {
-                    if (StanceIfSuccessSelf != CharacterEnums.CharacterStanceState.NONE) {
+                    if (StanceIfSuccessSelf != CharacterEnums.CharacterStanceState.None) {
                         actor.SetStanceState(StanceIfSuccessSelf);
                     }
 
@@ -189,137 +193,14 @@ namespace Commands {
             }
         }
 
-
-        [LuaAccessible]
-        public double ParseAndCalculateCheckOther(object player) {
-            if (player != null) {
-                Expression expression = new Expression(ReplaceStringWithNumber((Character.Iactor)player));
-                return (double)expression.Evaluate();
-            }
-            return 0.0d;
-        }
-
+        //deprecated
         //[LuaAccessible]
-        //public Type GetObjectType(object o) {
-        //    Type t = o.GetType();
-        //    switch (t.Name) {
-        //        case "bool":
-        //            t = typeof(System.Boolean);
-        //            break;
-        //        case "int":
-        //            t = typeof(System.Int32);
-        //            break;
-        //        case "double":
-        //            t = typeof(System.Double);
-        //            break;
-        //        case "string":
-        //        default:
-        //            t = typeof(System.String);
-        //            break;
+        //public double ParseAndCalculateCheckOther(object player) {
+        //    if (player != null) {
+        //        Expression expression = new Expression(ReplaceStringWithNumber((Character.Iactor)player));
+        //        return (double)expression.Evaluate();
         //    }
-        //    return t;
-        //}
-
-        // [LuaAccessible]
-        //public object CastObject(object o, string type) {
-        //    return Convert.ChangeType(o, Type.GetType(type));
-        //}
-
-        //[LuaAccessible]
-        // public Type GetClassType(string className) {
-        //    Type t = null;
-
-        //    switch (className) {
-        //        case "Utils":
-        //            t = typeof(Utils);
-        //            break;
-        //        case "Room":
-        //            t = typeof(Room);
-        //            break;
-        //        case "Exits":
-        //            t = typeof(Exits);
-        //            break;
-        //        case "Skill":
-        //            t = typeof(Skill);
-        //            break;
-        //        case "Character":
-        //            t = typeof(Character.Character);
-        //            break;
-        //        case "NPC":
-        //            t = typeof(Character.NPC);
-        //            break;
-        //        case "NPCUtils":
-        //            t = typeof(Character.NPCUtils);
-        //            break;
-        //        case "Items":
-        //            t = typeof(Items.Items);
-        //            break;
-        //        case "User":
-        //            t = typeof(User.User);
-        //            break;
-        //        case "Server":
-        //            t = typeof(MySockets.Server);
-        //            break;
-        //        case "CommandParser":
-        //            t = typeof(CommandParser);
-        //            break;
-        //        default:
-        //            break;
-        //    }
-
-        //    return t;
-        //}
-
-        //[LuaAccessible]
-        //public object GetObjectType(string value, string type) {
-        //    object o = null;
-        //    switch (type) {
-        //        case "System.Int32": {
-        //                int result;
-        //                int.TryParse(value, out result);
-        //                o = result;
-        //                break;
-        //            }
-        //        case "System.Double": {
-        //                double result;
-        //                double.TryParse(value, out result);
-        //                o = result;
-        //                break;
-        //            }
-        //        case "System.Boolean": {
-        //                bool result;
-        //                bool.TryParse(value, out result);
-        //                o = result;
-        //                break;
-        //            }
-        //        case "System.String":
-        //        default: {
-        //                o = value;
-        //                break;
-        //            }
-        //    }
-
-        //    return o;
-        //}
-
-        //[LuaAccessible]
-        //public object GetMethodResult(string className, string methodName, object table) {
-        //    Type t = GetClassType(className);
-        //    MethodInfo m = t.GetMethod(methodName, BindingFlags.Public | BindingFlags.Static | BindingFlags.NonPublic);
-                            
-        //    LuaTable luaTable = (LuaTable)table;
-        //    ParameterInfo[] p = m.GetParameters();
-        //    object[] parameters = new object[luaTable.Values.Count];
-        //    int i = 0;
-        //    foreach (var value in luaTable.Values) {
-        //        parameters[i] = CastObject(value, p[i].ParameterType.FullName);
-        //        i++;
-        //    }
-
-            
-        //    object result = m.Invoke(null, parameters);
-
-        //    return result;
+        //    return 0.0d;
         //}
 
         [LuaAccessible]
@@ -327,35 +208,6 @@ namespace Commands {
             Utils.FontForeColor fontColor = (Utils.FontForeColor)color;
             return message.FontColor(fontColor);
         }
-
-        //[LuaAccessible]
-        //public void InvokeMethod(object o, string methodName, object table) {
-        //    Type t = o.GetType();
-        //    MethodInfo m = t.GetMethod(methodName, BindingFlags.Public | BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic);
-            
-        //    LuaTable luaTable = table as LuaTable;
-        //    if (luaTable != null) {
-        //        object[] parameters = new object[luaTable.Values.Count];
-        //        int i = 0;
-        //        foreach (var value in luaTable.Values) {
-        //            var vType = value.GetType();
-        //            parameters[i] = value;
-        //            i++;
-        //        }
-        //        if (m.IsStatic) {
-        //            o = null;
-        //        }
-
-        //       m.Invoke(o, parameters);
-        //    }
-        //    else {
-        //        if (m.IsStatic) {
-        //            o = null;
-        //        }
-                
-        //        m.Invoke(o, new object[] { table });
-        //    }
-        //}
 
         [LuaAccessible]
         public void SetVariable(string name, object o) {
@@ -377,26 +229,6 @@ namespace Commands {
             return o;
         }
 
-        //[LuaAccessible]
-        //public object GetDictionaryElement(object o, string name) {
-        //    IDictionary dict = (IDictionary)o;
-        //    if (dict.Contains(name.CamelCaseWord())) {
-        //        o = dict[name.CamelCaseWord()];
-        //    }
-
-        //    return o;
-        //}
-
-        //[LuaAccessible]
-        //public object GetElement(object[] array, double position, string type) {
-        //    object o = null;
-        //    if ((int)position >= 0 && (int)position < array.Length) {
-        //        o = array[(int)position];
-        //        o = CastObject(o, type);
-        //    }
-        //    return o;
-        //}
-
         [LuaAccessible]
         public void AssignMessage(string who, string message) {
             if (!string.IsNullOrEmpty(message)) {
@@ -411,12 +243,6 @@ namespace Commands {
                 }
             }
         }
-
-        //[LuaAccessible]
-        //public void SendMessage(string playerID, string message) {
-        //    User.User player = MySockets.Server.GetAUser(playerID);
-        //    player.MessageHandler(message);
-        //}
 
         [LuaAccessible]
         public object GetPlayer(string type) {
@@ -444,52 +270,6 @@ namespace Commands {
             return o;
         }
 
-        //[LuaAccessible]
-        //public object GetProperty(object o, string value, string type, string className = null) {
-        //    if (o == null && className == null) {
-        //        return null;
-        //    }
-            
-        //    Type t = null;
-            
-        //    if (!string.IsNullOrEmpty(className) && string.Equals(className, "Skill", StringComparison.CurrentCultureIgnoreCase)) {
-        //        o = this;
-        //        t = o.GetType();
-        //    }
-        //    else {
-        //        t = o.GetType();
-        //    }
-                       
-        //    var p = t.GetProperties();
-
-        //    o = p.Where(prop => string.Equals(prop.Name, value, StringComparison.CurrentCultureIgnoreCase)).SingleOrDefault().GetValue(o, null);
-
-        //    if (!string.IsNullOrEmpty(type)) {
-        //        o = CastObject(o, type);
-        //    }
-
-        //    return o;
-        //}
-
-        //[LuaAccessible]
-        //public object GetField(object o, string name) {
-        //    Type t = o.GetType();
-        //    FieldInfo f = t.GetField(name);
-
-        //    o = f.GetValue(o);
-            
-        //    return o;
-        //}
-
-        //[LuaAccessible]
-        //public object GetMember(object o, string name) {
-        //    Type t = o.GetType();
-            
-        //    o = t.GetMember(name)[0];
-            
-        //    return o;
-        //}
-     
         #endregion Lua script parsing methods
         
         private enum CheckRoom { NONE, ALL, GREATER_OR_EQUAL, GREATER, LESS, LESS_OR_EQUAL }

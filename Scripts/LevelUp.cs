@@ -44,6 +44,25 @@ namespace Scripts {
 
              TempLvlChar specificUser = usersLevelingUp.Where(u => u.user.UserID == userId).SingleOrDefault();
 
+             //TODO: I'd like to make this more generic, we allow them to create any attribute they want why are we hardcoding them in here?
+             //we should just create a dictionary that matches the case to the attribute name
+
+             //it would also be super cool if we could get the steps from the DB instead of hardcoding the enums as well.
+             //this way things could be DB driven and the code just executes it. I'm thinking maybe we can just create something like a generic Step enum that goes
+             //from 1 to 20 (for now) and the scripts can parse the DB step to the enum and then we can call another generic method to display what we want from the DB
+             //and then also what steps it points to for previous and next
+
+             //kinda like this:
+
+             //var stepToExecute = _scriptCollection.FindOneAs<BsonDocument>(Query.EQ("_id", specificUser.lastStep.ToString()));
+             //Type t = specificUser.GetType();
+             //var propertyToAssignTo = t.GetProperty(stepToExecute["FriendlyName"].AsString);
+             //propertyToAssignTo.SetValue(specificUser, response);
+             //specificUser.currentStep = (ScriptSteps)Enum.Parse(typeof(ScriptSteps), stepToExecute["NextStep"].AsString);
+             //specificUser.lastStep = (ScriptSteps)Enum.Parse(typeof(ScriptSteps), stepToExecute["PreviousStep"].AsString);
+
+             //internal enum ScriptSteps { None, AwaitingResponse, Step1, Step2, Step3, Step4, Step5, Step6, Step7, Step8, Step9, Step10, Step11, Step12, Step13, Step14, Step15, Step16, Step17, Step18, Step19, Step20, Step21, Step22, Step23, Step24, Step25, Step26, Step27, Step28, Step29, Step30 };
+
              if (specificUser != null && specificUser.currentStep == LevelUpSteps.AWAITINGRESPONSE) {
                  int increase = 0;
 				 switch (specificUser.lastStep) {
@@ -82,7 +101,6 @@ namespace Scripts {
                                          state = User.User.UserState.TALKING;
                                          usersLevelingUp.Remove(specificUser);
                                          return state;
-                                         break;
                                  }
                                  if (increase > 0) {
                                      specificUser.user.MessageHandler(String.Format("You've increased your {0} by {1} points", attribute, increase));

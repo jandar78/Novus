@@ -65,10 +65,10 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="AffectedForm.cs">
+    <Compile Include="Helper Forms\AffectedForm.cs">
       <SubType>Form</SubType>
     </Compile>
-    <Compile Include="AffectedForm.Designer.cs">
+    <Compile Include="Helper Forms\AffectedForm.Designer.cs">
       <DependentUpon>AffectedForm.cs</DependentUpon>
     </Compile>
     <Compile Include="Form1.cs">
@@ -76,6 +76,12 @@
     </Compile>
     <Compile Include="Form1.Designer.cs">
       <DependentUpon>Form1.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Helper Forms\ModifiersForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Helper Forms\ModifiersForm.Designer.cs">
+      <DependentUpon>ModifiersForm.cs</DependentUpon>
     </Compile>
     <Compile Include="ItemsTab.cs">
       <SubType>Form</SubType>
@@ -88,23 +94,26 @@
     <Compile Include="ScriptsTab.cs">
       <SubType>Form</SubType>
     </Compile>
-    <Compile Include="TextBoxForm.cs">
+    <Compile Include="Helper Forms\TextBoxForm.cs">
       <SubType>Form</SubType>
     </Compile>
-    <Compile Include="TextBoxForm.Designer.cs">
+    <Compile Include="Helper Forms\TextBoxForm.Designer.cs">
       <DependentUpon>TextBoxForm.cs</DependentUpon>
     </Compile>
-    <Compile Include="TriggerForm.cs">
+    <Compile Include="Helper Forms\TriggerForm.cs">
       <SubType>Form</SubType>
     </Compile>
-    <Compile Include="TriggerForm.Designer.cs">
+    <Compile Include="Helper Forms\TriggerForm.Designer.cs">
       <DependentUpon>TriggerForm.cs</DependentUpon>
     </Compile>
-    <EmbeddedResource Include="AffectedForm.resx">
+    <EmbeddedResource Include="Helper Forms\AffectedForm.resx">
       <DependentUpon>AffectedForm.cs</DependentUpon>
     </EmbeddedResource>
     <EmbeddedResource Include="Form1.resx">
       <DependentUpon>Form1.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Helper Forms\ModifiersForm.resx">
+      <DependentUpon>ModifiersForm.cs</DependentUpon>
     </EmbeddedResource>
     <EmbeddedResource Include="Properties\Resources.resx">
       <Generator>ResXFileCodeGenerator</Generator>
@@ -115,10 +124,10 @@
       <AutoGen>True</AutoGen>
       <DependentUpon>Resources.resx</DependentUpon>
     </Compile>
-    <EmbeddedResource Include="TextBoxForm.resx">
+    <EmbeddedResource Include="Helper Forms\TextBoxForm.resx">
       <DependentUpon>TextBoxForm.cs</DependentUpon>
     </EmbeddedResource>
-    <EmbeddedResource Include="TriggerForm.resx">
+    <EmbeddedResource Include="Helper Forms\TriggerForm.resx">
       <DependentUpon>TriggerForm.cs</DependentUpon>
     </EmbeddedResource>
     <None Include="packages.config" />

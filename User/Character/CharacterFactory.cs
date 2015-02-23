@@ -36,15 +36,15 @@ namespace CharacterFactory {
 
         internal static Character.Iactor CreateNPCCharacterHusk() {
 
-            CharacterEnums.CharacterClass charClass = CharacterEnums.CharacterClass.FIGHTER;
-            CharacterEnums.EyeColors EyeColor = CharacterEnums.EyeColors.BLACK;
-            CharacterEnums.Genders Gender = CharacterEnums.Genders.MALE;
-            CharacterEnums.HairColors HairColor = CharacterEnums.HairColors.BLACK;
+            CharacterEnums.CharacterClass charClass = CharacterEnums.CharacterClass.Fighter;
+            CharacterEnums.EyeColors EyeColor = CharacterEnums.EyeColors.Black;
+            CharacterEnums.Genders Gender = CharacterEnums.Genders.Male;
+            CharacterEnums.HairColors HairColor = CharacterEnums.HairColors.Black;
             CharacterEnums.CharacterRace Race = CharacterEnums.CharacterRace.DWARF;
-            CharacterEnums.SkinColors SkinColor = CharacterEnums.SkinColors.BLACK;
-            CharacterEnums.SkinType SkinType = CharacterEnums.SkinType.FEATHERS;
-            CharacterEnums.Languages Language = CharacterEnums.Languages.COMMON;
-            CharacterEnums.BodyBuild Build = CharacterEnums.BodyBuild.ATHLETIC;
+            CharacterEnums.SkinColors SkinColor = CharacterEnums.SkinColors.Black;
+            CharacterEnums.SkinType SkinType = CharacterEnums.SkinType.Feathers;
+            CharacterEnums.Languages Language = CharacterEnums.Languages.Common;
+            CharacterEnums.BodyBuild Build = CharacterEnums.BodyBuild.Athletic;
 
             Character.Iactor actor = new Character.NPC(Race, charClass, Gender, Language, SkinColor, SkinType, HairColor, EyeColor, Build);
             Character.Inpc npc = actor as Character.Inpc;

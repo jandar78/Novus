@@ -48,7 +48,7 @@ namespace Commands {
             ItemCommands.Add("TURNOFF", new CommandDelegate(DeActivate));
             ItemCommands.Add("DEACTIVATE", new CommandDelegate(DeActivate));
             ItemCommands.Add("SWITCHOFF", new CommandDelegate(DeActivate));
-            //these two may be the same as equip and unequip we'l see
+            //these two may be the same as equip and unequip we'll see
             //ItemCommands.Add("WEAR", new CommandDelegate(Wear));
             //ItemCommands.Add("REMOVE", new CommandDelegate(Remove));
 
@@ -105,10 +105,9 @@ namespace Commands {
 			CombatCommands.Add("ATTACK", new CommandDelegate(Kill));
 			CombatCommands.Add("KILL", new CommandDelegate(Kill));
 			CombatCommands.Add("CLEAVE", new CommandDelegate(Cleave));
-			CombatCommands.Add("DESTROY", new CommandDelegate(Destroy));
+			CombatCommands.Add("DESTROY", new CommandDelegate(Break));
 			CombatCommands.Add("BREAK", new CommandDelegate(Break));
-            CombatCommands.Add("ASSASSINATE", new CommandDelegate(Assassinate));
-			
+            			
 			//we don't want to add the combat dictionary to the list because we are already checking it before any of these
 			CommandsList = new List<Dictionary<string, CommandDelegate>>();
 			CommandsList.Add(VisualCommands);

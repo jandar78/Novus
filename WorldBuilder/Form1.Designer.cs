@@ -26,6 +26,14 @@
             this.components = new System.ComponentModel.Container();
             this.tabControl1 = new System.Windows.Forms.TabControl();
             this.tabPage1 = new System.Windows.Forms.TabPage();
+            this.itemTypeGroup = new System.Windows.Forms.GroupBox();
+            this.typeDrinkableValue = new System.Windows.Forms.CheckBox();
+            this.typeKeyValue = new System.Windows.Forms.CheckBox();
+            this.typeIluminationValue = new System.Windows.Forms.CheckBox();
+            this.typeClothingValue = new System.Windows.Forms.CheckBox();
+            this.typeWeaponValue = new System.Windows.Forms.CheckBox();
+            this.typeContainerValue = new System.Windows.Forms.CheckBox();
+            this.typeEdibleValue = new System.Windows.Forms.CheckBox();
             this.groupBox7 = new System.Windows.Forms.GroupBox();
             this.removeFromContainer = new System.Windows.Forms.Button();
             this.addToContainer = new System.Windows.Forms.Button();
@@ -130,15 +138,11 @@
             this.comboBox3 = new System.Windows.Forms.ComboBox();
             this.roomRefresh = new System.Windows.Forms.Button();
             this.label26 = new System.Windows.Forms.Label();
-            this.textBox2 = new System.Windows.Forms.TextBox();
-            this.roomWeatherValue = new System.Windows.Forms.TextBox();
-            this.label25 = new System.Windows.Forms.Label();
+            this.displayInGameValue = new System.Windows.Forms.TextBox();
             this.roomModifierValue = new System.Windows.Forms.ListBox();
             this.label24 = new System.Windows.Forms.Label();
             this.roomExitsValue = new System.Windows.Forms.ListBox();
             this.label23 = new System.Windows.Forms.Label();
-            this.comboBox2 = new System.Windows.Forms.ComboBox();
-            this.label22 = new System.Windows.Forms.Label();
             this.roomTitleValue = new System.Windows.Forms.TextBox();
             this.label21 = new System.Windows.Forms.Label();
             this.roomDescriptionValue = new System.Windows.Forms.TextBox();
@@ -173,16 +177,17 @@
             this.toolTip1 = new System.Windows.Forms.ToolTip(this.components);
             this.statusStrip1 = new System.Windows.Forms.StatusStrip();
             this.databaseConnectionStatusValue = new System.Windows.Forms.ToolStripStatusLabel();
-            this.itemTypeGroup = new System.Windows.Forms.GroupBox();
-            this.typeEdibleValue = new System.Windows.Forms.CheckBox();
-            this.typeContainerValue = new System.Windows.Forms.CheckBox();
-            this.typeWeaponValue = new System.Windows.Forms.CheckBox();
-            this.typeClothingValue = new System.Windows.Forms.CheckBox();
-            this.typeIluminationValue = new System.Windows.Forms.CheckBox();
-            this.typeKeyValue = new System.Windows.Forms.CheckBox();
-            this.typeDrinkableValue = new System.Windows.Forms.CheckBox();
+            this.groupBox9 = new System.Windows.Forms.GroupBox();
+            this.outdoorValue = new System.Windows.Forms.CheckBox();
+            this.indoorValue = new System.Windows.Forms.CheckBox();
+            this.darkCaveValue = new System.Windows.Forms.CheckBox();
+            this.noPvpValue = new System.Windows.Forms.CheckBox();
+            this.forestValue = new System.Windows.Forms.CheckBox();
+            this.groupBox10 = new System.Windows.Forms.GroupBox();
+            this.weatherValues = new System.Windows.Forms.ListBox();
             this.tabControl1.SuspendLayout();
             this.tabPage1.SuspendLayout();
+            this.itemTypeGroup.SuspendLayout();
             this.groupBox7.SuspendLayout();
             this.groupBox6.SuspendLayout();
             this.groupBox4.SuspendLayout();
@@ -198,7 +203,8 @@
             this.tabPage4.SuspendLayout();
             this.groupBox8.SuspendLayout();
             this.statusStrip1.SuspendLayout();
-            this.itemTypeGroup.SuspendLayout();
+            this.groupBox9.SuspendLayout();
+            this.groupBox10.SuspendLayout();
             this.SuspendLayout();
             // 
             // tabControl1
@@ -261,6 +267,100 @@
             this.tabPage1.TabIndex = 0;
             this.tabPage1.Text = "Item Creation";
             this.tabPage1.UseVisualStyleBackColor = true;
+            // 
+            // itemTypeGroup
+            // 
+            this.itemTypeGroup.Controls.Add(this.typeDrinkableValue);
+            this.itemTypeGroup.Controls.Add(this.typeKeyValue);
+            this.itemTypeGroup.Controls.Add(this.typeIluminationValue);
+            this.itemTypeGroup.Controls.Add(this.typeClothingValue);
+            this.itemTypeGroup.Controls.Add(this.typeWeaponValue);
+            this.itemTypeGroup.Controls.Add(this.typeContainerValue);
+            this.itemTypeGroup.Controls.Add(this.typeEdibleValue);
+            this.itemTypeGroup.Location = new System.Drawing.Point(786, 252);
+            this.itemTypeGroup.Name = "itemTypeGroup";
+            this.itemTypeGroup.RightToLeft = System.Windows.Forms.RightToLeft.No;
+            this.itemTypeGroup.Size = new System.Drawing.Size(125, 192);
+            this.itemTypeGroup.TabIndex = 59;
+            this.itemTypeGroup.TabStop = false;
+            this.itemTypeGroup.Text = "Item Type";
+            // 
+            // typeDrinkableValue
+            // 
+            this.typeDrinkableValue.AutoSize = true;
+            this.typeDrinkableValue.Location = new System.Drawing.Point(34, 42);
+            this.typeDrinkableValue.Name = "typeDrinkableValue";
+            this.typeDrinkableValue.RightToLeft = System.Windows.Forms.RightToLeft.Yes;
+            this.typeDrinkableValue.Size = new System.Drawing.Size(71, 17);
+            this.typeDrinkableValue.TabIndex = 19;
+            this.typeDrinkableValue.Text = "Drinkable";
+            this.typeDrinkableValue.UseVisualStyleBackColor = true;
+            // 
+            // typeKeyValue
+            // 
+            this.typeKeyValue.AutoSize = true;
+            this.typeKeyValue.Location = new System.Drawing.Point(61, 159);
+            this.typeKeyValue.Name = "typeKeyValue";
+            this.typeKeyValue.RightToLeft = System.Windows.Forms.RightToLeft.Yes;
+            this.typeKeyValue.Size = new System.Drawing.Size(44, 17);
+            this.typeKeyValue.TabIndex = 18;
+            this.typeKeyValue.Text = "Key";
+            this.typeKeyValue.UseVisualStyleBackColor = true;
+            // 
+            // typeIluminationValue
+            // 
+            this.typeIluminationValue.AutoSize = true;
+            this.typeIluminationValue.Location = new System.Drawing.Point(29, 136);
+            this.typeIluminationValue.Name = "typeIluminationValue";
+            this.typeIluminationValue.RightToLeft = System.Windows.Forms.RightToLeft.Yes;
+            this.typeIluminationValue.Size = new System.Drawing.Size(76, 17);
+            this.typeIluminationValue.TabIndex = 17;
+            this.typeIluminationValue.Text = "Ilumination";
+            this.typeIluminationValue.UseVisualStyleBackColor = true;
+            // 
+            // typeClothingValue
+            // 
+            this.typeClothingValue.AutoSize = true;
+            this.typeClothingValue.Location = new System.Drawing.Point(41, 113);
+            this.typeClothingValue.Name = "typeClothingValue";
+            this.typeClothingValue.RightToLeft = System.Windows.Forms.RightToLeft.Yes;
+            this.typeClothingValue.Size = new System.Drawing.Size(64, 17);
+            this.typeClothingValue.TabIndex = 16;
+            this.typeClothingValue.Text = "Clothing";
+            this.typeClothingValue.UseVisualStyleBackColor = true;
+            // 
+            // typeWeaponValue
+            // 
+            this.typeWeaponValue.AutoSize = true;
+            this.typeWeaponValue.Location = new System.Drawing.Point(38, 88);
+            this.typeWeaponValue.Name = "typeWeaponValue";
+            this.typeWeaponValue.RightToLeft = System.Windows.Forms.RightToLeft.Yes;
+            this.typeWeaponValue.Size = new System.Drawing.Size(67, 17);
+            this.typeWeaponValue.TabIndex = 15;
+            this.typeWeaponValue.Text = "Weapon";
+            this.typeWeaponValue.UseVisualStyleBackColor = true;
+            // 
+            // typeContainerValue
+            // 
+            this.typeContainerValue.AutoSize = true;
+            this.typeContainerValue.Location = new System.Drawing.Point(34, 65);
+            this.typeContainerValue.Name = "typeContainerValue";
+            this.typeContainerValue.RightToLeft = System.Windows.Forms.RightToLeft.Yes;
+            this.typeContainerValue.Size = new System.Drawing.Size(71, 17);
+            this.typeContainerValue.TabIndex = 14;
+            this.typeContainerValue.Text = "Container";
+            this.typeContainerValue.UseVisualStyleBackColor = true;
+            // 
+            // typeEdibleValue
+            // 
+            this.typeEdibleValue.AutoSize = true;
+            this.typeEdibleValue.Location = new System.Drawing.Point(50, 19);
+            this.typeEdibleValue.Name = "typeEdibleValue";
+            this.typeEdibleValue.RightToLeft = System.Windows.Forms.RightToLeft.Yes;
+            this.typeEdibleValue.Size = new System.Drawing.Size(55, 17);
+            this.typeEdibleValue.TabIndex = 13;
+            this.typeEdibleValue.Text = "Edible";
+            this.typeEdibleValue.UseVisualStyleBackColor = true;
             // 
             // groupBox7
             // 
@@ -1233,20 +1333,18 @@
             // 
             // tabPage2
             // 
+            this.tabPage2.Controls.Add(this.groupBox10);
+            this.tabPage2.Controls.Add(this.groupBox9);
             this.tabPage2.Controls.Add(this.saveRoom);
             this.tabPage2.Controls.Add(this.roomLoad);
             this.tabPage2.Controls.Add(this.newRoom);
             this.tabPage2.Controls.Add(this.groupBox5);
             this.tabPage2.Controls.Add(this.label26);
-            this.tabPage2.Controls.Add(this.textBox2);
-            this.tabPage2.Controls.Add(this.roomWeatherValue);
-            this.tabPage2.Controls.Add(this.label25);
+            this.tabPage2.Controls.Add(this.displayInGameValue);
             this.tabPage2.Controls.Add(this.roomModifierValue);
             this.tabPage2.Controls.Add(this.label24);
             this.tabPage2.Controls.Add(this.roomExitsValue);
             this.tabPage2.Controls.Add(this.label23);
-            this.tabPage2.Controls.Add(this.comboBox2);
-            this.tabPage2.Controls.Add(this.label22);
             this.tabPage2.Controls.Add(this.roomTitleValue);
             this.tabPage2.Controls.Add(this.label21);
             this.tabPage2.Controls.Add(this.roomDescriptionValue);
@@ -1297,7 +1395,7 @@
             this.groupBox5.Controls.Add(this.label28);
             this.groupBox5.Controls.Add(this.comboBox3);
             this.groupBox5.Controls.Add(this.roomRefresh);
-            this.groupBox5.Location = new System.Drawing.Point(337, 19);
+            this.groupBox5.Location = new System.Drawing.Point(974, 19);
             this.groupBox5.Name = "groupBox5";
             this.groupBox5.RightToLeft = System.Windows.Forms.RightToLeft.No;
             this.groupBox5.Size = new System.Drawing.Size(254, 628);
@@ -1321,6 +1419,7 @@
             this.roomsListValue.Name = "roomsListValue";
             this.roomsListValue.Size = new System.Drawing.Size(237, 511);
             this.roomsListValue.TabIndex = 42;
+            this.roomsListValue.DoubleClick += new System.EventHandler(this.roomsListValue_DoubleClick);
             // 
             // textBox4
             // 
@@ -1365,49 +1464,34 @@
             // label26
             // 
             this.label26.AutoSize = true;
-            this.label26.Location = new System.Drawing.Point(674, 22);
+            this.label26.Location = new System.Drawing.Point(305, 19);
             this.label26.Name = "label26";
-            this.label26.Size = new System.Drawing.Size(50, 13);
+            this.label26.Size = new System.Drawing.Size(84, 13);
             this.label26.TabIndex = 15;
-            this.label26.Text = "In Game ";
+            this.label26.Text = "In Game Display";
             // 
-            // textBox2
+            // displayInGameValue
             // 
-            this.textBox2.Location = new System.Drawing.Point(730, 22);
-            this.textBox2.Multiline = true;
-            this.textBox2.Name = "textBox2";
-            this.textBox2.Size = new System.Drawing.Size(574, 307);
-            this.textBox2.TabIndex = 14;
-            this.toolTip1.SetToolTip(this.textBox2, "How room will look like displayed in game.");
-            // 
-            // roomWeatherValue
-            // 
-            this.roomWeatherValue.Location = new System.Drawing.Point(85, 259);
-            this.roomWeatherValue.Name = "roomWeatherValue";
-            this.roomWeatherValue.Size = new System.Drawing.Size(193, 20);
-            this.roomWeatherValue.TabIndex = 13;
-            // 
-            // label25
-            // 
-            this.label25.AutoSize = true;
-            this.label25.Location = new System.Drawing.Point(31, 262);
-            this.label25.Name = "label25";
-            this.label25.Size = new System.Drawing.Size(48, 13);
-            this.label25.TabIndex = 12;
-            this.label25.Text = "Weather";
+            this.displayInGameValue.Location = new System.Drawing.Point(308, 35);
+            this.displayInGameValue.Multiline = true;
+            this.displayInGameValue.Name = "displayInGameValue";
+            this.displayInGameValue.Size = new System.Drawing.Size(394, 221);
+            this.displayInGameValue.TabIndex = 14;
+            this.toolTip1.SetToolTip(this.displayInGameValue, "How room will look like displayed in game.");
             // 
             // roomModifierValue
             // 
             this.roomModifierValue.FormattingEnabled = true;
-            this.roomModifierValue.Location = new System.Drawing.Point(85, 428);
+            this.roomModifierValue.Location = new System.Drawing.Point(85, 401);
             this.roomModifierValue.Name = "roomModifierValue";
-            this.roomModifierValue.Size = new System.Drawing.Size(100, 108);
+            this.roomModifierValue.Size = new System.Drawing.Size(156, 108);
             this.roomModifierValue.TabIndex = 11;
+            this.roomModifierValue.DoubleClick += new System.EventHandler(this.roomModifierValue_DoubleClick);
             // 
             // label24
             // 
             this.label24.AutoSize = true;
-            this.label24.Location = new System.Drawing.Point(30, 428);
+            this.label24.Location = new System.Drawing.Point(30, 401);
             this.label24.Name = "label24";
             this.label24.Size = new System.Drawing.Size(49, 13);
             this.label24.TabIndex = 10;
@@ -1416,36 +1500,19 @@
             // roomExitsValue
             // 
             this.roomExitsValue.FormattingEnabled = true;
-            this.roomExitsValue.Location = new System.Drawing.Point(85, 299);
+            this.roomExitsValue.Location = new System.Drawing.Point(85, 244);
             this.roomExitsValue.Name = "roomExitsValue";
-            this.roomExitsValue.Size = new System.Drawing.Size(100, 108);
+            this.roomExitsValue.Size = new System.Drawing.Size(156, 108);
             this.roomExitsValue.TabIndex = 9;
             // 
             // label23
             // 
             this.label23.AutoSize = true;
-            this.label23.Location = new System.Drawing.Point(50, 299);
+            this.label23.Location = new System.Drawing.Point(50, 244);
             this.label23.Name = "label23";
             this.label23.Size = new System.Drawing.Size(29, 13);
             this.label23.TabIndex = 8;
             this.label23.Text = "Exits";
-            // 
-            // comboBox2
-            // 
-            this.comboBox2.FormattingEnabled = true;
-            this.comboBox2.Location = new System.Drawing.Point(85, 222);
-            this.comboBox2.Name = "comboBox2";
-            this.comboBox2.Size = new System.Drawing.Size(168, 21);
-            this.comboBox2.TabIndex = 7;
-            // 
-            // label22
-            // 
-            this.label22.AutoSize = true;
-            this.label22.Location = new System.Drawing.Point(48, 225);
-            this.label22.Name = "label22";
-            this.label22.Size = new System.Drawing.Size(31, 13);
-            this.label22.TabIndex = 6;
-            this.label22.Text = "Type";
             // 
             // roomTitleValue
             // 
@@ -1781,99 +1848,87 @@
             this.databaseConnectionStatusValue.Size = new System.Drawing.Size(103, 17);
             this.databaseConnectionStatusValue.Text = "Database OFFLINE";
             // 
-            // itemTypeGroup
+            // groupBox9
             // 
-            this.itemTypeGroup.Controls.Add(this.typeDrinkableValue);
-            this.itemTypeGroup.Controls.Add(this.typeKeyValue);
-            this.itemTypeGroup.Controls.Add(this.typeIluminationValue);
-            this.itemTypeGroup.Controls.Add(this.typeClothingValue);
-            this.itemTypeGroup.Controls.Add(this.typeWeaponValue);
-            this.itemTypeGroup.Controls.Add(this.typeContainerValue);
-            this.itemTypeGroup.Controls.Add(this.typeEdibleValue);
-            this.itemTypeGroup.Location = new System.Drawing.Point(786, 252);
-            this.itemTypeGroup.Name = "itemTypeGroup";
-            this.itemTypeGroup.RightToLeft = System.Windows.Forms.RightToLeft.No;
-            this.itemTypeGroup.Size = new System.Drawing.Size(125, 192);
-            this.itemTypeGroup.TabIndex = 59;
-            this.itemTypeGroup.TabStop = false;
-            this.itemTypeGroup.Text = "Item Type";
+            this.groupBox9.Controls.Add(this.forestValue);
+            this.groupBox9.Controls.Add(this.noPvpValue);
+            this.groupBox9.Controls.Add(this.darkCaveValue);
+            this.groupBox9.Controls.Add(this.indoorValue);
+            this.groupBox9.Controls.Add(this.outdoorValue);
+            this.groupBox9.Location = new System.Drawing.Point(727, 22);
+            this.groupBox9.Name = "groupBox9";
+            this.groupBox9.Size = new System.Drawing.Size(118, 141);
+            this.groupBox9.TabIndex = 58;
+            this.groupBox9.TabStop = false;
+            this.groupBox9.Text = "Room Type";
             // 
-            // typeEdibleValue
+            // outdoorValue
             // 
-            this.typeEdibleValue.AutoSize = true;
-            this.typeEdibleValue.Location = new System.Drawing.Point(50, 19);
-            this.typeEdibleValue.Name = "typeEdibleValue";
-            this.typeEdibleValue.RightToLeft = System.Windows.Forms.RightToLeft.Yes;
-            this.typeEdibleValue.Size = new System.Drawing.Size(55, 17);
-            this.typeEdibleValue.TabIndex = 13;
-            this.typeEdibleValue.Text = "Edible";
-            this.typeEdibleValue.UseVisualStyleBackColor = true;
+            this.outdoorValue.AutoSize = true;
+            this.outdoorValue.Location = new System.Drawing.Point(20, 22);
+            this.outdoorValue.Name = "outdoorValue";
+            this.outdoorValue.Size = new System.Drawing.Size(69, 17);
+            this.outdoorValue.TabIndex = 1;
+            this.outdoorValue.Text = "Outdoors";
+            this.outdoorValue.UseVisualStyleBackColor = true;
             // 
-            // typeContainerValue
+            // indoorValue
             // 
-            this.typeContainerValue.AutoSize = true;
-            this.typeContainerValue.Location = new System.Drawing.Point(34, 65);
-            this.typeContainerValue.Name = "typeContainerValue";
-            this.typeContainerValue.RightToLeft = System.Windows.Forms.RightToLeft.Yes;
-            this.typeContainerValue.Size = new System.Drawing.Size(71, 17);
-            this.typeContainerValue.TabIndex = 14;
-            this.typeContainerValue.Text = "Container";
-            this.typeContainerValue.UseVisualStyleBackColor = true;
+            this.indoorValue.AutoSize = true;
+            this.indoorValue.Location = new System.Drawing.Point(20, 45);
+            this.indoorValue.Name = "indoorValue";
+            this.indoorValue.Size = new System.Drawing.Size(61, 17);
+            this.indoorValue.TabIndex = 2;
+            this.indoorValue.Text = "Indoors";
+            this.indoorValue.UseVisualStyleBackColor = true;
             // 
-            // typeWeaponValue
+            // darkCaveValue
             // 
-            this.typeWeaponValue.AutoSize = true;
-            this.typeWeaponValue.Location = new System.Drawing.Point(38, 88);
-            this.typeWeaponValue.Name = "typeWeaponValue";
-            this.typeWeaponValue.RightToLeft = System.Windows.Forms.RightToLeft.Yes;
-            this.typeWeaponValue.Size = new System.Drawing.Size(67, 17);
-            this.typeWeaponValue.TabIndex = 15;
-            this.typeWeaponValue.Text = "Weapon";
-            this.typeWeaponValue.UseVisualStyleBackColor = true;
+            this.darkCaveValue.AutoSize = true;
+            this.darkCaveValue.Location = new System.Drawing.Point(20, 68);
+            this.darkCaveValue.Name = "darkCaveValue";
+            this.darkCaveValue.Size = new System.Drawing.Size(77, 17);
+            this.darkCaveValue.TabIndex = 3;
+            this.darkCaveValue.Text = "Dark Cave";
+            this.darkCaveValue.UseVisualStyleBackColor = true;
             // 
-            // typeClothingValue
+            // noPvpValue
             // 
-            this.typeClothingValue.AutoSize = true;
-            this.typeClothingValue.Location = new System.Drawing.Point(41, 113);
-            this.typeClothingValue.Name = "typeClothingValue";
-            this.typeClothingValue.RightToLeft = System.Windows.Forms.RightToLeft.Yes;
-            this.typeClothingValue.Size = new System.Drawing.Size(64, 17);
-            this.typeClothingValue.TabIndex = 16;
-            this.typeClothingValue.Text = "Clothing";
-            this.typeClothingValue.UseVisualStyleBackColor = true;
+            this.noPvpValue.AutoSize = true;
+            this.noPvpValue.Location = new System.Drawing.Point(20, 91);
+            this.noPvpValue.Name = "noPvpValue";
+            this.noPvpValue.Size = new System.Drawing.Size(64, 17);
+            this.noPvpValue.TabIndex = 4;
+            this.noPvpValue.Text = "No PVP";
+            this.noPvpValue.UseVisualStyleBackColor = true;
             // 
-            // typeIluminationValue
+            // forestValue
             // 
-            this.typeIluminationValue.AutoSize = true;
-            this.typeIluminationValue.Location = new System.Drawing.Point(29, 136);
-            this.typeIluminationValue.Name = "typeIluminationValue";
-            this.typeIluminationValue.RightToLeft = System.Windows.Forms.RightToLeft.Yes;
-            this.typeIluminationValue.Size = new System.Drawing.Size(76, 17);
-            this.typeIluminationValue.TabIndex = 17;
-            this.typeIluminationValue.Text = "Ilumination";
-            this.typeIluminationValue.UseVisualStyleBackColor = true;
+            this.forestValue.AutoSize = true;
+            this.forestValue.Location = new System.Drawing.Point(20, 114);
+            this.forestValue.Name = "forestValue";
+            this.forestValue.Size = new System.Drawing.Size(55, 17);
+            this.forestValue.TabIndex = 5;
+            this.forestValue.Text = "Forest";
+            this.forestValue.UseVisualStyleBackColor = true;
             // 
-            // typeKeyValue
+            // groupBox10
             // 
-            this.typeKeyValue.AutoSize = true;
-            this.typeKeyValue.Location = new System.Drawing.Point(61, 159);
-            this.typeKeyValue.Name = "typeKeyValue";
-            this.typeKeyValue.RightToLeft = System.Windows.Forms.RightToLeft.Yes;
-            this.typeKeyValue.Size = new System.Drawing.Size(44, 17);
-            this.typeKeyValue.TabIndex = 18;
-            this.typeKeyValue.Text = "Key";
-            this.typeKeyValue.UseVisualStyleBackColor = true;
+            this.groupBox10.Controls.Add(this.weatherValues);
+            this.groupBox10.Location = new System.Drawing.Point(308, 289);
+            this.groupBox10.Name = "groupBox10";
+            this.groupBox10.Size = new System.Drawing.Size(351, 163);
+            this.groupBox10.TabIndex = 59;
+            this.groupBox10.TabStop = false;
+            this.groupBox10.Text = "Weather";
             // 
-            // typeDrinkableValue
+            // weatherValues
             // 
-            this.typeDrinkableValue.AutoSize = true;
-            this.typeDrinkableValue.Location = new System.Drawing.Point(34, 42);
-            this.typeDrinkableValue.Name = "typeDrinkableValue";
-            this.typeDrinkableValue.RightToLeft = System.Windows.Forms.RightToLeft.Yes;
-            this.typeDrinkableValue.Size = new System.Drawing.Size(71, 17);
-            this.typeDrinkableValue.TabIndex = 19;
-            this.typeDrinkableValue.Text = "Drinkable";
-            this.typeDrinkableValue.UseVisualStyleBackColor = true;
+            this.weatherValues.FormattingEnabled = true;
+            this.weatherValues.Location = new System.Drawing.Point(23, 20);
+            this.weatherValues.Name = "weatherValues";
+            this.weatherValues.Size = new System.Drawing.Size(181, 121);
+            this.weatherValues.TabIndex = 0;
             // 
             // Form1
             // 
@@ -1888,6 +1943,8 @@
             this.tabControl1.ResumeLayout(false);
             this.tabPage1.ResumeLayout(false);
             this.tabPage1.PerformLayout();
+            this.itemTypeGroup.ResumeLayout(false);
+            this.itemTypeGroup.PerformLayout();
             this.groupBox7.ResumeLayout(false);
             this.groupBox6.ResumeLayout(false);
             this.groupBox6.PerformLayout();
@@ -1915,8 +1972,9 @@
             this.groupBox8.PerformLayout();
             this.statusStrip1.ResumeLayout(false);
             this.statusStrip1.PerformLayout();
-            this.itemTypeGroup.ResumeLayout(false);
-            this.itemTypeGroup.PerformLayout();
+            this.groupBox9.ResumeLayout(false);
+            this.groupBox9.PerformLayout();
+            this.groupBox10.ResumeLayout(false);
             this.ResumeLayout(false);
             this.PerformLayout();
 
@@ -2025,15 +2083,11 @@
         private System.Windows.Forms.TextBox roomIdValue;
         private System.Windows.Forms.Label label19;
         private System.Windows.Forms.Label label26;
-        private System.Windows.Forms.TextBox textBox2;
-        private System.Windows.Forms.TextBox roomWeatherValue;
-        private System.Windows.Forms.Label label25;
+        private System.Windows.Forms.TextBox displayInGameValue;
         private System.Windows.Forms.ListBox roomModifierValue;
         private System.Windows.Forms.Label label24;
         private System.Windows.Forms.ListBox roomExitsValue;
         private System.Windows.Forms.Label label23;
-        private System.Windows.Forms.ComboBox comboBox2;
-        private System.Windows.Forms.Label label22;
         private System.Windows.Forms.TextBox roomTitleValue;
         private System.Windows.Forms.Label label21;
         private System.Windows.Forms.TextBox roomDescriptionValue;
@@ -2081,6 +2135,14 @@
         private System.Windows.Forms.CheckBox typeKeyValue;
         private System.Windows.Forms.CheckBox typeIluminationValue;
         private System.Windows.Forms.CheckBox typeDrinkableValue;
+        private System.Windows.Forms.GroupBox groupBox9;
+        private System.Windows.Forms.CheckBox noPvpValue;
+        private System.Windows.Forms.CheckBox darkCaveValue;
+        private System.Windows.Forms.CheckBox indoorValue;
+        private System.Windows.Forms.CheckBox outdoorValue;
+        private System.Windows.Forms.CheckBox forestValue;
+        private System.Windows.Forms.GroupBox groupBox10;
+        private System.Windows.Forms.ListBox weatherValues;
     }
 }
 

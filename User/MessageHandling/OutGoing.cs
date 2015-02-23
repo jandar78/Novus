@@ -49,7 +49,7 @@ namespace ClientHandling{
 		 #region Private Methods
 		 //this method will take in a string and parse it so that there is a new line every 80 characters
 		 //without splitting words, it will go back to the previous space, comma, period, etc.
-		 private static string Format(string input) {		
+		 public static string Format(string input) {		
              if (input == null || input.Length == 0) return "";
 
 			 StringBuilder sb = new StringBuilder();

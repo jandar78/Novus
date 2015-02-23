@@ -11,7 +11,6 @@ using MongoDB.Driver;
 using MongoDB.Driver.Builders;
 
 namespace Character {
-    //TODO: Convert this to an interface rather than an abstract class, same with Character and Actor
     public interface Iactor {
         #region  Properties
         Inventory Inventory { get;}
@@ -86,8 +85,12 @@ namespace Character {
         bool IsDead();
         void ClearTarget();
         void UpdateTarget(string targetID);
+                
+        double GetBonus(BonusTypes type);
+        void AddBonus(BonusTypes type, string name, double amount, int time = 0);
+        void RemoveBonus(BonusTypes type, string name, double bonus);
+        void CleanupBonuses();
         //void Wield(Items.Iitem item);
-
         #endregion Combat Methods
 
         #region Attribute Wrappers

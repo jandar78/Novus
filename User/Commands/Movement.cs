@@ -69,12 +69,12 @@ namespace Commands {
                             string temp = null;
 
                             //if the player was just hiding and moves he shows himself
-                            if (player.Player.ActionState == CharacterEnums.CharacterActionState.HIDING) {
+                            if (player.Player.ActionState == CharacterEnums.CharacterActionState.Hiding) {
                                 PerformSkill(player, new List<string>(new string[] { "Hide", "Hide" }));
                             }
 
                             //when sneaking the skill displays the leave/arrive message
-                            if (player.Player.ActionState != CharacterEnums.CharacterActionState.SNEAKING) {
+                            if (player.Player.ActionState != CharacterEnums.CharacterActionState.Sneaking) {
                                 temp = String.Format(leave["ShowOthers"].AsString, who, direction);
                                 Room.GetRoom(player.Player.LastLocation).InformPlayersInRoom(temp, new List<string>(new string[] { player.UserID }));
                             }
@@ -104,7 +104,7 @@ namespace Commands {
                             }
                             ApplyRoomModifier(player);
 
-                            if (player.Player.ActionState != CharacterEnums.CharacterActionState.SNEAKING) {
+                            if (player.Player.ActionState != CharacterEnums.CharacterActionState.Sneaking) {
                                 temp = String.Format(message["ShowOthers"].AsString, who, direction);
                                 room.InformPlayersInRoom(temp, new List<string>(new string[] { player.UserID }));
                             }
@@ -609,13 +609,13 @@ namespace Commands {
 
        private static void Prone(User.User user, List<string> commands) {
 			string message = "";
-			if (user.Player.StanceState != CharacterEnums.CharacterStanceState.PRONE && (user.Player.ActionState == CharacterEnums.CharacterActionState.NONE
-				|| user.Player.ActionState == CharacterEnums.CharacterActionState.FIGHTING)) {
-					user.Player.SetStanceState(CharacterEnums.CharacterStanceState.PRONE);
+			if (user.Player.StanceState != CharacterEnums.CharacterStanceState.Prone && (user.Player.ActionState == CharacterEnums.CharacterActionState.None
+				|| user.Player.ActionState == CharacterEnums.CharacterActionState.Fighting)) {
+					user.Player.SetStanceState(CharacterEnums.CharacterStanceState.Prone);
 					user.MessageHandler("You lay down.");
 				Room.GetRoom(user.Player.Location).InformPlayersInRoom(String.Format("{0} lays down on the ground.", user.Player.FirstName), new List<string>(new string[]{user.UserID}));
 			}
-			else if (user.Player.ActionState != CharacterEnums.CharacterActionState.NONE) {
+			else if (user.Player.ActionState != CharacterEnums.CharacterActionState.None) {
 				message = String.Format("You can't lay prone.  You are {0}!", user.Player.ActionState.ToString().ToLower());
 			}
 			else {
@@ -626,13 +626,13 @@ namespace Commands {
 
 		private static void Stand(User.User user, List<string> commands) {
 			string message = "";
-			if (user.Player.StanceState != CharacterEnums.CharacterStanceState.STANDING && (user.Player.ActionState == CharacterEnums.CharacterActionState.NONE
-				|| user.Player.ActionState == CharacterEnums.CharacterActionState.FIGHTING)) {
-				user.Player.SetStanceState(CharacterEnums.CharacterStanceState.STANDING);
+			if (user.Player.StanceState != CharacterEnums.CharacterStanceState.Standing && (user.Player.ActionState == CharacterEnums.CharacterActionState.None
+				|| user.Player.ActionState == CharacterEnums.CharacterActionState.Fighting)) {
+				user.Player.SetStanceState(CharacterEnums.CharacterStanceState.Standing);
 				user.MessageHandler("You stand up.");
                 Room.GetRoom(user.Player.Location).InformPlayersInRoom(String.Format("{0} stands up.", user.Player.FirstName), new List<string>(new string[] { user.UserID }));
 			}
-			else if (user.Player.ActionState != CharacterEnums.CharacterActionState.NONE) {
+			else if (user.Player.ActionState != CharacterEnums.CharacterActionState.None) {
 				message = String.Format("You can't stand up.  You are {0}!", user.Player.ActionState.ToString().ToLower());
 			}
 			else {
@@ -643,13 +643,13 @@ namespace Commands {
 
 		private static void Sit(User.User user, List<string> commands) {
 			string message = "";
-			if (user.Player.StanceState != CharacterEnums.CharacterStanceState.SITTING && (user.Player.ActionState == CharacterEnums.CharacterActionState.NONE
-				|| user.Player.ActionState == CharacterEnums.CharacterActionState.FIGHTING)) {
-				user.Player.SetStanceState(CharacterEnums.CharacterStanceState.SITTING);
+			if (user.Player.StanceState != CharacterEnums.CharacterStanceState.Sitting && (user.Player.ActionState == CharacterEnums.CharacterActionState.None
+				|| user.Player.ActionState == CharacterEnums.CharacterActionState.Fighting)) {
+				user.Player.SetStanceState(CharacterEnums.CharacterStanceState.Sitting);
 				user.MessageHandler("You sit down.");
                 Room.GetRoom(user.Player.Location).InformPlayersInRoom(String.Format("{0} sits down.", user.Player.FirstName), new List<string>(new string[] { user.UserID }));
 			}
-			else if (user.Player.ActionState != CharacterEnums.CharacterActionState.NONE) {
+			else if (user.Player.ActionState != CharacterEnums.CharacterActionState.None) {
 				message = String.Format("You can't sit down.  You are {0}!", user.Player.ActionState.ToString().ToLower());
 			}
 			else {
