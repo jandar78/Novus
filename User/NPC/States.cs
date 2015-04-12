@@ -33,8 +33,8 @@ namespace AI {
         }
 
         public void Execute(Character.NPC actor, ITrigger trigger = null) {
-            if (actor.StanceState != CharacterEnums.CharacterStanceState.Laying_Unconcious &&
-                actor.StanceState != CharacterEnums.CharacterStanceState.Laying_Dead &&
+            if (actor.StanceState != CharacterEnums.CharacterStanceState.Laying_unconcious &&
+                actor.StanceState != CharacterEnums.CharacterStanceState.Laying_dead &&
                 actor.StanceState != CharacterEnums.CharacterStanceState.Decomposing) {
                 if (DateTime.Now.ToUniversalTime() > actor.NextAiAction) {//so it's time for this AI state to execute
                     string message = "Hey pal, you looking for trouble?";

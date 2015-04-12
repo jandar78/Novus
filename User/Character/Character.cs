@@ -110,7 +110,7 @@ namespace Character{
 
         public Character() {
             _class = CharacterEnums.CharacterClass.Explorer;
-            _race = CharacterEnums.CharacterRace.HUMAN;
+            _race = CharacterEnums.CharacterRace.Human;
             _gender = CharacterEnums.Genders.Female;
             _skinColor = CharacterEnums.SkinColors.Fair;
             _skinType = CharacterEnums.SkinType.Flesh;
@@ -147,9 +147,9 @@ namespace Character{
             Equipment = new Equipment();
             Bonuses = new StatBonuses();
 
-            Inventory.player = this;
-            Equipment.player = this;
-
+            Inventory.playerID = this.ID;
+            Equipment.playerID = this.ID;
+            
             Attributes = new Dictionary<string, Attribute>();
 
             Attributes.Add("Hitpoints", new Attribute(150, "Hitpoints", 150, 0.1, 1));
@@ -166,7 +166,7 @@ namespace Character{
             SubAttributes.Add("Cunning", 1);
             SubAttributes.Add("Wisdom", 1);
             SubAttributes.Add("Leadership", 1);
-        } //: this(CharacterRace.HUMAN, CharacterClass.FIGHTER, Genders.MALE, Languages.COMMON, SkinColors.FAIR, CharacterEnums.SkinType.FLESH, HairColors.BLACK, EyeColors.BROWN, BodyBuild.ATHLETIC) {}
+        } 
         
         /// <summary>
         /// Deep copy constructor
@@ -450,18 +450,18 @@ namespace Character{
 			ID = found["_id"].AsObjectId.ToString();
 			FirstName = found["FirstName"].AsString.CamelCaseWord();
 			LastName = found["LastName"].AsString.CamelCaseWord();
-			_class = (CharacterClass)Enum.Parse(typeof(CharacterClass), found["Class"].AsString.ToUpper());
-			_race = (CharacterRace)Enum.Parse(typeof(CharacterRace), found["Race"].AsString.ToUpper());
-            _gender = (Genders)Enum.Parse(typeof(Genders), found["Gender"].AsString.ToUpper());
-            _skinType = (SkinType)Enum.Parse(typeof(SkinType), found["SkinType"].AsString.ToUpper());
-            _skinColor = (SkinColors)Enum.Parse(typeof(SkinColors), found["SkinColor"].AsString.ToUpper());
-            _skinType = (SkinType)Enum.Parse(typeof(SkinType), found["SkinType"].AsString.ToUpper());
-            _hairColor = (HairColors)Enum.Parse(typeof(HairColors), found["HairColor"].AsString.ToUpper());
-            _eyeColor = (EyeColors)Enum.Parse(typeof(EyeColors), found["EyeColor"].AsString.ToUpper());
+			_class = (CharacterClass)Enum.Parse(typeof(CharacterClass), found["Class"].AsString.CamelCaseWord());
+            _race = (CharacterRace)Enum.Parse(typeof(CharacterRace), found["Race"].AsString.CamelCaseWord());
+            _gender = (Genders)Enum.Parse(typeof(Genders), found["Gender"].AsString.CamelCaseWord());
+            _skinType = (SkinType)Enum.Parse(typeof(SkinType), found["SkinType"].AsString.CamelCaseWord());
+            _skinColor = (SkinColors)Enum.Parse(typeof(SkinColors), found["SkinColor"].AsString.CamelCaseWord());
+            _skinType = (SkinType)Enum.Parse(typeof(SkinType), found["SkinType"].AsString.CamelCaseWord());
+            _hairColor = (HairColors)Enum.Parse(typeof(HairColors), found["HairColor"].AsString.CamelCaseWord());
+            _eyeColor = (EyeColors)Enum.Parse(typeof(EyeColors), found["EyeColor"].AsString.CamelCaseWord());
             Height = found["Height"].AsDouble;
             Weight = found["Weight"].AsDouble;
-			_stanceState = (CharacterStanceState)Enum.Parse(typeof(CharacterStanceState), found["StanceState"].AsString.ToUpper());
-			_actionState = (CharacterActionState)Enum.Parse(typeof(CharacterActionState), found["ActionState"].AsString.ToUpper());
+            _stanceState = (CharacterStanceState)Enum.Parse(typeof(CharacterStanceState), found["StanceState"].AsString.CamelCaseWord());
+            _actionState = (CharacterActionState)Enum.Parse(typeof(CharacterActionState), found["ActionState"].AsString.CamelCaseWord());
 			Description = found["Description"].AsString;
 			Location = found["Location"].AsInt32;
             Password = found["Password"].AsString;
@@ -513,7 +513,7 @@ namespace Character{
                 foreach (BsonDocument item in equipmentList) {
                     Items.Iitem fullItem = Items.Items.GetByID(item["_id"].AsObjectId.ToString());
                     if (!Equipment.equipped.ContainsKey(fullItem.WornOn)) {
-                        Equipment.EquipItem(fullItem);
+                        Equipment.EquipItem(fullItem, this.Inventory);
                     }
                 }
             }
@@ -843,7 +843,7 @@ namespace Character{
             bool result = false;
             if (CheckUnconscious) {
                 SetActionState(CharacterEnums.CharacterActionState.Unconcious);
-                SetStanceState(CharacterStanceState.Laying_Unconcious);
+                SetStanceState(CharacterStanceState.Laying_unconcious);
                 ClearTarget();
                 result = true;
             }
@@ -851,7 +851,7 @@ namespace Character{
                 if (ActionState == CharacterActionState.Unconcious) {
                     SetActionState(CharacterActionState.None);
                 }
-                if (StanceState == CharacterStanceState.Laying_Unconcious) {
+                if (StanceState == CharacterStanceState.Laying_unconcious) {
                     SetStanceState(CharacterStanceState.Prone);
                 }
             }
@@ -863,7 +863,7 @@ namespace Character{
             bool result = false;
             if (CheckDead) {
                 SetActionState(CharacterActionState.Dead);
-                SetStanceState(CharacterStanceState.Laying_Dead);
+                SetStanceState(CharacterStanceState.Laying_dead);
                 ClearTarget();
                 result = true;
             }

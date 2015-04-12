@@ -17,7 +17,7 @@ namespace Character {
     /// </summary>
    public class StatBonuses {
         
-        private Dictionary<string, Tuple<double, DateTime>> _bonus;
+        private Dictionary<string, Tuple<double, DateTime>> _bonus = new Dictionary<string,Tuple<double,DateTime>>();
         
         /// <summary>
         /// Adds an amount (positive or negative) to the type specified. Passing in zero or null for the time will make this bonus never expire.
@@ -62,7 +62,9 @@ namespace Character {
 
         public void LoadFromBson(BsonArray array) {
             foreach (BsonDocument doc in array) {
-                this.Add((BonusTypes)Enum.Parse(typeof(BonusTypes), doc["Name"].AsString), doc["Amount"].AsDouble, doc["Time"].AsInt32);
+                if (doc.ElementCount > 0) {
+                    this.Add((BonusTypes)Enum.Parse(typeof(BonusTypes), doc["Name"].AsString), doc["Amount"].AsDouble, doc["Time"].AsInt32);
+                }
             }
 
         }

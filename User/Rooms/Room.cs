@@ -32,14 +32,17 @@ using MongoDB.Bson.Serialization.Options;
 //the ItemQuantity collection and then loading up the item from the ItemTemplate collection.
 namespace Rooms {
 
-    //Will create a room object that has all the necessary information that way it can inherit from interfaces and let mongoDB do all the heavy lifting like with items
-    //will keep GetPlayers, GetNPCS and GetItems as static calls though
+    //Will create a room object that has all the necessary information that way it can inherit from interfaces and let mongoDB do all the heavy lifting like with items.
+    //Will keep GetPlayers, GetNPCS and GetItems as static calls though.
     public class Room : IRoom, IWeather {
         private string _description;
         private string _title;
         private List<string> players;
         private List<string> npcs;
         private List<string> items;
+        
+
+        private List<Triggers.ITrigger> _triggers;
 
         public int Id { get; set; }
         public string Title {
@@ -53,16 +56,19 @@ namespace Rooms {
                 _title = value;
             }
         }
+        public BsonArray Descriptions { get; set; }
+        public BsonArray Conditions { get; set; }
+        public string CurrentCondition { get; set; }
+        public DateTime ConditionTimeEnd { get; set; }//TODO: get these to save as DateTime in the json and things should work
         public string WeatherMessage { get; set; }
         public string Description {
             get {
                 if (IsDark) {
                     return "It is too dark to see anything!";
                 }
-                else if (!string.IsNullOrEmpty(WeatherMessage)) {
-                    return _description + WeatherMessage;
-                }
-                return _description;
+                
+                return _description + (WeatherMessage ?? "");
+                
             }
             set {
                 _description = value;
@@ -93,7 +99,7 @@ namespace Rooms {
         public List<Exits> RoomExits { get; private set; }
         public int WeatherIntensity { get; set; }
         public string Weather { get; set; }
-
+        private BsonArray Triggers { get; set; }
         //constructor
         public Room() { }
 
@@ -264,13 +270,27 @@ namespace Rooms {
                     }
                 }
 
-                //send whatever the message was to the doors to consume
-                //List<object> paramsOut = null; //why the fuck do I need these here?
+                //Here we want to see if this room has any triggers or if any of the exits have any triggers
+                CheckRoomTriggers(message);
                 GetRoomExits();
                 if (RoomExits != null) {
                     foreach (Exits exit in RoomExits) {
                         if (exit.doors.Count > 0 && exit.doors[exit.Direction.CamelCaseWord()].Listener) {
                             string methodToCall = exit.doors[exit.Direction.CamelCaseWord()].CheckPhrase(message);
+                        }
+                    }
+                }
+            }
+        }
+
+        //for items we can have triggers subscribe to certain events and then fire off based on them, but for rooms since they aren't always in memory
+        //we have to iterate through each trigger and then fire off each one that's a hit.  Same concept is going to apply to the exits.
+        private void CheckRoomTriggers(string message) {
+            if (_triggers != null) {
+                foreach (Triggers.ITrigger trigger in _triggers) {
+                    if (message.Contains(trigger.TriggerOn)) {
+                        if (Extensions.RandomNumber.GetRandomNumber().NextNumber(0,100) <= trigger.ChanceToTrigger) {
+                            trigger.HandleEvent(null, null);
                         }
                     }
                 }
@@ -313,6 +333,14 @@ namespace Rooms {
             MongoCollection collection = db.GetCollection("Rooms");
 
             collection.Save<Room>(this);
+        }
+
+        private void Save(BsonDocument roomDoc) {
+            MongoUtils.MongoData.ConnectToDatabase();
+            MongoDatabase db = MongoUtils.MongoData.GetDatabase("World");
+            MongoCollection collection = db.GetCollection("Rooms");
+
+            collection.Save(roomDoc);
         }
 
         private void GetNPCsInRoom() {
@@ -469,10 +497,56 @@ namespace Rooms {
             BsonDocument roomDocument = roomCollection.FindOneAs<BsonDocument>(query);
 
             room = BsonSerializer.Deserialize<Room>(roomDocument);
+            room._triggers = LoadTriggers(room.Triggers);
+            room.UpdateDescription(roomDocument);
             room.GetPlayersInRoom();
             room.GetNPCsInRoom();
             room.GetItemsInRoom();
             return room;
         }
+
+        private static List<Triggers.ITrigger> LoadTriggers(BsonArray triggers) {
+            List<Triggers.ITrigger> triggerList = new List<Triggers.ITrigger>();
+            foreach (BsonDocument doc in triggers) {
+                global::Triggers.GeneralTrigger triggerToAdd = new Triggers.GeneralTrigger(doc, "Room");
+                triggerList.Add(triggerToAdd);
+            }
+
+            return triggerList;
+        }
+
+        /// <summary>
+        /// This method updates the room description depending on the currentDescriptionID.
+        /// Any script that wants to change the room description just needs to update the currentDescriptionID in the DB and this will take care of the rest.
+        /// </summary>
+        private void UpdateDescription(BsonDocument doc) {
+            
+            //we are going to do a check to see if the timer expired
+            DateTime conditionTime = doc["ConditionTimeEnd"].ToUniversalTime();
+            if ( conditionTime <=  DateTime.UtcNow && conditionTime != DateTime.MaxValue) {
+                BsonDocument currentCondition = Conditions.Where(c => c.AsBsonDocument["id"] == doc["CurrentCondition"].AsString).SingleOrDefault().AsBsonDocument;
+                if (currentCondition != null) {
+                    BsonDocument nextCondition = Conditions.Where(c => c.AsBsonDocument["id"] == currentCondition["NextCondition"].AsString).SingleOrDefault().AsBsonDocument;
+                    if (nextCondition != null) {
+                        doc["CurrentCondition"] = nextCondition["id"].AsString;
+                        if (nextCondition["Duration"].AsInt32 != -1) {
+                            doc["ConditionTimeEnd"] = DateTime.UtcNow.AddMilliseconds(nextCondition["Duration"].AsInt32);
+                        }
+                        else {
+                            doc["ConditionTimeEnd"] = DateTime.MaxValue;
+                        }
+                    }
+                }
+            }
+
+            BsonDocument currentDescription = Descriptions.Where(d => d.AsBsonDocument["id"].AsString == doc["CurrentCondition"].AsString).SingleOrDefault().AsBsonDocument;
+            doc["Description"] = currentDescription["Description"].AsString;
+            doc["Title"] = currentDescription["Title"].AsString;
+
+            Save(doc);
+            Description = doc["Description"].AsString;
+            Title = doc["Title"].AsString;
+        }
+
     }
 }

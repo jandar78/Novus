@@ -15,7 +15,7 @@ using MongoDB;
 
 namespace Character {
     public class Equipment {
-        public Iactor player { get; set; } //I don't like the circular dependency this creates but oh well.
+        public string playerID { get; set; } 
 
         public Dictionary<Items.Wearable, Items.Iitem> equipped;
 
@@ -23,8 +23,7 @@ namespace Character {
             equipped = new Dictionary<Items.Wearable, Items.Iitem>();
         }
         
-        public bool EquipItem(Items.Iitem item) {
-            //Wieldable items cannot be equipped they must be wielded that check needs to go here
+        public bool EquipItem(Items.Iitem item, Inventory inventory) {
             bool result = false;
 
             Items.Iweapon weaponItem = item as Items.Iweapon;
@@ -34,8 +33,8 @@ namespace Character {
             else {
                 if (!equipped.ContainsKey(item.WornOn)) {
                     equipped.Add(item.WornOn, item);
-                    if (player.Inventory.inventory.Any(i => i.Id == item.Id)) {//in case we are adding it from a load and not moving it from the inventory
-                        player.Inventory.inventory.RemoveWhere(i => i.Id == item.Id); //we moved the item over to equipped so we need it out of inventory
+                    if (inventory.inventory.Any(i => i.Id == item.Id)) {//in case we are adding it from a load and not moving it from the inventory
+                        inventory.inventory.RemoveWhere(i => i.Id == item.Id); //we moved the item over to equipped so we need it out of inventory
                     }
                     result = true;
                 }
@@ -46,8 +45,8 @@ namespace Character {
                         item.WornOn = freeHand;
                         item.Save();
                         equipped.Add(freeHand, item);
-                        if (player.Inventory.inventory.Any(i => i.Id == item.Id)) {//in case we are adding it from a load and not moving it from the inventory
-                            player.Inventory.inventory.RemoveWhere(i => i.Id == item.Id); //we moved the item over to equipped so we need it out of inventory
+                        if (inventory.inventory.Any(i => i.Id == item.Id)) {//in case we are adding it from a load and not moving it from the inventory
+                            inventory.inventory.RemoveWhere(i => i.Id == item.Id); //we moved the item over to equipped so we need it out of inventory
                         }
                         result = true;
                     }
@@ -57,7 +56,7 @@ namespace Character {
             return result;
         }
 
-        public bool UnequipItem(Items.Iitem item) {
+        public bool UnequipItem(Items.Iitem item, Iactor player) {
             bool result = false;
             if (equipped.ContainsKey(item.WornOn)) {
                 player.Inventory.inventory.Add(item); //unequipped stuff goes to inventory
@@ -70,13 +69,12 @@ namespace Character {
                         player.MainHand = Items.Wearable.WIELD_LEFT.ToString();
                     }
                 }
-                player.Save();
                 result = true;
             }
             return result;
         }
 
-        public bool WieldItem(Items.Iitem item) {
+        public bool WieldItem(Items.Iitem item, Inventory inventory) {
             bool wielded = false;
 
             if (!equipped.ContainsKey(Items.Wearable.WIELD_RIGHT)) {
@@ -90,22 +88,25 @@ namespace Character {
 
             if (wielded) {
                 equipped.Add(item.WornOn, item);
-                player.Inventory.inventory.RemoveWhere(i => i.Id == item.Id);
+                inventory.inventory.RemoveWhere(i => i.Id == item.Id);
                 return true;
             }
 
             return false;
         }
 
+
+        //TODO: this method may need some work done to it
         public void UpdateEquipmentFromDatabase() {
-            if (player.ID != null) {
+            if (playerID != null) {
                 MongoCollection col = MongoUtils.MongoData.GetCollection("World", "Items");
-                var docs = col.FindAs<BsonDocument>(Query.EQ("Owner", player.ID));
+                var docs = col.FindAs<BsonDocument>(Query.EQ("Owner", playerID));
                 foreach (BsonDocument dbItem in docs) {
                     ObjectId itemID = dbItem["_id"].AsObjectId;
-                    Items.Iitem temp = player.Equipment.equipped.Where(i => i.Value.Id == itemID).SingleOrDefault().Value;
+                    Items.Iitem temp = equipped.Where(i => i.Value.Id == itemID).SingleOrDefault().Value;
                     if (temp == null) {
-                        player.Equipment.equipped[temp.WornOn] = Items.Items.GetByID(dbItem["_id"].AsObjectId.ToString());
+                        temp = Items.Items.GetByID(dbItem["_id"].AsObjectId.ToString());
+                        equipped[temp.WornOn] = temp;
                     }
                 }
             }
@@ -113,27 +114,26 @@ namespace Character {
 
         public Dictionary<Items.Wearable, Items.Iitem> GetEquipment() {
             UpdateEquipmentFromDatabase();
-            return player.Equipment.equipped;
+            return equipped;
         }
 
-        public void Wield(Items.Iitem item) {
-            player.Equipment.WieldItem(item);
-            player.Save();
+        public void Wield(Items.Iitem item, Inventory inventory) {
+            WieldItem(item, inventory);
         }
 
         public List<Items.Iitem> GetWieldedWeapons() {
             List<Items.Iitem> result = new List<Items.Iitem>();
-            if (player.Equipment.equipped.ContainsKey(Items.Wearable.WIELD_RIGHT)) {
-                result.Add((Items.Iitem)Items.ItemFactory.CreateItem(player.Equipment.equipped[Items.Wearable.WIELD_RIGHT].Id));
+            if (equipped.ContainsKey(Items.Wearable.WIELD_RIGHT)) {
+                result.Add((Items.Iitem)Items.ItemFactory.CreateItem(equipped[Items.Wearable.WIELD_RIGHT].Id));
             }
-            if (player.Equipment.equipped.ContainsKey(Items.Wearable.WIELD_LEFT)) {
-                result.Add((Items.Iitem)Items.ItemFactory.CreateItem(player.Equipment.equipped[Items.Wearable.WIELD_LEFT].Id));
+            if (equipped.ContainsKey(Items.Wearable.WIELD_LEFT)) {
+                result.Add((Items.Iitem)Items.ItemFactory.CreateItem(equipped[Items.Wearable.WIELD_LEFT].Id));
             }
 
             return result;
         }
 
-        public Items.Wearable GetMainHandWeapon() {
+        public Items.Wearable GetMainHandWeapon(Iactor player) {
             if (player.MainHand != null) {
                 return (Items.Wearable)Enum.Parse(typeof(Items.Wearable), player.MainHand);
             }

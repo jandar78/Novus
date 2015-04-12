@@ -19,8 +19,10 @@ namespace Commands {
         //2.Check if can hit
         //  a. Calculate attacker hit chance
         //    i. Take into consideration any penalties or bonuses
-        //  b. Calculate defender dodge chance
+        //   ii. Take stance into consideration
+        //  b. Calculate defender block/dodge chance
         //    i. Take into consideration any penalties or bonuses
+        //   ii. Take stance into consideration
         //3. Hit - dodge = chance to hit (% of damage to apply)
         //  a. if chance to hit <= zero: no damage (we don't calculate an attack?)
         //  b. if chance to hit > zero: modifies damage
@@ -34,7 +36,11 @@ namespace Commands {
         //9. Set next round timer
 
 
-
+        private static double ApplyStanceModifier(double originalValue){
+            double stanceModifier = 1.0;
+            //do some math stuff here to reduce 1.0 or increment it based on stance
+            return originalValue * stanceModifier;
+        }
 
 
         private static double GetBonus(User.User player, CharacterEnums.BonusTypes type) {
@@ -61,13 +67,13 @@ namespace Commands {
         }
 
         //Will probably have to be modified a little bit when we introduce spells, but maybe not
-		private static void Kill(User.User player, List<string> commands) {
+        private static void Kill(User.User player, List<string> commands) {
 
-            //no combat this round, this will eventually depend on their dexterity stat or they are charging a spell
+            //Has the round interval time elapsed?
             if (!CheckIfCanAttack(player.Player.LastCombatTime)) {
-                return; 
+                return;
             }
-            
+
             //no target, no fight
             User.User enemy = GetTarget(player, commands);
             if (enemy == null) {
@@ -78,41 +84,99 @@ namespace Commands {
             TargetEachOther(player, enemy);
 
             //See if we can hit the other player
-            if (CanHitTarget(player, enemy)) {
+            double hitPercent = PercentHit(player, enemy);
 
-                //Get their main hand
-                Items.Wearable mainHand = player.Player.Equipment.GetMainHandWeapon();
+            //get target block
+            //block only lowers damage output, a really succesful block will make damage 0 or may even reflect back damage (maybe)
+            //also block should take into consideration what is being used to block, obviosuly a shield is better but with a weapons parrying is much better than 
+            //block, as you may lose a combat round or your stance may be affected for the next round causing the defending player to waste a combat round
+            //to get back into a good stance (well not a full round but it will affect 
+            //double chanceToBlock = GetAndEvaluateExpression("BlockChance", enemy.Player);
 
-                //Attack with the main hand
-                WeaponHandAttack(player, enemy);
-                //if they are wielding a weapon in their opposite hand then attack with it.
-                if (player.Player.Equipment.GetWieldedWeapons().Count == 2) {
-                    WeaponHandAttack(player, enemy, true); //off-hand attack
-                }
+            //Get their main hand
+            Items.Wearable mainHand = player.Player.Equipment.GetMainHandWeapon(player.Player);
 
-                //last time they attacked in a combat round 
-                player.Player.LastCombatTime = DateTime.Now.ToUniversalTime();
+            //Attack with the main hand
+            WeaponHandAttack(player, enemy);
+            //if they are wielding a weapon in their opposite hand then attack with it.
+            if (player.Player.Equipment.GetWieldedWeapons().Count == 2) {
+                WeaponHandAttack(player, enemy, true); //off-hand attack
             }
+
+            //last time they attacked in a combat round 
+            player.Player.LastCombatTime = DateTime.Now.ToUniversalTime();
+
             //save as we progress through the fight, no quitting once you get going 
             enemy.Player.Save();
-            player.Player.Save();  
-		}
+            player.Player.Save();
+        }
 
-        private static bool CanHitTarget(User.User player, User.User enemy) {
+        private static double PercentHit(User.User player, User.User enemy) {
             //TODO:
-            //this needs to be Players base chance to hit plus bonus >= enemy base chance to dodge + bonus
-            //or whatever calculation it ends up being to see if attacker can hit the target
-            if (GetBonus(player, CharacterEnums.BonusTypes.HitChance) >= GetBonus(enemy, CharacterEnums.BonusTypes.Dodge)) {
-                return true;
-            }
-            else {
-                player.OutBuffer = GetMessage("Messages", "Dodge", MessageType.Self); //probably should be TargetDodge
-                enemy.OutBuffer = GetMessage("Messages", "Dodge", MessageType.Target);
-                Room.GetRoom(player.Player.Location).InformPlayersInRoom(GetMessage("Messages", "Dodge", MessageType.Room), new List<string> { player.UserID, enemy.UserID });
-                return false;
-            }
+            //Calculate the attackers chance to succesfully perform a hit.
+            //The defender then needs to calculate block. 
+            //So the damage a player can do is proportional to the chance of hitting he has, the higher chance of landing a full blow
+            //the higher the damage will be.  The defender also does have a chance to dodge an attack which can cause damage to be zero (full dodge)
+            //or be lowered some more (graze).  Dodging should happen rarely based on what level of dodge they have (Master may be only 25% chance to dodge)
+            //obviously being a master dodger will require quite a bit of points dropped into dexterity and endurance.
+            //Blocking lowers the damage amount, not the chance to hit.
+            double chanceToHit = GetAndEvaluateExpression("HitChance", player.Player);
+            return chanceToHit;
           
         }
+
+        private static double GetAndEvaluateExpression(string calculationName, Character.Iactor player) {
+            MongoCollection col = MongoUtils.MongoData.GetCollection("Calculations", "Combat");
+            IMongoQuery query = Query.EQ("_id", calculationName);
+            BsonDocument doc = col.FindOneAs<BsonDocument>(query).AsBsonDocument;
+            NCalc.Expression expression = new NCalc.Expression(ReplaceStringWithNumber(player, doc["Expression"].AsString));
+            double expressionResult = (double)expression.Evaluate();
+            //let's take into consideration some other factors.  Visibility, stance, etc.
+            //TODO: add that here.  They only take away from chance to hit. But some of them can be negated.
+            //if it's dark but player can see in the dark for example.
+            return expressionResult;
+        }
+
+        //TODO:
+        //This method exists in the Skill class, should probably combine them into a math library or something
+        private static string ReplaceStringWithNumber(Character.Iactor player, string expression) {
+            //would like to make this a bit more generic so if new attributes are inserted we don't have to change this method
+            //I think easiest way is to have the expression be separated by spaces, but just so it works with anything let's get rid of
+            //any mathematical signs and then we should just have the name of the attributes we want.
+            string temp = expression;
+            string[] operators = new string[] { "+", "-", "/", "*", "(", ")", "[", "]", "{", "}", "^", "SQRT", "POW", "MAX" };
+            foreach (string operand in operators) {
+                temp = temp.Replace(operand, " ");
+            }
+
+            //need to get rid of repeats and empty spaces
+            string[] attributeList = temp.Split(' ');
+
+            //if you cocked your head to the side at this assignment, read over the code again.
+            temp = expression;
+
+            foreach (string attributeName in attributeList) {
+                if (!string.IsNullOrEmpty(attributeName)) {
+                    if (player.GetAttributes().ContainsKey(attributeName)) {
+                        temp = temp.Replace(attributeName, player.GetAttributeValue("attributeName").ToString());
+                    }
+                    else if (player.GetSubAttributes().ContainsKey(attributeName)) {
+                        temp = temp.Replace(attributeName, player.GetSubAttributes()[attributeName].ToString());
+                    }
+                    else if (attributeName.Contains("Rank")) {
+                        temp = temp.Replace(attributeName, player.GetAttributeRank(attributeName.Substring(0, attributeName.Length - 4)).ToString());
+                    }
+                    else if (attributeName.Contains("Bonus")){ //this part does not exist in the Skill class method
+                        string bonusName = attributeName.Replace("Bonus", "");
+                        double replacementValue = player.GetBonus((CharacterEnums.BonusTypes)Enum.Parse(typeof(CharacterEnums.BonusTypes), bonusName));
+                        temp = temp.Replace(attributeName, replacementValue.ToString());
+                    }
+                }
+            }
+
+            return temp;
+        }
+
 
         private static void WeaponHandAttack(User.User player, User.User enemy, bool offHand = false) {            
             //Calculate the total damage           

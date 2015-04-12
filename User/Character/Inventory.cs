@@ -14,7 +14,7 @@ using MongoDB;
 
 namespace Character {
     public class Inventory {
-        public Iactor player { get; set; }
+        public string playerID { get; set; }
 
         public HashSet<Items.Iitem> inventory;
 
@@ -22,17 +22,17 @@ namespace Character {
             inventory = new HashSet<Items.Iitem>();
         }
 
-        public Items.Iitem RemoveInventoryItem(Items.Iitem item) {
+        public Items.Iitem RemoveInventoryItem(Items.Iitem item, Equipment equipment) {
             Items.Iitem result = null;
 
             result = inventory.Where(i => i.Id == item.Id).SingleOrDefault();
             inventory.RemoveWhere(i => i.Id == item.Id);
 
             if (result == null) { //so if it wasn't in the inventory we need to check what is equipped
-                foreach (KeyValuePair<Items.Wearable, Items.Iitem> slot in player.Equipment.equipped) {
+                foreach (KeyValuePair<Items.Wearable, Items.Iitem> slot in equipment.equipped) {
                     if (slot.Value == item) {
                         result = (Items.Iitem)slot.Value;
-                        player.Equipment.equipped.Remove(slot.Key);
+                        equipment.equipped.Remove(slot.Key);
                         break;
                     }
                 }
@@ -41,15 +41,14 @@ namespace Character {
         }
 
         public void AddItemToInventory(Items.Iitem item) {
-            item.Owner = player.ID.ToString();
+            item.Owner = playerID;
             item.Save();
             inventory.Add(item);
-            player.Save();
         }
 
         public void UpdateInventoryFromDatabase() {
             MongoCollection col = MongoUtils.MongoData.GetCollection("World", "Items");
-            var docs = col.FindAs<BsonDocument>(Query.EQ("Owner", player.ID));
+            var docs = col.FindAs<BsonDocument>(Query.EQ("Owner", playerID));
             foreach (BsonDocument dbItem in docs) {
                 ObjectId itemID = dbItem["_id"].AsObjectId;
                 Items.Iitem temp = inventory.Where(i => i.Id == itemID).SingleOrDefault();

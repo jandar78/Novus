@@ -433,8 +433,8 @@ namespace Character {
             Inventory = new Inventory();
             Equipment = new Equipment();
 
-            Inventory.player = this;
-            Equipment.player = this;
+            Inventory.playerID = this.ID;
+            Equipment.playerID = this.ID;
 
 			Attributes = new Dictionary<string, Attribute>();
 
@@ -614,16 +614,16 @@ namespace Character {
             ID = found["_id"].AsObjectId.ToString();
             FirstName = found["FirstName"].AsString.CamelCaseWord();
             LastName = found["LastName"].AsString.CamelCaseWord();
-            _class = (CharacterClass)Enum.Parse(typeof(CharacterClass), found["Class"].AsString.ToUpper());
-            _race = (CharacterRace)Enum.Parse(typeof(CharacterRace), found["Race"].AsString.ToUpper());
-            _gender = (Genders)Enum.Parse(typeof(Genders), found["Gender"].AsString.ToUpper());
-            _skinType = (SkinType)Enum.Parse(typeof(SkinType), found["SkinType"].AsString.ToUpper());
-            _skinColor = (SkinColors)Enum.Parse(typeof(SkinColors), found["SkinColor"].AsString.ToUpper());
-            _skinType = (SkinType)Enum.Parse(typeof(SkinType), found["SkinType"].AsString.ToUpper());
-            _hairColor = (HairColors)Enum.Parse(typeof(HairColors), found["HairColor"].AsString.ToUpper());
-            _eyeColor = (EyeColors)Enum.Parse(typeof(EyeColors), found["EyeColor"].AsString.ToUpper());
-            _stanceState = (CharacterStanceState)Enum.Parse(typeof(CharacterStanceState), found["StanceState"].AsString.ToUpper());
-            _actionState = (CharacterActionState)Enum.Parse(typeof(CharacterActionState), found["ActionState"].AsString.ToUpper());
+            _class = (CharacterClass)Enum.Parse(typeof(CharacterClass), found["Class"].AsString.CamelCaseWord());
+            _race = (CharacterRace)Enum.Parse(typeof(CharacterRace), found["Race"].AsString.CamelCaseWord());
+            _gender = (Genders)Enum.Parse(typeof(Genders), found["Gender"].AsString.CamelCaseWord());
+            _skinType = (SkinType)Enum.Parse(typeof(SkinType), found["SkinType"].AsString.CamelCaseWord());
+            _skinColor = (SkinColors)Enum.Parse(typeof(SkinColors), found["SkinColor"].AsString.CamelCaseWord());
+            _skinType = (SkinType)Enum.Parse(typeof(SkinType), found["SkinType"].AsString.CamelCaseWord());
+            _hairColor = (HairColors)Enum.Parse(typeof(HairColors), found["HairColor"].AsString.CamelCaseWord());
+            _eyeColor = (EyeColors)Enum.Parse(typeof(EyeColors), found["EyeColor"].AsString.CamelCaseWord());
+            _stanceState = (CharacterStanceState)Enum.Parse(typeof(CharacterStanceState), found["StanceState"].AsString.CamelCaseWord());
+            _actionState = (CharacterActionState)Enum.Parse(typeof(CharacterActionState), found["ActionState"].AsString.CamelCaseWord());
             Description = found["Description"].AsString;
             Location = found["Location"].AsInt32;
             Height = found["Height"].AsDouble;
@@ -645,7 +645,10 @@ namespace Character {
             BsonArray playerAttributes = found["Attributes"].AsBsonArray;
             BsonArray xpTracker = found["XpTracker"].AsBsonArray;
             BsonDocument triggers = found["Triggers"].AsBsonDocument;
-            BsonArray bonusesList = found["Bonuses"].AsBsonArray;
+            BsonArray bonusesList = null;
+            if (found.Contains("Bonuses")) {
+                bonusesList = found["Bonuses"].AsBsonArray;
+            }
 
             if (playerAttributes != null) {
                 foreach (BsonDocument attrib in playerAttributes) {
@@ -675,10 +678,10 @@ namespace Character {
                 }
             }
 
-            ITrigger trigger = new SpeechTrigger(triggers);
+            ITrigger trigger = new GeneralTrigger(triggers, "NPC");
             Triggers.Add(trigger);
 
-            if (bonusesList.Count > 0) {
+            if (bonusesList != null && bonusesList.Count > 0) {
                 Bonuses.LoadFromBson(bonusesList);
             }
         }
@@ -765,7 +768,7 @@ namespace Character {
             bool result = false;
             if (CheckUnconscious) {
                 SetActionState(CharacterEnums.CharacterActionState.Unconcious);
-                SetStanceState(CharacterStanceState.Laying_Unconcious);
+                SetStanceState(CharacterStanceState.Laying_unconcious);
                 ClearTarget();
                 result = true;
             }
@@ -773,7 +776,7 @@ namespace Character {
                 if (ActionState == CharacterActionState.Unconcious) {
                     SetActionState(CharacterActionState.None);
                 }
-                if (StanceState == CharacterStanceState.Laying_Unconcious) {
+                if (StanceState == CharacterStanceState.Laying_unconcious) {
                     SetStanceState(CharacterStanceState.Prone);
                 }
             }
@@ -785,7 +788,7 @@ namespace Character {
             bool result = false;
             if (CheckDead) {
                 SetActionState(CharacterActionState.Dead);
-                SetStanceState(CharacterStanceState.Laying_Dead);
+                SetStanceState(CharacterStanceState.Laying_dead);
                 ClearTarget();
                 result = true;
             }
@@ -910,7 +913,7 @@ namespace Character {
                     sb.AppendLine("You loot the following items from " + FirstName + ":");
                     Inventory.GetInventoryAsItemList().ForEach(i => {
                         sb.AppendLine(i.Name);
-                        looter.Player.Inventory.AddItemToInventory(Inventory.RemoveInventoryItem(i));
+                        looter.Player.Inventory.AddItemToInventory(Inventory.RemoveInventoryItem(i, this.Equipment));
                     });
                 }
                 else if (commands.Count > 2) { //the big one, should allow to loot individual item from the inventory
@@ -924,13 +927,11 @@ namespace Character {
 
                     Inventory.GetInventoryAsItemList().ForEach(i => {
                         if (string.Equals(i.Name, itemName, StringComparison.InvariantCultureIgnoreCase) && index == position) {
-                            looter.Player.Inventory.AddItemToInventory(Inventory.RemoveInventoryItem(i));
+                            looter.Player.Inventory.AddItemToInventory(Inventory.RemoveInventoryItem(i, this.Equipment));
      
                             sb.AppendLine("You loot " + i.Name + " from " + FirstName);
                             Rooms.Room.GetRoom(looter.Player.Location).InformPlayersInRoom(string.Format("{0} loots {1} from {3}'s lifeless body.", looter.Player.FirstName, i.Name, FirstName), new List<string>() { ID });
                             index = -1; //we found it and don't need this to match anymore
-                            //no need to break since we are checking on index and I doubt a player will have so many items in their inventory that it will
-                            //take a long time to go through each of them
                         }
                         else {
                             index++;

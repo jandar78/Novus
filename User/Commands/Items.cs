@@ -42,7 +42,7 @@ namespace Commands {
             string msgPlayer = null;
 
             if (item != null) {
-                player.Player.Inventory.RemoveInventoryItem(item);
+                player.Player.Inventory.RemoveInventoryItem(item, player.Player.Equipment);
                 item.Location = player.Player.Location;
                 item.Owner = item.Location.ToString();
                 item.Save();
@@ -108,7 +108,7 @@ namespace Commands {
             //they said 'all' so we are going to remove everything
             if (commands.Count > 2 && string.Equals(commands[2].ToLower(), "all", StringComparison.InvariantCultureIgnoreCase)) {
                 foreach (KeyValuePair<Items.Wearable, Items.Iitem> item in player.Player.Equipment.GetEquipment()) {
-                    if(player.Player.Equipment.UnequipItem(item.Value));
+                    if(player.Player.Equipment.UnequipItem(item.Value, player.Player));
                 }
 
                 
@@ -133,7 +133,7 @@ namespace Commands {
                 Items.Iitem item = items[itemPosition - 1];
 
                 if (item != null) {
-                    player.Player.Equipment.UnequipItem(item);
+                    player.Player.Equipment.UnequipItem(item, player.Player);
                     msgOthers = string.Format("{0} unequips {1}", player.Player.FirstName, item.Name);
                     msgPlayer = string.Format("You unequip {0}", item.Name);
                 }
@@ -160,7 +160,7 @@ namespace Commands {
             //we need to make a list of items to wear from the players inventory and sort them based on stats
             if (commands.Count > 2 && string.Equals(commands[2].ToLower(), "all", StringComparison.InvariantCultureIgnoreCase)) {
                 foreach (Items.Iitem item in player.Player.Inventory.GetAllItemsToWear()) {
-                    if (player.Player.Equipment.EquipItem(item)) {
+                    if (player.Player.Equipment.EquipItem(item, player.Player.Inventory)) {
                         msgPlayer += string.Format("You equip {0}.\n", item.Name);
                         msgOthers = string.Format("{0} equips {1}.\n", player.Player.FirstName, item.Name);
                     }
@@ -189,7 +189,7 @@ namespace Commands {
                 Items.Iweapon weapon = item as Items.Iweapon;
 
                 if (item != null && item.IsWearable) {
-                    player.Player.Equipment.EquipItem(item);
+                    player.Player.Equipment.EquipItem(item, player.Player.Inventory);
                     if (item.ItemType.ContainsKey(Items.ItemsType.CONTAINER)) {
                         Items.Icontainer container = item as Items.Icontainer;
                         container.Wear();
@@ -245,7 +245,7 @@ namespace Commands {
                     player.Player.MainHand = Items.Wearable.WIELD_RIGHT.ToString(); //we will default to the right hand
                 }
                 
-                player.Player.Equipment.Wield(item);
+                player.Player.Equipment.Wield(item, player.Player.Inventory);
                 item.Save();
                 //TODO: check weapon for any wield perks/curses
 
@@ -350,7 +350,7 @@ namespace Commands {
             }
 
             //now remove it from the players inventory
-            player.Player.Inventory.RemoveInventoryItem(item);
+            player.Player.Inventory.RemoveInventoryItem(item, player.Player.Equipment);
 
             //item has been consumed so get rid of it from the DB
             MongoUtils.MongoData.ConnectToDatabase();

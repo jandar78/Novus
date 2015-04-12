@@ -15,26 +15,20 @@ using LuaInterface;
 namespace Rooms {
     public class Exits {
 		 
-		 public Dictionary<string, Room> availableExits;
-		 public Dictionary<string, Door> doors;
+	 public Dictionary<string, Room> availableExits;
+	 public Dictionary<string, Door> doors;
 
-        public bool HasDoor {
+      public bool HasDoor {
              get {
                  return doors.Count > 0;
              }
          }
 
-		 public string Description {
-			 get;
-			 set;
-		 }
+	 public string Description { get; set; }
 
-		 public string Direction {
-			 get;
-			 set;
-		 }
+	 public string Direction { get; set; }
 
-        public Exits() {
+       public Exits() {
 			  availableExits = new Dictionary<string, Room>();
 			  doors = new Dictionary<string, Door>();
         }
@@ -106,7 +100,7 @@ namespace Rooms {
         public string DescriptionDestroyed { get; set; }
         #endregion Public Properties
 
-        private List<Triggers.SpeechTrigger> _speechTriggers = new List<Triggers.SpeechTrigger>();
+        private List<Triggers.ITrigger> _exitTriggers = new List<Triggers.ITrigger>();
 
         public Door() { }
 
@@ -127,13 +121,10 @@ namespace Rooms {
 
         private void LoadTriggers() {
             foreach (BsonDocument doc in Triggers) {
-                Triggers.SpeechTrigger trigger = new Triggers.SpeechTrigger(doc);
+                Triggers.GeneralTrigger trigger = new Triggers.GeneralTrigger(doc, "Exits");
                 trigger.script.AddVariableForScript(this, "door");
-                if (trigger.MessageOverrideAsString.Count > 0) {
-                    trigger.script.AddVariableForScript(trigger.MessageOverrideAsString, "messageOverride");
-                    trigger.script.LuaScript.RegisterMarkedMethodsOf(new DoorHelpers());
-                }
-                _speechTriggers.Add(trigger);
+                trigger.script.LuaScript.RegisterMarkedMethodsOf(new DoorHelpers());
+                _exitTriggers.Add(trigger);
             }          
         }
 
@@ -185,7 +176,7 @@ namespace Rooms {
             }
 
             message = message.Replace("\"", "").Trim();
-            foreach (Triggers.SpeechTrigger trigger in _speechTriggers) {
+            foreach (Triggers.GeneralTrigger trigger in _exitTriggers) {
                 if (message.Contains(trigger.TriggerOn)) {
                     trigger.HandleEvent(null, null);
                 }

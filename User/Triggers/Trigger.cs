@@ -12,6 +12,19 @@ using LuaInterface;
 
 namespace Triggers {
     public class GeneralTrigger : ITrigger {
+        public GeneralTrigger(BsonDocument doc, string triggerType) {
+            MessageOverrideAsString = new List<string>();
+            if (doc != null && doc.ElementCount > 0) {
+                TriggerOn = doc["Trigger"].AsString;
+                ChanceToTrigger = doc["ChanceToTrigger"].AsInt32;
+                script = new Script(doc["ScriptID"].AsString, triggerType);
+                foreach (var overrides in doc["Overrides"].AsBsonArray) {
+                    MessageOverrideAsString.Add(overrides.AsString);
+                }
+            }
+        }
+
+        public GeneralTrigger(){}
         public string TriggerOn { get; set; }
         public double ChanceToTrigger { get; set; }
         public BsonArray MessageOverrides { get; set; }
@@ -26,19 +39,7 @@ namespace Triggers {
 
 
     public class ItemTrigger : GeneralTrigger {
-        public ItemTrigger(BsonDocument doc) {
-            MessageOverrideAsString = new List<string>();
-
-            if (doc != null && doc.ElementCount > 0) {
-                TriggerOn = doc["Trigger"].AsString;
-                ChanceToTrigger = doc["ChanceToTrigger"].AsInt32;
-                script = new Script(doc["ScriptID"].AsString, "Items");
-                             
-                foreach (var overrides in doc["Overrides"].AsBsonArray) {
-                    MessageOverrideAsString.Add(overrides.AsString);
-                }
-            }
-        }
+        public ItemTrigger(BsonDocument doc):base(doc, "Items") {}
 
         public override void HandleEvent(object o, EventArgs e) {
             //for items we want to add the item and the owner into the script as variables
@@ -51,23 +52,5 @@ namespace Triggers {
             }
             ThreadPool.QueueUserWorkItem(delegate { script.RunScript(); });
         }
-
-
-    }
-
-    public class SpeechTrigger : GeneralTrigger {
-        public SpeechTrigger(BsonDocument doc) {
-            MessageOverrideAsString = new List<string>();
-
-            if (doc != null && doc.ElementCount > 0) {
-                TriggerOn = doc["TriggerOn"].AsString;
-                ChanceToTrigger = (double)doc["ChanceToTrigger"].AsInt32;
-                script = new Script(doc["ScriptID"].AsString, "Door");
-
-                foreach (var overrides in doc["Overrides"].AsBsonArray) {
-                    MessageOverrideAsString.Add(overrides.AsString);
-                }
-            }
-        } 
     }
 }

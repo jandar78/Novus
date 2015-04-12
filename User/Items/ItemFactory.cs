@@ -26,7 +26,7 @@ namespace Items {
                 result = BsonSerializer.Deserialize<Items>(tempItem);
 
                 //add any triggers to the item
-                result = AddTriggersToItem(result, tempItem);
+                result = AddTriggersToItem(result, tempItem); //may be easier to just do result.ItemTriggers = AddTriggersToItem(tempItem);
             }
             catch (Exception ex) {
                 result.ToString();
@@ -42,6 +42,7 @@ namespace Items {
        /// <param name="tempItem"></param>
        /// <returns></returns>
         private static Iitem AddTriggersToItem(Iitem result, BsonDocument tempItem) {
+            //This method could probably just return an ITriggers List instead
             result.ItemTriggers = new List<ITrigger>();
           //  result.SpeechTriggers = new List<ITrigger>();
 

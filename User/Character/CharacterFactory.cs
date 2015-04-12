@@ -40,7 +40,7 @@ namespace CharacterFactory {
             CharacterEnums.EyeColors EyeColor = CharacterEnums.EyeColors.Black;
             CharacterEnums.Genders Gender = CharacterEnums.Genders.Male;
             CharacterEnums.HairColors HairColor = CharacterEnums.HairColors.Black;
-            CharacterEnums.CharacterRace Race = CharacterEnums.CharacterRace.DWARF;
+            CharacterEnums.CharacterRace Race = CharacterEnums.CharacterRace.Dwarf;
             CharacterEnums.SkinColors SkinColor = CharacterEnums.SkinColors.Black;
             CharacterEnums.SkinType SkinType = CharacterEnums.SkinType.Feathers;
             CharacterEnums.Languages Language = CharacterEnums.Languages.Common;
