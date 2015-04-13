@@ -12,19 +12,11 @@ using Extensions;
 
 namespace Commands {
     public partial class CommandParser {
-        //TODO: should be able to find item based on partial name by using best guess
-        
+       
         public static void Drop(User.User player, List<string> commands) {
             //1.get the item name from the command, may have to join all the words after dropping the command
             StringBuilder itemName = new StringBuilder();
             Room room = Room.GetRoom(player.Player.Location);
-
-            int itemPosition = 1;
-            string[] position = commands[commands.Count - 1].Split('.'); //we are separating based on using the decimal operator after the name of the npc/item
-            if (position.Count() > 1) {
-                int.TryParse(position[position.Count() - 1], out itemPosition);
-                itemName = itemName.Remove(itemName.Length - 2, 2);
-            }
 
             string full = commands[0];
             commands.RemoveAt(0);
@@ -32,6 +24,13 @@ namespace Commands {
             
             foreach (string word in commands) {
                 itemName.Append(word + " ");
+            }
+
+            int itemPosition = 1;
+            string[] position = commands[commands.Count - 1].Split('.'); //we are separating based on using the decimal operator after the name of the npc/item
+            if (position.Count() > 1) {
+                int.TryParse(position[position.Count() - 1], out itemPosition);
+                itemName = itemName.Remove(itemName.Length - 2, 2);
             }
 
             //2.get the item from the DB
@@ -339,7 +338,6 @@ namespace Commands {
             affectAttributes = food.Consume();
             
             foreach (KeyValuePair<string, double> attribute in affectAttributes) {
-                //TODO: this doesn't seem to be working properly for Hitpoints, gonna have to put a breakpoint here
                 player.Player.ApplyEffectOnAttribute(attribute.Key.CamelCaseWord(), attribute.Value);
                 if (attribute.Value < 0) {
                     upDown = "lost";
@@ -655,7 +653,7 @@ namespace Commands {
                     }
                 }
             }
-            else { //let's be smart and figure out what lightSource he wants activated, first come first serve
+            else { //let's be smart and figure out what lightSource he wants activated, first come first serve otherwise
                 foreach (Items.Iitem item in player.Player.Equipment.GetEquipment().Values) {
                     Items.Iiluminate lightsource = item as Items.Iiluminate;
                     if (lightsource != null && lightsource.isLightable) {
@@ -663,12 +661,25 @@ namespace Commands {
                         break;
                     }
                 }
-                if (lightItem == null) { //not in players equipment let's check the room, but not in containers TODO:(or maybe only open containers)?
+                if (lightItem == null) { //not in players equipment let's check the room
                     foreach (string itemId in room.GetObjectsInRoom(Room.RoomObjects.Items)) {
                         lightItem = Items.Items.GetByID(itemId);
                         Items.Iiluminate lightsource = lightItem as Items.Iiluminate;
                         if (lightsource != null && lightsource.isLightable) {
                             break;
+                        }
+                        //if it's a container and it's open see if it has a lightsource inside
+                        if (lightItem.ItemType.ContainsKey(Items.ItemsType.CONTAINER)) {
+                            Items.Icontainer containerItem = lightItem as Items.Icontainer;
+                            if (containerItem.Opened) {
+                                foreach (string id in containerItem.GetContents()) {
+                                    lightItem = Items.Items.GetByID(itemId);
+                                    lightsource = lightItem as Items.Iiluminate;
+                                    if (lightsource != null && lightsource.isLightable) {
+                                        break;
+                                    }
+                                }
+                            }
                         }
                     }
                 }

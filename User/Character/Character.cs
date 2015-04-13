@@ -13,10 +13,7 @@ using Extensions;
 
 namespace Character{
 
-   //Todo:  Anything that needs to be added as a future feature should go here so it's easy for anyone to find when they're looking for something
-	//to work on.  If you're going to be working on it update this saying it's being worked on.
-
-	public class Character : Iactor {
+  	public class Character : Iactor {
         private Inventory _inventory;
         private Equipment _equipment;
        

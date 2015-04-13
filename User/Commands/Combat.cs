@@ -648,6 +648,9 @@ namespace Commands {
 
 		private static bool BreakObject(User.User player, string objectName) {
             //TODO: finish this method now that we have objects in the game that can be destroyed
+            //find item in the DB, check if destructible.
+            //Calculate player attack and determine damage to item
+            //return message.
 			return false;
 		}
 		#endregion

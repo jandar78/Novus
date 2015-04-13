@@ -15,7 +15,7 @@ namespace Triggers {
         public GeneralTrigger(BsonDocument doc, string triggerType) {
             MessageOverrideAsString = new List<string>();
             if (doc != null && doc.ElementCount > 0) {
-                TriggerOn = doc["Trigger"].AsString;
+                TriggerOn = doc["TriggerOn"].AsString;
                 ChanceToTrigger = doc["ChanceToTrigger"].AsInt32;
                 script = new Script(doc["ScriptID"].AsString, triggerType);
                 foreach (var overrides in doc["Overrides"].AsBsonArray) {

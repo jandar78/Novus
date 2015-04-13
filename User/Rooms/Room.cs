@@ -507,11 +507,12 @@ namespace Rooms {
 
         private static List<Triggers.ITrigger> LoadTriggers(BsonArray triggers) {
             List<Triggers.ITrigger> triggerList = new List<Triggers.ITrigger>();
-            foreach (BsonDocument doc in triggers) {
-                global::Triggers.GeneralTrigger triggerToAdd = new Triggers.GeneralTrigger(doc, "Room");
-                triggerList.Add(triggerToAdd);
+            if (triggers != null) {
+                foreach (BsonDocument doc in triggers) {
+                   global::Triggers.GeneralTrigger triggerToAdd = new Triggers.GeneralTrigger(doc, "Room");
+                   triggerList.Add(triggerToAdd);
+                }
             }
-
             return triggerList;
         }
 

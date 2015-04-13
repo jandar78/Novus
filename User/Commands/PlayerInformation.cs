@@ -145,7 +145,7 @@ namespace Commands {
 				new List<string>(new string[] { player.UserID })); 
 		}
 
-		//a whisper is a private message but with a chance that other players may hear what was said, other player has to be in the same room
+	    //a whisper is a private message but with a chance that other players may hear what was said, other player has to be in the same room
         //TODO: need to add the ability for others to listen in on the whisper if they have the skill
 		private static void Whisper(User.User player, List<string> commands){
 			List<User.User> toPlayerList = new List<User.User>();

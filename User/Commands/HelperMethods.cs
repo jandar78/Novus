@@ -181,8 +181,7 @@ namespace Commands {
         //called from the MOVE command
         private static void ApplyRoomModifier(User.User player) {
             StringBuilder sb = new StringBuilder();
-            //Todo:  Build a dictionary with what the player is immune/has resistance to and for how much to then calculate the actual
-            //       damage/buff value that will be applied to the player
+            //Todo:  Check the player bonuses to see if they are immune or have resistance to the modifier
             foreach (Dictionary<string, string> modifier in Rooms.Room.GetModifierEffects(player.Player.Location)) {
                 player.Player.ApplyEffectOnAttribute("Hitpoints", double.Parse(modifier["Value"]));
 
@@ -207,10 +206,44 @@ namespace Commands {
         //could be an item or an npc, we'll figure it out
         private static string GetObjectInPosition(int position, string name, int location) {
             string result = "";
-
             string[] parsedName = name.Split('.');
-            //TODO: do the same for items at some point
+            
+            result = GetNPCInPosition(position, name, location, parsedName);
+            if (string.IsNullOrEmpty(result)) {
+               result = GetItemInPosition(position, name, location, parsedName);
+            }
 
+            return result;
+        }
+
+        private static string GetItemInPosition(int position, string name, int location, string[] parsedName) {
+            string result = "";
+
+            MongoUtils.MongoData.ConnectToDatabase();
+            MongoCollection itemCollection = MongoUtils.MongoData.GetCollection("World","Items" );
+            List<string> itemIds = Room.GetRoom(location).GetObjectsInRoom(Room.RoomObjects.Items);
+
+            int count = 1;
+
+            foreach (string ids in itemIds) {
+                IMongoQuery query = Query.EQ("_id", ObjectId.Parse(ids));
+                BsonDocument item = itemCollection.FindOneAs<BsonDocument>(query);
+                if (string.Equals(item["Name"].AsString, parsedName[0], StringComparison.InvariantCultureIgnoreCase) && count == position) {
+                    result = ids;
+                    break;
+                }
+                else {
+                    count++;
+                    continue;
+                }
+            }
+
+            return result;
+        }
+
+        private static string GetNPCInPosition(int position, string name, int location, string[] parsedName) {
+            string result = "";
+            
             MongoUtils.MongoData.ConnectToDatabase();
             MongoDatabase db = MongoUtils.MongoData.GetDatabase("Characters");
             MongoCollection npcs = db.GetCollection("NPCCharacters");

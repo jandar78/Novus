@@ -95,25 +95,25 @@ namespace Character {
             return false;
         }
 
-
-        //TODO: this method may need some work done to it
-        public void UpdateEquipmentFromDatabase() {
+        private void UpdateEquipmentFromDatabase(Dictionary<Items.Wearable, Items.Iitem> equipped) {
             if (playerID != null) {
                 MongoCollection col = MongoUtils.MongoData.GetCollection("World", "Items");
                 var docs = col.FindAs<BsonDocument>(Query.EQ("Owner", playerID));
                 foreach (BsonDocument dbItem in docs) {
                     ObjectId itemID = dbItem["_id"].AsObjectId;
+                    //do they have this item equipped?
                     Items.Iitem temp = equipped.Where(i => i.Value.Id == itemID).SingleOrDefault().Value;
                     if (temp == null) {
-                        temp = Items.Items.GetByID(dbItem["_id"].AsObjectId.ToString());
-                        equipped[temp.WornOn] = temp;
+                    //let's equip it then 
+                    temp = Items.Items.GetByID(dbItem["_id"].AsObjectId.ToString());
+                    equipped[temp.WornOn] = temp;
                     }
                 }
             }
         }
 
         public Dictionary<Items.Wearable, Items.Iitem> GetEquipment() {
-            UpdateEquipmentFromDatabase();
+            UpdateEquipmentFromDatabase(equipped);
             return equipped;
         }
 

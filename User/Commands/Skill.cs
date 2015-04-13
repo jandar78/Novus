@@ -19,12 +19,7 @@ using System.Collections;
 using LuaInterface;
 using Triggers;
 
-namespace Commands {
-
-    //TODO: some skills may need to call some unerlying methods like OPEN, UNLOCK, NORTH, WEST, etc.  Need to implement a way for that to happen and also
-    //if that underlying method should be called before or after the skill is performed. Example: Sneak needs to display messages to players in the room the player
-    //arrives to. PickLock needs to call UNLOCK after the skill was completed.
-    
+namespace Commands {   
 
     public class Skill {
         private Dictionary<string, object> DataSet { get; set; }
@@ -75,8 +70,6 @@ namespace Commands {
             DataSet = new Dictionary<string, object>();
             DataStack = new Stack<object>();
 
-           // MongoCollection col = MongoUtils.MongoData.GetCollection("Messages", "Skills");
-           // SkillDocument = col.FindOneAs<BsonDocument>(Query.EQ("_id", commands[1].CamelCaseWord()));
             UserCommand = commands;
             
             script = new Script(commands[1].CamelCaseWord(), "Action");
@@ -192,16 +185,6 @@ namespace Commands {
                 }
             }
         }
-
-        //deprecated
-        //[LuaAccessible]
-        //public double ParseAndCalculateCheckOther(object player) {
-        //    if (player != null) {
-        //        Expression expression = new Expression(ReplaceStringWithNumber((Character.Iactor)player));
-        //        return (double)expression.Evaluate();
-        //    }
-        //    return 0.0d;
-        //}
 
         [LuaAccessible]
         public object ColorFont(string message, double color) {
