@@ -9,8 +9,7 @@ using MongoDB.Driver.Builders;
 using Character;
 
 namespace Scripts {
-    public class LevelUpScript {
-		 private static MongoCollection _generalCollection;
+    public class LevelUpScript : ScriptBase {
          private static MongoCollection _scriptCollection;
 
          private static List<TempLvlChar> usersLevelingUp = new List<TempLvlChar>();
@@ -32,145 +31,145 @@ namespace Scripts {
          private LevelUpScript() {
              MongoUtils.MongoData.ConnectToDatabase();
              MongoDatabase db = MongoUtils.MongoData.GetDatabase("Characters");
-             _generalCollection = db.GetCollection("General");
              db = MongoUtils.MongoData.GetDatabase("Scripts");
-             _scriptCollection = db.GetCollection("CreateCharacter");
+             _scriptCollection = db.GetCollection("LevelUp");
          }
 
 
 		 public User.User.UserState InsertResponse(string response, string userId) {
              User.User.UserState state = User.User.UserState.LEVEL_UP;
              if (string.IsNullOrEmpty(response)) return state;
+			 
+			 TempLvlChar currentUser = usersLevelingUp.Where(u => u.user.UserID == userId).SingleOrDefault();
+			 currentUser.Response = response;
+			 BsonDocument stepDoc = MongoUtils.MongoData.GetCollection("Scripts", "LevelUp").FindOneAs<BsonDocument>(Query.EQ("_id", currentUser.lastStep.ToString()));
 
-             TempLvlChar specificUser = usersLevelingUp.Where(u => u.user.UserID == userId).SingleOrDefault();
-
-             //TODO: I'd like to make this more generic, we allow them to create any attribute they want why are we hardcoding them in here?
-             //we should just create a dictionary that matches the case to the attribute name
-
-             //it would also be super cool if we could get the steps from the DB instead of hardcoding the enums as well.
-             //this way things could be DB driven and the code just executes it. I'm thinking maybe we can just create something like a generic Step enum that goes
-             //from 1 to 20 (for now) and the scripts can parse the DB step to the enum and then we can call another generic method to display what we want from the DB
-             //and then also what steps it points to for previous and next
-
-             //kinda like this:
-
-             //var stepToExecute = _scriptCollection.FindOneAs<BsonDocument>(Query.EQ("_id", specificUser.lastStep.ToString()));
-             //Type t = specificUser.GetType();
-             //var propertyToAssignTo = t.GetProperty(stepToExecute["FriendlyName"].AsString);
-             //propertyToAssignTo.SetValue(specificUser, response);
-             //specificUser.currentStep = (ScriptSteps)Enum.Parse(typeof(ScriptSteps), stepToExecute["NextStep"].AsString);
-             //specificUser.lastStep = (ScriptSteps)Enum.Parse(typeof(ScriptSteps), stepToExecute["PreviousStep"].AsString);
-
-             //internal enum ScriptSteps { None, AwaitingResponse, Step1, Step2, Step3, Step4, Step5, Step6, Step7, Step8, Step9, Step10, Step11, Step12, Step13, Step14, Step15, Step16, Step17, Step18, Step19, Step20, Step21, Step22, Step23, Step24, Step25, Step26, Step27, Step28, Step29, Step30 };
-
-             if (specificUser != null && specificUser.currentStep == LevelUpSteps.AWAITINGRESPONSE) {
-                 int increase = 0;
-				 switch (specificUser.lastStep) {
-                     case LevelUpSteps.STEP1: {
-                             int stat = -1;
-                             int.TryParse(response, out stat);
-                             if (stat >= 1 && stat <= specificUser.maxOptions + 1) {
-                                 string attribute = "";
-                                 switch (stat) {
-                                     case 1:
-                                         increase = RankIncrease(specificUser, "Hitpoints");
-                                         attribute = "Hitpoints";
-                                         break;
-                                     case 2:
-                                         increase = RankIncrease(specificUser, "Strength");
-                                         attribute = "Strength";
-                                         break;
-                                     case 3:
-                                         increase = RankIncrease(specificUser, "Dexterity");
-                                         attribute = "Dexterity";
-                                         break;
-                                     case 4:
-                                         increase = RankIncrease(specificUser, "Endurance");
-                                         attribute = "Endurance";
-                                         break;
-                                     case 5:
-                                         increase = RankIncrease(specificUser, "Intelligence");
-                                         attribute = "Intelligence";
-                                         break;
-                                     case 6:
-                                         increase = RankIncrease(specificUser, "Charisma");
-                                         attribute = "Charisma";
-                                         break;
-                                     default:
-                                         //player chose to quit while still having points to spend
-                                         state = User.User.UserState.TALKING;
-                                         usersLevelingUp.Remove(specificUser);
-                                         return state;
-                                 }
-                                 if (increase > 0) {
-                                     specificUser.user.MessageHandler(String.Format("You've increased your {0} by {1} points", attribute, increase));
-                                 }
-                                 else {
-                                     specificUser.user.MessageHandler("You don't have enough points to increase the rank of " + attribute);
-                                     //this will put us back at the level up stats page
-                                     specificUser.currentStep = LevelUpSteps.STEP1;
-                                     specificUser.lastStep = LevelUpSteps.NONE;
-                                 }
-                                 if (specificUser.user.Player.PointsToSpend == 0) {
-                                     state = User.User.UserState.TALKING;
-                                     usersLevelingUp.Remove(specificUser);
-                                     specificUser.user.MessageHandler("");
-
-                                 }
-                                 //this may be the perks options
-                                 //specificUser.currentStep = LevelUpSteps.STEP2;
-                                 //specificUser.lastStep = LevelUpSteps.STEP1;
-                             }
-                             else {
-                                 specificUser.currentStep = LevelUpSteps.STEP1;
-                                 specificUser.lastStep = LevelUpSteps.NONE;
-                             }
-                         }
-                         break;
-                     case LevelUpSteps.STEP2:
-                         //this is where perks / feats would get chosen
-                         break;
-                     case LevelUpSteps.STEP3:
-                         break;
-                     default: break;
-                 }
-             }
-
+			 if (currentUser != null && currentUser.currentStep == ScriptSteps.AwaitingResponse) {
+				 state = (User.User.UserState)ParseStepDocument(stepDoc, currentUser, levelUpScript);
+			 }
+			 currentUser.Response = "";
              return state;
          }
 
          public string ExecuteScript(string userId) {
              string message = "";
 
-             TempLvlChar specificUser = usersLevelingUp.Where(u => u.user.UserID == userId).SingleOrDefault();
-             
-             if (specificUser != null && specificUser.lastStep != specificUser.currentStep) {
-                 switch (specificUser.currentStep) {
-                     case LevelUpSteps.STEP1:
-                         message = DisplayLvlStats(specificUser);
-                         specificUser.lastStep = specificUser.currentStep;
-                         specificUser.currentStep = LevelUpSteps.AWAITINGRESPONSE;
-                         break;
-                     case LevelUpSteps.STEP2:
-                         specificUser.user.CurrentState = User.User.UserState.TALKING;
-                         usersLevelingUp.Remove(specificUser);
-                         message = "\n\r";
-                         break;
-                     case LevelUpSteps.STEP3:
-                         break;
-                     default: break;
-                 }
-             }
-             else {
-                 if (specificUser != null) {
-                     if (specificUser.currentStep == LevelUpSteps.STEP1) {
-                         message = "That is not a valid selection.";
-                     }
-                 }
-             }
+			 TempLvlChar currentUser = usersLevelingUp.Where(u => u.user.UserID == userId).SingleOrDefault();
+			 //get the document for the step
+			 BsonDocument stepDoc = MongoUtils.MongoData.GetCollection("Scripts", "LevelUp").FindOneAs<BsonDocument>(Query.EQ("_id", currentUser.lastStep.ToString()));
 
+			 if (currentUser != null && currentUser.lastStep != currentUser.currentStep && currentUser.currentStep != ScriptSteps.AwaitingResponse) {
+				 message = (string)ParseStepDocument(stepDoc, currentUser, levelUpScript);
+			 }
+			 else if (currentUser.currentStep != ScriptSteps.AwaitingResponse) {
+				 if (currentUser != null) {
+					 if (currentUser.currentStep == ScriptSteps.Step1) {
+						 message = "That is not a valid selection.";
+					 }
+				 }
+			 }
+			 
              return message;
          }
+
+		 private void ExitScript(TempLvlChar currentUser) {
+			 currentUser.user.CurrentState = User.User.UserState.TALKING;
+			 usersLevelingUp.Remove(currentUser);
+		 }
+
+		 private User.User.UserState IncreaseStatResponse(string response, TempLvlChar currentUser) {
+			 User.User.UserState state = User.User.UserState.LEVEL_UP;
+			 int stat = -1;
+			 decimal increase = 0m;
+			 int.TryParse(response, out stat);
+			 if (stat >= 1 && stat <= currentUser.maxOptions + 1) {
+				 string attribute = "";
+				 Dictionary<string, Character.Attribute> attributesPlayerHas = currentUser.user.Player.GetAttributes();
+				 int i = 1;
+
+				 foreach (KeyValuePair<string, Character.Attribute> index in attributesPlayerHas) {
+					 if (i == stat) {
+						 attribute = index.Key;
+						 break;
+					 }
+					 i++;
+				 }
+
+				 if (!string.IsNullOrEmpty(attribute)) {
+					 increase = RankIncrease(currentUser, attribute);
+				 }
+				 else {
+					 //player chose to quit while still having points to spend
+					 state = User.User.UserState.TALKING;
+					 usersLevelingUp.Remove(currentUser);
+					 return state;
+				 }
+
+				 if (increase > 0) {
+					 currentUser.user.MessageHandler(String.Format("You've increased your {0} by {1} points", attribute, increase));
+				 }
+				 else {
+					 currentUser.user.MessageHandler("You don't have enough points to increase the rank of " + attribute);
+					 //this will put us back at the level up stats page
+					 currentUser.currentStep = ScriptSteps.Step1;
+					 currentUser.lastStep = ScriptSteps.None;
+				 }
+				 if (currentUser.user.Player.PointsToSpend == 0) {
+					 state = User.User.UserState.TALKING;
+					 usersLevelingUp.Remove(currentUser);
+					 currentUser.user.MessageHandler("");
+
+				 }
+			 }
+			 else {
+				 currentUser.currentStep = ScriptSteps.Step1;
+				 currentUser.lastStep = ScriptSteps.None;
+			 }
+
+			 return state;
+		 }
+		 
+			
+		 //private static object ParseStepDocument(BsonDocument stepDoc, TempLvlChar currentUser) {
+		 //	object returnObject = null;
+		 //	//if we have a message pass it to the message handler.
+		 //	if (!string.IsNullOrEmpty(stepDoc["Message"].AsString)) {
+		 //		currentUser.user.MessageHandler(stepDoc["Message"].AsString);
+		 //	}
+
+		 //	//we have a method we want to run, time to do some reflection
+		 //	if (stepDoc["MethodToRun"].AsBsonArray.Count > 0) {
+		 //		foreach (BsonDocument methodDoc in stepDoc["MethodToRun"].AsBsonArray) {
+		 //			Type t = levelUpScript.GetType();
+		 //			System.Reflection.MethodInfo method = t.GetMethod(methodDoc["Name"].AsString, System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+		 //			if (method != null) {						
+		 //			   returnObject = method.Invoke(levelUpScript, GetParameters(methodDoc["Parameters"].AsBsonArray, t, currentUser));
+		 //			}
+		 //		}
+		 //	}
+
+		 //	currentUser.lastStep = currentUser.currentStep;
+		 //	currentUser.currentStep = (ScriptSteps)Enum.Parse(typeof(ScriptSteps), stepDoc["NextStep"].AsString);
+
+		 //	return returnObject;
+		 //}
+
+		 //private static object[] GetParameters(BsonArray parameterArray, Type thisType, TempLvlChar specificUser) {
+		 //	List<object> parameters = new List<object>();
+		 //	foreach (BsonDocument doc in parameterArray) {
+		 //		if (string.Equals(doc["Name"].AsString, "CurrentUser", StringComparison.InvariantCultureIgnoreCase)){
+		 //			parameters.Add(specificUser);
+		 //			continue;
+		 //		}
+		 //		//the parameters for any of the methods being called should be available in this containing class
+		 //		System.Reflection.PropertyInfo p = thisType.GetProperty(doc["Name"].AsString, System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic);
+		 //		if (p != null) {
+		 //			parameters.Add(p.GetValue(null,null));
+		 //		}
+		 //	}
+
+		 //	return parameters.ToArray();
+		 //}
 
          private int RankIncrease(TempLvlChar specificUser, string attributeName) {
              double addToMax = 0.0d;
@@ -190,22 +189,23 @@ namespace Scripts {
              return (int)Math.Round(addToMax, 2, MidpointRounding.AwayFromZero);
          }
 
-         private string DisplayLvlStats(TempLvlChar user) {
+         private string DisplayLevelStats(TempLvlChar user) {
              StringBuilder sb = new StringBuilder();
-
-             //Notes: For the atributes you will need to keep a count of what rank each one is and base the attribute value/max off of that rank.
+			    
              //The rank of the attribute also determines how many points it costs to increase it to the next rank.  The higher the rank the more expensive
-             //the upgrade is limiting you to choose wisely.  Refer back to the chart in the excel on how to calculate the attribute values based on the rank.
+             //the upgrade is limiting you to choose wisely.
+			 
+			 Dictionary<string, Character.Attribute> attributesPlayerHas = user.user.Player.GetAttributes();
+			 int i = 1;
+			 sb.AppendLine("Level: " + user.user.Player.Level);
+			 sb.AppendLine("Points Available: " + user.user.Player.PointsToSpend);
 
-             sb.AppendLine("Level: " + user.user.Player.Level);
-             sb.AppendLine("Points Available: " + user.user.Player.PointsToSpend);
-             sb.AppendLine("1) Hitpoints   : " + user.user.Player.GetAttributeValue("Hitpoints") + "\tCost: " + GetRankCost(user.user.Player.GetAttributes(), "Hitpoints"));
-             sb.AppendLine("2) Strength    : " + user.user.Player.GetAttributeValue("Strength") + "\tCost: " + GetRankCost(user.user.Player.GetAttributes(), "Strength"));
-             sb.AppendLine("3) Dexterity   : " + user.user.Player.GetAttributeValue("Dexterity") + "\tCost: " + GetRankCost(user.user.Player.GetAttributes(), "Dexterity"));
-             sb.AppendLine("4) Endurance   : " + user.user.Player.GetAttributeValue("Endurance") + "\tCost: " + GetRankCost(user.user.Player.GetAttributes(), "Endurance"));
-             sb.AppendLine("5) Intelligence: " + user.user.Player.GetAttributeValue("Intelligence") + "\tCost: " + GetRankCost(user.user.Player.GetAttributes(), "Intelligence"));
-             sb.AppendLine("6) Charisma    : " + user.user.Player.GetAttributeValue("Charisma") + "\tCost: " + GetRankCost(user.user.Player.GetAttributes(), "Charisma"));
-             sb.AppendLine("7) Quit");
+			 foreach (KeyValuePair<string, Character.Attribute> attrib in attributesPlayerHas) {
+				 sb.AppendLine(i + ") " + attrib.Key  + " : " + user.user.Player.GetAttributeValue(attrib.Key) + "\tCost: " + GetRankCost(user.user.Player.GetAttributes(), attrib.Key));
+				 i++;
+			 }
+			 			
+			 sb.AppendLine(i + ") Quit");
              sb.AppendLine("Which stat would you like to increase?: ");
              return sb.ToString();
          }
@@ -213,29 +213,67 @@ namespace Scripts {
          private int GetRankCost(Dictionary<string, Character.Attribute> attributes, string attributeName) {
              int currentRank = attributes[attributeName].Rank;
              //ranks cost more points as they increase
+			 //TODO: these should come from the DB
              int cost = (int)Math.Ceiling(currentRank / 3.0d);          
              return cost;
          }
     }
 
 
-    public enum LevelUpSteps { STEP1, STEP2, STEP3, AWAITINGRESPONSE, NONE};
+   // public enum LevelUpSteps { STEP1, STEP2, STEP3, AWAITINGRESPONSE, NONE};
 
-    internal class TempLvlChar {
+	public enum ScriptSteps {
+		None,
+		AwaitingResponse,
+		Step1,
+		Step2,
+		Step3,
+		Step4,
+		Step5,
+		Step6,
+		Step7,
+		Step8,
+		Step9,
+		Step10,
+		Step11,
+		Step12,
+		Step13,
+		Step14,
+		Step15,
+		Step16,
+		Step17,
+		Step18,
+		Step19,
+		Step20,
+		Step21,
+		Step22,
+		Step23,
+		Step24,
+		Step25,
+		Step26,
+		Step27,
+		Step28,
+		Step29,
+		Step30
+	};
+
+    public class TempLvlChar {
         public User.User user = null;
-        public LevelUpSteps currentStep;
-        public LevelUpSteps lastStep;
+		public ScriptSteps currentStep;
+		public ScriptSteps lastStep;
         public int maxOptions;
 
         public string FirstName { get; set; }
         public string LastName { get; set; }
         public string Password { get; set; }
+		public string Response { get; set; }
 
         public TempLvlChar(User.User player) {
             user = player;
-            currentStep = LevelUpSteps.STEP1;
-            lastStep = LevelUpSteps.NONE;
+			currentStep = ScriptSteps.None;
+			lastStep = ScriptSteps.Step1;
             maxOptions = player.Player.GetAttributes().Count; 
+
         }
 
     }

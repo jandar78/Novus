@@ -114,15 +114,6 @@ namespace CharacterFactory {
 
 			return npc;
 		}
-
-        //mob should be same as NPC except they are not allowed to interact with player other than through combat
-        internal static Character.Iactor CreateMobCharacter(CharacterRace race, CharacterClass characterClass, Genders gender) {
-			Character.Character mobCharacter = new Character.Character();
-			//Todo:
-			//load mob info from database
-			return mobCharacter;
-		}
-
 	}
 }
 

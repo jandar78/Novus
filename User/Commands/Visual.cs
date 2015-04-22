@@ -173,7 +173,9 @@ namespace Commands {
                 List<Exits> exitList = room.RoomExits;
                                 
                 sb.AppendLine(("- " + room.Title + " -\t\t\t").FontStyle(Utils.FontStyles.BOLD));
-                //TODO: add a "Descriptive" flag, that we will use to determine if we need to display the room description.
+                //TODO: add a "Descriptive" flag, that we will use to determine if we need to display the room description.  Should be a player level
+				//config we can probably store them in a dictionary called Settings and make a method that turns them on or off.  User would just type
+				//Set Descriptions and the method would toggle the bit and then display back to the user the current setting ON/OFF
                 sb.AppendLine(room.Description);
                 sb.Append(HintCheck(player));
                

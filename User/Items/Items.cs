@@ -11,12 +11,8 @@ using MongoDB.Bson.Serialization;
 using MongoDB.Bson.Serialization.Attributes;
 using MongoDB.Bson.Serialization.Options;
 using Triggers;
-//TODO: OK so the way Items are handled right now will probably not be conducive for integrating the crafting system yes we could probably use
-//a dynamic wrapper to have the object inherit different interfaces but with the flexibility mongo gives us Item can inherit from all interfaces
-//and then we can just say what type of item it is in a field and the item can do all the heavy lifting, this way crafting will be much simpler
-//and we can add/remove interfaces at will.
 
-//Items now perform an event any time they do an action, listeners can now use the event that gets raised to do whatever they may want to do
+//Items now perform an event any time they do an action, triggers can now use the event that gets raised to do whatever they may want to do by subscribing
 
 //TODO: Booby traps that can be placed on things, like doors, exits, items, etc.  It should just be an item that has a booby trap type of trigger that can be
 //deactivated, removed, reset, etc.  Should be fun to make, not everything should have a slot for booby trap placements though.
@@ -324,7 +320,6 @@ namespace Items {
                 }
 
                 if (container != null) {
-                    //TODO: hmmm need to normalize these values prior to adding to the score tally
                     scores[index] += (int)container.WeightLimit / 100;
                     scores[index] += (int)container.ReduceCarryWeightBy * 100;
                 }

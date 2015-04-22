@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace CharacterEnums {
 
-	public enum CharacterType { PLAYER, NPC, MOB }
+	public enum CharacterType { PLAYER, NPC }
 	public enum CharacterRace { Human, Orc, Dwarf, Elf }
 
 	//uses bitwise operator to make it more readable, output is the same as setting them to 0x1,0x2,0x4,0x8,0x10, etc.

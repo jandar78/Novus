@@ -187,8 +187,6 @@ namespace Rooms {
     }
 
     #region Helper Methods for door scripts
-    //These methods below are used to call the appropriate methods without having to cycle through all the classes to find the correct method why dynamically binding them
-    //so they are all kept here and make the call to each class that has
     public class DoorHelpers {
         [LuaAccessible]
         public static void OpenDoor(int roomID, string direction) {
@@ -211,12 +209,6 @@ namespace Rooms {
             CommandParser.UnlockDoorOverride(roomID, direction);
             
         }
-
-        //[LuaAccessible]
-        //public static object InformAllPlayersInRoom(List<object> parameters) {
-        //    Room.GetRoom((int)parameters[1]).InformPlayersInRoom((string)parameters[0], new List<string>(new string[] { "" }));
-        //    return null;
-        //}
 
         [LuaAccessible]
         public static void Wait(int seconds) {

@@ -59,7 +59,7 @@ namespace Rooms {
         public BsonArray Descriptions { get; set; }
         public BsonArray Conditions { get; set; }
         public string CurrentCondition { get; set; }
-        public DateTime ConditionTimeEnd { get; set; }//TODO: get these to save as DateTime in the json and things should work
+        public DateTime ConditionTimeEnd { get; set; }
         public string WeatherMessage { get; set; }
         public string Description {
             get {

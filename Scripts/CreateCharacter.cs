@@ -455,7 +455,6 @@ namespace Scripts {
                         specificUser.user.UserID = specificUser.user.Player.ID;
 
                         specificUser.user.Player.Load(specificUser.user.UserID);
-                        //TODO: Based on the choices we will take the base stats and alter them accordingly +/-
                         AssignStatPoints(specificUser.user.Player);
                         specificUser.user.Player.Save(); //we updated the stats now save them.
                         message = "Character created!  Welcome " + specificUser.user.Player.FirstName + " " + specificUser.user.Player.LastName + "!";
@@ -519,11 +518,11 @@ namespace Scripts {
             document = col.FindOneAs<BsonDocument>(Query.EQ("_id", "Race"));
             AdjustRacePoints(specificUser, document);
             //not sure about these two below
-            //AdjustSkinPoints(specificUser, document);
-            //AdjustBuildPoints(specificUser, document);
+            //AdjustSkinPoints(specificUser, document); endurance/dexterity?
+            //AdjustBuildPoints(specificUser, document); strength/dexterity/endurance?
 
             //increase the max to reflect the new values
-            IncreaseMaxToValues(specificUser);
+            IncreaseAttributeMaxToValues(specificUser);
         }
 
         internal void AdjustClassPoints(Character.Iactor specificUser, BsonDocument document) {
@@ -556,7 +555,7 @@ namespace Scripts {
             }
         }
 
-        internal void IncreaseMaxToValues(Character.Iactor specificUser) {
+        internal void IncreaseAttributeMaxToValues(Character.Iactor specificUser) {
             foreach (var attrib in specificUser.GetAttributes()) {
                 attrib.Value.Max = attrib.Value.Value;
             }
