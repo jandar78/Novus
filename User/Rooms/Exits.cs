@@ -123,7 +123,7 @@ namespace Rooms {
             foreach (BsonDocument doc in Triggers) {
                 Triggers.GeneralTrigger trigger = new Triggers.GeneralTrigger(doc, "Exits");
                 trigger.script.AddVariableForScript(this, "door");
-                trigger.script.LuaScript.RegisterMarkedMethodsOf(new DoorHelpers());
+                //trigger.script.LuaScript.RegisterMarkedMethodsOf(new DoorHelpers());
                 _exitTriggers.Add(trigger);
             }          
         }

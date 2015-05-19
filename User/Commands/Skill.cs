@@ -61,7 +61,7 @@ namespace Commands {
         public CharacterEnums.CharacterStanceState StanceIfSuccessOthers { get; set; }
         
         public double CheckToPass { get; set; }
-        public Script script;
+        public IScript script;
 
         public Skill() { }
 
@@ -72,15 +72,15 @@ namespace Commands {
 
             UserCommand = commands;
             
-            script = new Script(commands[1].CamelCaseWord(), "Action");
+            script = new LuaScript(commands[1].CamelCaseWord(), "Action");
             
             UserCommand.RemoveAt(0);
-            script.LuaScript["UserCommand"] = UserCommand;
+           // script.LuaScript["UserCommand"] = UserCommand;
             
-            script.LuaScript.RegisterMarkedMethodsOf(this);
+          //  script.LuaScript.RegisterMarkedMethodsOf(this);
 
             Player = user;
-            script.LuaScript["player"] = Player.Player;
+          //  script.LuaScript["player"] = Player.Player;
             
             //if they have a target or they passed one in let's add it to the script variables as well
             if (Player.Player.CurrentTarget != null || commands.Count > 3){
@@ -92,7 +92,7 @@ namespace Commands {
                 }
 
                 if (Target != null) {
-                    script.LuaScript["target"] = Target.Player;
+                  //  script.LuaScript["target"] = Target.Player;
                 }
             }
         }

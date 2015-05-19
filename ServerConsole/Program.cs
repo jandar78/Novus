@@ -44,7 +44,7 @@ namespace ServerConsole {
 
 			MudTimer.StartUpTimers();
 
-			server.IPAddress = "192.168.1.107";
+			server.IPAddress = "192.168.1.100";
 			server.Port = 1301;
 
 			try {

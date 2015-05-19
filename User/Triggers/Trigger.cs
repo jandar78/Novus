@@ -17,7 +17,7 @@ namespace Triggers {
             if (doc != null && doc.ElementCount > 0 && doc.Contains("TriggerOn")) {
                 TriggerOn = doc["TriggerOn"].AsString;
                 ChanceToTrigger = doc["ChanceToTrigger"].AsInt32;
-                script = new Script(doc["ScriptID"].AsString, triggerType);
+                script = new LuaScript(doc["ScriptID"].AsString, triggerType);
                 foreach (var overrides in doc["Overrides"].AsBsonArray) {
                     MessageOverrideAsString.Add(overrides.AsString);
                 }
@@ -30,7 +30,7 @@ namespace Triggers {
         public BsonArray MessageOverrides { get; set; }
         public List<string> MessageOverrideAsString { get; set; }
         public string StateToExecute { get; set; }
-        public Script script; 
+        public LuaScript script; //this will have to be casted to the proper script type unless triggers can only be LUA script
 
         public virtual void HandleEvent(object o, EventArgs e) {
             ThreadPool.QueueUserWorkItem(delegate { script.RunScript(); });           
@@ -44,11 +44,11 @@ namespace Triggers {
         public override void HandleEvent(object o, EventArgs e) {
             //for items we want to add the item and the owner into the script as variables
             var item = Items.Items.GetByID(((Items.ItemEventArgs)e).ItemID.ToString());
-            script.AddVariableForScript(item, "item");
+            ((LuaScript)script).AddVariableForScript(item, "item");
 
             User.User player = MySockets.Server.GetAUser(item.Owner);
             if (player != null) {//the owner could be another item and not a player
-                script.AddVariableForScript(player.Player, "player");
+                ((LuaScript)script).AddVariableForScript(player.Player, "player");
             }
             ThreadPool.QueueUserWorkItem(delegate { script.RunScript(); });
         }
