@@ -9,6 +9,7 @@ namespace Character {
         void Update();
         void CalculateXP();
         void IncreaseXPReward(string id, double damage);
+		void DecreaseXPReward(double amount);
         void ParseMessage(string message);
         AI.FSM Fsm { get; set; }
         DateTime NextAiAction { get; set; }
