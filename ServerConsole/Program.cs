@@ -44,7 +44,7 @@ namespace ServerConsole {
 
 			MudTimer.StartUpTimers();
 
-			server.IPAddress = "192.168.1.100";
+			server.IPAddress = "192.168.1.107";
 			server.Port = 1301;
 
 			try {
@@ -81,7 +81,7 @@ namespace ServerConsole {
 					try {
 						//run NPC AI on separate thread, yes even if no players are playing.
 						ThreadPool.QueueUserWorkItem(delegate {
-							npcUtils.ProcessAiForNpcs();
+							npcUtils.ProcessAIForNPCs();
 						});
 
 						if (MySockets.Server.GetCurrentUserList().Count > 0) {

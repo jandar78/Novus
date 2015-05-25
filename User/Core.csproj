@@ -115,6 +115,7 @@
     <Compile Include="MessageHandling\Message.cs" />
     <Compile Include="NPC\Inpc.cs" />
     <Compile Include="NPC\MessageParser.cs" />
+    <Compile Include="NPC\NPCUtils.cs" />
     <Compile Include="NPC\QuestHandler.cs" />
     <Compile Include="NPC\States.cs" />
     <Compile Include="NPC\AI.cs" />

@@ -68,7 +68,9 @@ namespace MudTime
 	
 		private static void PlayerTimerTick(uint playerTicks, EventArgs e) {
             //Every 5 seconds
-            foreach (User.User user in MySockets.Server.GetCurrentUserList()) {
+			Character.NPCUtils.GetInstance().CleanupBonuses(); //NPCs
+
+			foreach (User.User user in MySockets.Server.GetCurrentUserList()) { //Players
                 user.Player.CleanupBonuses();
             }
 
@@ -78,7 +80,11 @@ namespace MudTime
 						user.Player.ApplyRegen(attrib.Key);
 					}
 				}
+
+				Character.NPCUtils.GetInstance().RegenerateAttributes();
 			}
+
+			
 		}
 
 		private static void weatherTimerTick(uint ticks, EventArgs e) {
