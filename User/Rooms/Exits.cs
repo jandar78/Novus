@@ -11,6 +11,7 @@ using System.Reflection;
 using Commands;
 using System.Threading;
 using LuaInterface;
+using Triggers;
 
 namespace Rooms {
     public class Exits {
@@ -121,9 +122,13 @@ namespace Rooms {
 
         private void LoadTriggers() {
             foreach (BsonDocument doc in Triggers) {
-                Triggers.GeneralTrigger trigger = new Triggers.GeneralTrigger(doc, "Exits");
-                trigger.script.AddVariableForScript(this, "door");
-                //trigger.script.LuaScript.RegisterMarkedMethodsOf(new DoorHelpers());
+                Triggers.GeneralTrigger trigger = new Triggers.GeneralTrigger(doc, "Door");
+                trigger.script.AddVariable(this, "door");
+				if (trigger.script.ScriptType == ScriptFactory.ScriptTypes.Lua) {
+					LuaScript luaScript = trigger.script as LuaScript;
+					luaScript.RegisterMarkedMethodsOf(new DoorHelpers());
+
+				}
                 _exitTriggers.Add(trigger);
             }          
         }

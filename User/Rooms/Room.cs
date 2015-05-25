@@ -297,6 +297,10 @@ namespace Rooms {
             }
         }
 
+		public List<string> GetObjectsInRoom(string objectType, double percentage = 100) {
+			return GetObjectsInRoom((RoomObjects)Enum.Parse(typeof(RoomObjects), objectType), percentage);
+		}
+
         public List<string> GetObjectsInRoom(RoomObjects objectType, double percentage = 100) {
             List<string> result = new List<string>();
             object objectList = null;

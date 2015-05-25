@@ -12,9 +12,24 @@ using Items;
 using Extensions;
 using Commands;
 using System.Collections;
+using NCalc;
 
 namespace Triggers {
 	public class ScriptMethods {
+		private Dictionary<string, object> DataSet {
+			get;
+			set;
+		}
+		private Stack<object> DataStack {
+			get;
+			set;
+		}
+
+
+		public ScriptMethods() {
+			DataSet = new Dictionary<string, object>();
+			DataStack = new Stack<object>();
+		}
 		//These are copied from SKill.cs will need to work on converting skill.cs to using the Script class so they can share common ones
 		//and if needed then classes can register their own additional functions with Lua
 
@@ -246,6 +261,74 @@ namespace Triggers {
 		[LuaAccessible]
 		public static object[] Table2Array(LuaInterface.LuaTable table) {
 			return Table2List(table).ToArray();
+		}
+
+		[LuaAccessible]
+		public double ParseAndCalculateCheck(Character.Iactor player, string calculation) {
+			Expression expression = new Expression(ReplaceStringWithNumber(player, calculation));
+			double result = 0;
+			try {
+				result = (double)expression.Evaluate();
+			}
+			catch (Exception) {
+			}
+
+			return result;
+		}
+
+		[LuaAccessible]
+		public object ColorFont(string message, double color) {
+			Utils.FontForeColor fontColor = (Utils.FontForeColor)color;
+			return message.FontColor(fontColor);
+		}
+
+		[LuaAccessible]
+		public void SetVariable(string name, object o) {
+			if (!DataSet.ContainsKey(name)) {
+				DataSet.Add(name, o);
+			}
+			else {
+				DataSet[name] = o;
+			}
+		}
+
+		/// <summary>
+		/// For this method to work correctly the Attribute names **MUST** be separated by a space at the start and end.
+		/// (Dexterity+Cunning) will not work it needs to be ( Dexterity + Cunning ) any other math symbols and numbers do not require
+		/// spaces.
+		/// </summary>
+		/// <param name="player"></param>
+		/// <returns></returns>
+		private string ReplaceStringWithNumber(Character.Iactor player, string calculation) {
+			//would like to make this a bit more generic so if new attributes are inserted we don't have to change this method
+			//I think easiest way is to have the expression be separated by spaces, but just so it works with anything let's get rid of
+			//any mathematical signs and then we should just have the name of the attributes we want.
+			string temp = calculation;
+			string[] operators = new string[] { "+", "-", "/", "*", "(", ")", "[", "]", "{", "}", "^", "SQRT", "POW", "." };
+			foreach (string operand in operators) {
+				temp = temp.Replace(operand, " ");
+			}
+
+			//need to get rid of repeats and empty spaces
+			string[] attributeList = temp.Split(' ');
+
+			temp = calculation;
+
+			foreach (string attributeName in attributeList) {
+				if (!string.IsNullOrEmpty(attributeName)) {
+					if (player.GetAttributes().ContainsKey(attributeName)) {
+						temp = temp.Replace(attributeName, player.GetAttributeValue("attributeName").ToString());
+					}
+					else if (player.GetSubAttributes().ContainsKey(attributeName)) {
+						temp = temp.Replace(attributeName, player.GetSubAttributes()[attributeName].ToString());
+					}
+					else if (attributeName.Contains("Rank")) {
+						temp = temp.Replace(attributeName, player.GetAttributeRank(attributeName.Substring(0, attributeName.Length - 4)).ToString());
+					}
+				}
+			}
+
+			return temp;
 		}
 	}
 }

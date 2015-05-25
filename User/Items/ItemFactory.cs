@@ -52,7 +52,7 @@ namespace Items {
                     ItemTrigger trigger = new ItemTrigger(doc);
                     SubscribeToCorrectEvent(result, trigger);
                     //for most scripts we are going to want the playerID to then get anything else we may want within it like rooms, items, etc
-                    trigger.script.AddVariableForScript(result.Owner, "playerID");
+                    trigger.script.AddVariable(result.Owner, "ownerID");
 
                     result.ItemTriggers.Add(trigger);
                 }

@@ -123,6 +123,7 @@
     <Compile Include="Triggers\IScript.cs" />
     <Compile Include="Triggers\ITrigger.cs" />
     <Compile Include="Triggers\Script.cs" />
+    <Compile Include="Triggers\ScriptFactory.cs" />
     <Compile Include="Triggers\ScriptMethods.cs" />
     <Compile Include="Triggers\Trigger.cs" />
     <Compile Include="Utils.cs" />

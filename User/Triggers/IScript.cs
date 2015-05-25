@@ -7,6 +7,8 @@ using System.IO;
 
 namespace Triggers {
 	public interface IScript {
-		void RunScript();
+		 void RunScript();
+		 void AddVariable(object variable, string variableName);
+		 ScriptFactory.ScriptTypes ScriptType { get; }
 	}
 }

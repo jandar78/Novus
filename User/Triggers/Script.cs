@@ -18,8 +18,7 @@ namespace Triggers {
     public class RoslynScript : Script {
 		private Roslyn.Scripting.Session _session;
 		private ScriptEngine _engine;
-		private ScriptMethods scriptMethods;
-
+		
 		public ScriptEngine Engine {
 			get {
 				if (_engine == null) {
@@ -33,18 +32,17 @@ namespace Triggers {
 			get {
 				if (_session == null) {
 					
-					_session = Engine.CreateSession(scriptMethods, scriptMethods.GetType());
+					_session = Engine.CreateSession(new ScriptMethods(), new ScriptMethods().GetType());
 				}
 				return _session;
 			}
 		}
 
-        public override string MemStreamAsString {
-            get {
-				ASCIIEncoding.ASCII.GetString(MemStreamAsByteArray);
-				return @"SendMessage(""52aa9e0231b6bd15cc44e0b2"", ""You just ran a roslyn script! Congratulations on this achievement!"");";
-            }
-        }
+		public override ScriptFactory.ScriptTypes ScriptType {
+			get {
+				return ScriptFactory.ScriptTypes.Roslyn;
+			}
+		}
 
         public RoslynScript() { }
         /// <summary>
@@ -53,13 +51,25 @@ namespace Triggers {
         /// <param name="scriptID"></param>
         /// <param name="registerMethods"></param>
         public RoslynScript(string scriptID, string scriptCollection, bool registerMethods = true) {
-			scriptMethods = new ScriptMethods();
             MongoCollection collection = MongoUtils.MongoData.GetCollection("Scripts", scriptCollection);
             BsonDocument doc = collection.FindOneAs<BsonDocument>(Query.EQ("_id", scriptID));
             if (doc != null && doc["Bytes"].AsBsonBinaryData != null) {
                 ScriptByteArray = (byte[])doc["Bytes"].AsBsonBinaryData;
 				if (registerMethods) {
-					new[]
+					RegisterMethods();
+				}
+            }
+        }
+
+        public RoslynScript(byte[] scriptBytes, bool registerMethods = true) {
+			ScriptByteArray = scriptBytes;
+            if (registerMethods) {
+				RegisterMethods();
+            }
+        }
+
+		public void RegisterMethods() {
+			new[]
 					{
 						 typeof (Type).Assembly,
 						 typeof (ICollection).Assembly,
@@ -67,25 +77,18 @@ namespace Triggers {
 						 typeof (RoslynScript).Assembly,
 						 typeof (IEnumerable<>).Assembly,
 						 typeof (IQueryable).Assembly,
+						 typeof (ScriptMethods).Assembly,
 						 GetType().Assembly
 					}.ToList().ForEach(asm => Engine.AddReference(asm));
-				
-					//Import common namespaces
-					new[]
+
+			//Import common namespaces
+			new[]
 					{
 						 "System", "System.Linq",
 						 "System.Collections",
 						 "System.Collections.Generic"
 					 }.ToList().ForEach(ns => Engine.ImportNamespace(ns));
-				}
-            }
-        }
-
-        public RoslynScript(BsonDocument doc, bool registerMethods = true) {
-            MemStream = new MemoryStream((byte[])doc["Bytes"].AsBsonBinaryData);
-            if (registerMethods) {
-            }
-        }
+		}
 
         ~RoslynScript(){
             if (_memStream != null) {
@@ -106,8 +109,10 @@ namespace Triggers {
             }
         }
 
-        public override void AddVariableForScript(object variable, string variableName) {
-		
+        public override void AddVariable(object variable, string variableName) {
+			//need to figure out a way to add variables to the session or it may just be something that happens from the
+			//script code by calling the scriptmethods we provide.  We might just add variables like player/item ID's
+			Session.Execute(string.Format("{0} = {1}", (string)variable, variableName));
         }
 
 		public void AddNamespace(string nameSpace) {
@@ -123,7 +128,7 @@ namespace Triggers {
 	//this will be for any scripts that we want builders to create.  It will have limited access to classes.
 	public class LuaScript : Script {
         private Lua _lua;
-		private ScriptMethods scriptMethods;
+		
 
 		public Lua Engine {
 			get {
@@ -137,11 +142,11 @@ namespace Triggers {
 			}
 		}
 
-        public override string MemStreamAsString {
-            get {
-				return ASCIIEncoding.ASCII.GetString(MemStreamAsByteArray);
-            }
-        }
+		public override ScriptFactory.ScriptTypes ScriptType {
+			get {
+				return ScriptFactory.ScriptTypes.Lua;
+			}
+		}
 
         public LuaScript() { }
         /// <summary>
@@ -150,21 +155,20 @@ namespace Triggers {
         /// <param name="scriptID"></param>
         /// <param name="registerMethods"></param>
         public LuaScript(string scriptID, string scriptCollection, bool registerMethods = true) {
-			scriptMethods = new ScriptMethods();
             MongoCollection collection = MongoUtils.MongoData.GetCollection("Scripts", scriptCollection);
             BsonDocument doc = collection.FindOneAs<BsonDocument>(Query.EQ("_id", scriptID));
             if (doc != null && doc["Bytes"].AsBsonBinaryData != null) {
                 ScriptByteArray = (byte[])doc["Bytes"].AsBsonBinaryData;
 				if (registerMethods) {
-					Engine.RegisterMarkedMethodsOf(this);
+					Engine.RegisterMarkedMethodsOf(new ScriptMethods());
 				}
             }
         }
 
-        public LuaScript(BsonDocument doc, bool registerMethods = true) {
-            MemStream = new MemoryStream((byte[])doc["Bytes"].AsBsonBinaryData);
+        public LuaScript(byte[] scriptBytes, bool registerMethods = true) {
+			ScriptByteArray = scriptBytes;
             if (registerMethods) {
-				Engine.RegisterMarkedMethodsOf(this);
+				Engine.RegisterMarkedMethodsOf(new ScriptMethods());
             }
         }
 
@@ -185,13 +189,17 @@ namespace Triggers {
             }
         }
 
-        public override void AddVariableForScript(object variable, string variableName) {
+        public override void AddVariable(object variable, string variableName) {
 			Engine[variableName] = variable;
         }
 
-        
+		public void RegisterFunction(string path, object registerClass, MethodBase function) {
+			Engine.RegisterFunction(path, registerClass, function);
+		}
 
-        
+		public void RegisterMarkedMethodsOf(object classObject) {
+			Engine.RegisterMarkedMethodsOf(classObject);
+		}
 	}
 
 
@@ -246,8 +254,16 @@ namespace Triggers {
 			set;
 		}
 
-		public abstract string MemStreamAsString {
-			get;
+		public string MemStreamAsString {
+			get {
+				return System.Text.ASCIIEncoding.ASCII.GetString(ScriptByteArray);
+			}
+		}
+
+		public virtual ScriptFactory.ScriptTypes ScriptType {
+			get {
+				return ScriptFactory.ScriptTypes.None;
+			}
 		}
 
 		protected byte[] MemStreamAsByteArray {
@@ -256,7 +272,7 @@ namespace Triggers {
 			}
 		}
 
-		public virtual void AddVariableForScript(object variable, string variableName) {
+		public virtual void AddVariable(object variable, string variableName) {
 			throw new NotImplementedException();
 		}
 
