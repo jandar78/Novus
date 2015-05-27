@@ -97,6 +97,8 @@
     <Compile Include="Commands\Items.cs" />
     <Compile Include="Commands\MessageParser.cs" />
     <Compile Include="Commands\Skill.cs" />
+    <Compile Include="Groups\Group.cs" />
+    <Compile Include="Groups\Groups.cs" />
     <Compile Include="Items\Beverage.cs" />
     <Compile Include="Items\Clothing.cs" />
     <Compile Include="Items\Container.cs" />
