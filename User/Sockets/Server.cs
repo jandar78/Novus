@@ -130,19 +130,29 @@ namespace MySockets
             return null;
         }
 
-        public static List<User.User> GetAUserByName(string name) {
+        public static User.User GetAUserByFullName(string name) {
             if (string.IsNullOrEmpty(name)) {
                 return null;
             }
             Dictionary<Socket, User.User> tempList = new Dictionary<Socket, User.User>(clientSocketList);
-            List<KeyValuePair<Socket, User.User>> temp = tempList.Where(c => c.Value.Player.FirstName.ToLower() == name.ToLower()).ToList();
-            List<User.User> result = new List<User.User>();
-            
-            foreach (KeyValuePair<Socket, User.User> user in temp) {
-                result.Add(user.Value);
-            }
-            return result;
+            User.User userFound = tempList.Where(c => c.Value.Player.FullName.ToLower() == name.ToLower()).FirstOrDefault().Value;
+                        
+            return userFound;
         }
+
+		public static List<User.User> GetAUserByFirstName(string name) {
+			if (string.IsNullOrEmpty(name)) {
+				return null;
+			}
+			Dictionary<Socket, User.User> tempList = new Dictionary<Socket, User.User>(clientSocketList);
+			List<KeyValuePair<Socket, User.User>> temp = tempList.Where(c => c.Value.Player.FirstName.ToLower() == name.ToLower()).ToList();
+			List<User.User> result = new List<User.User>();
+
+			foreach (KeyValuePair<Socket, User.User> user in temp) {
+				result.Add(user.Value);
+			}
+			return result;
+		}
 
 		public void StartServer() {
 			try {
