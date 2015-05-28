@@ -635,6 +635,24 @@ namespace Character{
             set;
         }
 
+		public string FullName {
+			get {
+				return FirstName + " " + LastName;
+			}
+		}
+
+		public string FullHonors {
+			get {
+				return FullName + Title;
+			}
+		}
+
+		//Title will be titles the player can earn by completing quests/events and choose to display as the primary title
+		public string Title {
+			get;
+			set;
+		}
+
         public string Class {
             get {
                 return _class.ToString().CamelCaseWord();

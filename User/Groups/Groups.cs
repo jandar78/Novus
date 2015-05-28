@@ -3,11 +3,17 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using MongoDB.Bson;
+using MongoDB.Driver;
+using MongoDB.Driver.Builders;
 
 namespace Groups {
 	//The goal of this class is to provide an interface for players in whihc they can start a group, other players can join, leader can kick people from it,
 	//set up group rules, like how the loot gets divided (we may implement different systems for this, like first-to-loot, dice-roll, Next-Player-Loots, only-leader-loots, etc.
 	//Will have to implement a system so that new rules can be added easily
+
+	//For XP I think what we will do is everyone gets the same XP amount in the group but at 50% of what they could get individually.  Basically as a group they
+	//should be killing things much quicker and easier than soloing therefore the reduced XP amount.
 
 
 	public class Groups {
@@ -19,13 +25,51 @@ namespace Groups {
 			return _groupInstance ?? new Groups();
 		}
 
-		public void CreateGroup(string groupName) {
-			_groupList.Add(new Group(groupName));
+		private string GetMessageFromDB(string messageID) {
+			MongoCollection collection = MongoUtils.MongoData.GetCollection("Messages", "Groups");
+			return collection.FindOneAs<BsonDocument>(Query.EQ("_id", messageID))["Message"].AsString;
 		}
 
-		public void RemoveGroup(string groupName, string leaderID) {
+		public void CreateGroup(string leaderID, string groupName) {
+			string message = null;
+			string msgID = "GroupCreated";
+
+			if (!IsPlayerInGroup(leaderID)) {
+				if (!GroupAlreadyExists(groupName)) {
+					try {
+						_groupList.Add(new Group(groupName));
+					}
+					catch (Exception) { //you never know
+						msgID = "GroupCreateFailed";
+					}
+				}
+				else {
+					msgID = "GroupExists";
+				}
+			}
+			else {
+				msgID = "LeaderInOtherGroup";
+			}
+
+			MySockets.Server.GetAUser(leaderID).MessageHandler(string.Format(GetMessageFromDB(msgID), message));
+		}
+
+		private bool GroupAlreadyExists(string groupName) {
+			bool exists = false;
+			foreach (Group group in _groupList) {
+				if (string.Equals(group.GroupName, groupName, StringComparison.InvariantCultureIgnoreCase)) {
+					exists = true;
+					break;
+				}
+			}
+
+			return exists;
+		}
+
+		public void DisbandGroup(string groupName, string leaderID) {
 			Group group = GetGroup(groupName);
 			if (string.Equals(group.LeaderID, leaderID, StringComparison.InvariantCultureIgnoreCase)) {
+				group.Disband(GetMessageFromDB("DisbandGroup"));
 				_groupList.Remove(group);
 			}
 		}
@@ -33,7 +77,7 @@ namespace Groups {
 		public string GetGroupNameOnlyList() {
 			StringBuilder sb = new StringBuilder();
 			foreach (Group group in _groupList) {
-				if (group.GroupRuleForJoining != GroupJoinRule.Private) {
+				if (group.GroupRuleForVisibility != GroupVisibilityRule.Private) {
 					sb.AppendLine(group.GroupName);
 				}
 			}
@@ -62,6 +106,19 @@ namespace Groups {
 			foreach (Group group in _groupList) {
 				if (string.Equals(group.GroupName, groupName, StringComparison.InvariantCultureIgnoreCase)) {
 					groupFound = group;
+					break;
+				}
+			}
+
+			return groupFound;
+		}
+
+		private Group GetGroupByLeaderID(string leaderID) {
+			Group groupFound = null;
+			foreach (Group group in _groupList) {
+				if (string.Equals(group.LeaderID, leaderID, StringComparison.InvariantCultureIgnoreCase)) {
+					groupFound = group;
+					break;
 				}
 			}
 
@@ -73,13 +130,7 @@ namespace Groups {
 				group = GetGroup(groupName);
 			}
 
-			StringBuilder sb = new StringBuilder();
-			foreach (string playerID in group.PlayerList) {
-				bool isLeader = (playerID == group.LeaderID);
-				sb.AppendLine("\t" + MySockets.Server.GetAUser(playerID).Player.FirstName + (isLeader == true ? " (Leader)" : ""));
-			}
-
-			return sb.ToString();
+			return group.ToString();
 		}
 
 		public void ChangeLootingRule(string groupName, string leaderID, GroupLootRule newRule) {
@@ -116,6 +167,54 @@ namespace Groups {
 				group.PromoteToLeader(newLeaderID);
 			}
 		}
+
+		private bool IsPlayerInGroup(string playerID, string groupName = null) {
+			bool playerIsInGroup = false;
+
+			if (string.IsNullOrEmpty(groupName)) {
+				foreach (Group group in _groupList) {
+					playerIsInGroup = group.HasPlayer(playerID);
+					if (playerIsInGroup) {
+						break;
+					}
+				}
+			}
+			else {
+				playerIsInGroup = GetGroup(groupName).HasPlayer(playerID);
+			}
+
+			return playerIsInGroup;
+		}
+
+		public void RequestGroupJoin(string playerID, string groupName) {
+			Group group = GetGroup(groupName);
+			if (group.GroupRuleForVisibility == GroupVisibilityRule.Public) {
+				if (group.GroupRuleForJoining == GroupJoinRule.Request) {
+					group.RequestJoin(playerID);
+				}
+				else if (group.GroupRuleForJoining == GroupJoinRule.Friends_only) {
+					//Need to create a FriendList object for User class
+					if (!MySockets.Server.GetAUser(group.LeaderID).FriendsList.Contains(playerID)) {
+						//	"You are not a friend of the leader, you can not join the group";
+					}
+					else {
+						group.RequestJoin(playerID);
+					}
+				}
+				else {
+					//	"The group is public, a request is not neccessary to join it."
+				}
+			}
+			else {
+				// "You can not submit a request to join the group."
+			}
+		}
+
+		public void AcceptDenyJoinRequest(string playerName, string leaderID, bool accepted) {
+			Group group = GetGroupByLeaderID(leaderID);
+			User.User player = MySockets.Server.GetAUserByFullName(playerName);
+			group.ApproveDenyRequest(player.UserID, accepted);
+		}
 	}
 
 
@@ -138,10 +237,13 @@ namespace Groups {
 	//friends only = only players on the leaders friend list can join the group
 	//request = Players can join if leader approves request or leader sends invite.
 	public enum GroupJoinRule {
-		Public,
-		Private,
 		Friends_only,
 		Request
 	};
+
+	public enum GroupVisibilityRule {
+		Public,
+		Private
+	}
 
 }

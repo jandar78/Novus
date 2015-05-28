@@ -27,6 +27,9 @@ namespace Character {
         bool IsNPC { get; set; }     
         string FirstName { get; set; }
         string LastName { get; set; }
+		string FullName { get; }
+		string FullHonors {	get; }
+		string Title { get;	set; }
         string Description { get; set; }
         string Gender { get; }
         string GenderPossesive { get; }
