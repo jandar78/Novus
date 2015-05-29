@@ -26,6 +26,11 @@ namespace User
 			set;
 		}
 
+		public string GroupName {
+			get;
+			set;
+		}
+
         public Character.Iactor Player {
             get {
                 return _character;
@@ -41,6 +46,11 @@ namespace User
 		}
 
 		public bool LoginCompleted {
+			get;
+			set;
+		}
+
+		public List<string> FriendsList {
 			get;
 			set;
 		}

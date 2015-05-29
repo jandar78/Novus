@@ -542,15 +542,21 @@ namespace Character{
             MongoCollection npcs = db.GetCollection("NPCCharacters");
             BsonDocument npc = npcs.FindOneAs<BsonDocument>(Query.EQ("_id", ObjectId.Parse(id)));
             User.User temp = MySockets.Server.GetAUser(ID);
-            temp.OutBuffer = string.Format("You gain {0:0.##} XP from {1}", xpGained, npc["FirstName"].AsString.CamelCaseWord());
-            Experience += xpGained;
+			if (string.IsNullOrEmpty(temp.GroupName)) {
+				temp.MessageHandler(string.Format("You gain {0:0.##} XP from {1}", xpGained, npc["FirstName"].AsString.CamelCaseWord()));
+				Experience += xpGained;
+			}
+			else {
+				//we want to know how much XP the NPC would give out and cut it by half if player is in a group
+				Groups.Groups.GetInstance().RewardXP((long)(npc["XP"].AsInt64 * 0.5), temp.GroupName);
+			}
             if (IsLevelUp && !Leveled){ //we don't want the player to just farm a ton of points and continue to level up, we want them to type the command before we show this message again
-                temp.OutBuffer = "Congratulations! You've leveled up!"; //let's let them know they can level up it's up to them when they actually do level up
+                temp.MessageHandler("Congratulations! You've leveled up!"); //let's let them know they can level up it's up to them when they actually do level up
                 Character tempChar = temp.Player as Character;
                 Leveled = true;
                 tempChar.NextLevelExperience += (long)(tempChar.NextLevelExperience * 1.25);
                 IncreasePoints();
-                //increase all the attributes to max, small perk of leveling up
+                //increase all the attributes to max, small perk of leveling up.  Maybe a global setting?
                 foreach (KeyValuePair<string, Attribute> attrib in temp.Player.GetAttributes()) {
                     attrib.Value.Value = attrib.Value.Max;
                 }

@@ -60,6 +60,7 @@ namespace Commands {
             GeneralCommands.Add("SPOT", new CommandDelegate(PerformSkill));
             GeneralCommands.Add("SNEAK", new CommandDelegate(PerformSkill));
             GeneralCommands.Add("PEEK", new CommandDelegate(PerformSkill));
+			GeneralCommands.Add("GROUP", new CommandDelegate(Group));
 
 			//Movement Commands
 			MovementCommands.Add("NORTH", new CommandDelegate(Move));

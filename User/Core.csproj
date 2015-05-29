@@ -94,6 +94,7 @@
     <Compile Include="Character\Inventory.cs" />
     <Compile Include="Character\Equipment.cs" />
     <Compile Include="Character\IAttribute.cs" />
+    <Compile Include="Commands\Groups.cs" />
     <Compile Include="Commands\Items.cs" />
     <Compile Include="Commands\MessageParser.cs" />
     <Compile Include="Commands\Skill.cs" />

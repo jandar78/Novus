@@ -146,6 +146,18 @@ namespace Groups {
 			}
 		}
 
+		public void RewardXP(long xpAmount) {
+			foreach (string playerID in PlayerList) {
+				User.User user = MySockets.Server.GetAUser(playerID);
+				user.MessageHandler(string.Format("You gain {0:0.##} XP", xpAmount));
+				user.Player.Experience += xpAmount;
+			}
+		}
+
+		public void SayToGroup(string message) {
+			InformPlayersInGroup(message);
+		}
+
 		public bool HasPlayer(string playerID) {
 			return PlayerList.Contains(playerID);
 		}

@@ -12,7 +12,7 @@ namespace Groups {
 	//set up group rules, like how the loot gets divided (we may implement different systems for this, like first-to-loot, dice-roll, Next-Player-Loots, only-leader-loots, etc.
 	//Will have to implement a system so that new rules can be added easily
 
-	//For XP I think what we will do is everyone gets the same XP amount in the group but at 50% of what they could get individually.  Basically as a group they
+	//For XP I think what we will do is everyone gets the same XP amount in the group but at or below 50% of what they could get individually.  Basically as a group they
 	//should be killing things much quicker and easier than soloing therefore the reduced XP amount.
 
 
@@ -101,7 +101,7 @@ namespace Groups {
 			return groupInfo;
 		}
 
-		private Group GetGroup(string groupName) {
+		public Group GetGroup(string groupName) {
 			Group groupFound = null;
 			foreach (Group group in _groupList) {
 				if (string.Equals(group.GroupName, groupName, StringComparison.InvariantCultureIgnoreCase)) {
@@ -113,7 +113,7 @@ namespace Groups {
 			return groupFound;
 		}
 
-		private Group GetGroupByLeaderID(string leaderID) {
+		public Group GetGroupByLeaderID(string leaderID) {
 			Group groupFound = null;
 			foreach (Group group in _groupList) {
 				if (string.Equals(group.LeaderID, leaderID, StringComparison.InvariantCultureIgnoreCase)) {
@@ -133,35 +133,35 @@ namespace Groups {
 			return group.ToString();
 		}
 
-		public void ChangeLootingRule(string groupName, string leaderID, GroupLootRule newRule) {
+		public void ChangeLootingRule(string leaderID, string groupName, GroupLootRule newRule) {
 			Group group = GetGroup(groupName);
 			if (string.Equals(leaderID, group.LeaderID, StringComparison.InvariantCultureIgnoreCase)) {
 				group.ChangeLootingRule(newRule);
 			}
 		}
 
-		public void ChangeJoiningRule(string groupName, string leaderID, GroupJoinRule newRule) {
+		public void ChangeJoiningRule(string leaderID, string groupName, GroupJoinRule newRule) {
 			Group group = GetGroup(groupName);
 			if (string.Equals(leaderID, group.LeaderID, StringComparison.InvariantCultureIgnoreCase)) {
 				group.ChangeJoinRule(newRule);
 			}
 		}
 
-		public void RemovePlayerFromGroup(string groupName, string leaderID, string playerID) {
+		public void RemovePlayerFromGroup(string leaderID, string groupName, string playerID) {
 			Group group = GetGroup(groupName);
 			if (string.Equals(leaderID, group.LeaderID, StringComparison.InvariantCultureIgnoreCase)) {
 				group.RemovePlayerFromGroup(playerID);
 			}
 		}
 
-		public void AddPlayerToGroup(string groupName, string leaderID, string playerID) {
+		public void AddPlayerToGroup(string leaderID, string groupName, string playerID) {
 			Group group = GetGroup(groupName);
 			if (string.Equals(leaderID, group.LeaderID, StringComparison.InvariantCultureIgnoreCase)) {
 				group.AddPlayerToGroup(playerID);
 			}
 		}
 
-		public void PromoteToLeader(string groupName, string leaderID, string newLeaderID) {
+		public void PromoteToLeader(string leaderID, string groupName, string newLeaderID) {
 			Group group = GetGroup(groupName);
 			if (string.Equals(leaderID, group.LeaderID, StringComparison.InvariantCultureIgnoreCase)) {
 				group.PromoteToLeader(newLeaderID);
@@ -215,6 +215,32 @@ namespace Groups {
 			User.User player = MySockets.Server.GetAUserByFullName(playerName);
 			group.ApproveDenyRequest(player.UserID, accepted);
 		}
+
+		public void RewardXP(long xpAmount, string groupName) {
+			GetGroup(groupName).RewardXP(xpAmount);			
+		}
+
+		public void Say(string message, string groupName) {
+			GetGroup(groupName).SayToGroup(message);
+		}
+
+		public void Join(string playerID, string groupName) {
+			Group group = GetGroup(groupName);
+			if (group.GroupRuleForJoining == GroupJoinRule.Open) {
+				group.AddPlayerToGroup(playerID);
+			}
+			else if (group.GroupRuleForJoining == GroupJoinRule.Friends_only) {
+				if (!MySockets.Server.GetAUser(group.LeaderID).FriendsList.Contains(playerID)) {
+					MySockets.Server.GetAUser(playerID).MessageHandler("You are not a friend of the leader, you can not join the group.");
+				}
+				else {
+					group.AddPlayerToGroup(playerID);
+				}
+			}
+			else {
+				MySockets.Server.GetAUser(playerID).MessageHandler("You can not join the group. Submit a request to join.");
+			}
+		}
 	}
 
 
@@ -238,7 +264,8 @@ namespace Groups {
 	//request = Players can join if leader approves request or leader sends invite.
 	public enum GroupJoinRule {
 		Friends_only,
-		Request
+		Request,
+		Open
 	};
 
 	public enum GroupVisibilityRule {
