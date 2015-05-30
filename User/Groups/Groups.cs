@@ -36,8 +36,13 @@ namespace Groups {
 
 			if (!IsPlayerInGroup(leaderID)) {
 				if (!GroupAlreadyExists(groupName)) {
-					try {
-						_groupList.Add(new Group(groupName));
+					try{
+						if (string.IsNullOrEmpty(groupName)) {
+							MySockets.Server.GetAUser(leaderID).MessageHandler("You must provide a name for the group.");
+						}
+						else {
+							_groupList.Add(new Group(groupName));
+						}
 					}
 					catch (Exception) { //you never know
 						msgID = "GroupCreateFailed";
@@ -57,20 +62,28 @@ namespace Groups {
 		private bool GroupAlreadyExists(string groupName) {
 			bool exists = false;
 			foreach (Group group in _groupList) {
-				if (string.Equals(group.GroupName, groupName, StringComparison.InvariantCultureIgnoreCase)) {
-					exists = true;
-					break;
+					if (string.Equals(group.GroupName, groupName, StringComparison.InvariantCultureIgnoreCase)) {
+						exists = true;
+						break;
+					}
 				}
-			}
 
 			return exists;
 		}
 
-		public void DisbandGroup(string groupName, string leaderID) {
+		public void DisbandGroup(string leaderID, string groupName) {
 			Group group = GetGroup(groupName);
-			if (string.Equals(group.LeaderID, leaderID, StringComparison.InvariantCultureIgnoreCase)) {
-				group.Disband(GetMessageFromDB("DisbandGroup"));
-				_groupList.Remove(group);
+			if (group != null) {
+				if (string.Equals(group.LeaderID, leaderID, StringComparison.InvariantCultureIgnoreCase)) {
+					group.Disband(GetMessageFromDB("DisbandGroup"));
+					_groupList.Remove(group);
+				}
+				else {
+					MySockets.Server.GetAUser(leaderID).MessageHandler("You can not disband the group. Only the leader can disband the group.");
+				}
+			}
+			else {
+				MySockets.Server.GetAUser(leaderID).MessageHandler("No group exist with that name to disband.");
 			}
 		}
 
@@ -130,41 +143,81 @@ namespace Groups {
 				group = GetGroup(groupName);
 			}
 
-			return group.ToString();
+			return group.ToString() ?? "";
 		}
 
 		public void ChangeLootingRule(string leaderID, string groupName, GroupLootRule newRule) {
 			Group group = GetGroup(groupName);
-			if (string.Equals(leaderID, group.LeaderID, StringComparison.InvariantCultureIgnoreCase)) {
-				group.ChangeLootingRule(newRule);
+			if (group != null) {
+				if (string.Equals(leaderID, group.LeaderID, StringComparison.InvariantCultureIgnoreCase)) {
+					group.ChangeLootingRule(newRule);
+				}
+				else {
+					MySockets.Server.GetAUser(leaderID).MessageHandler("Only the group leader can chnage group looting rules.");
+				}
+			}
+			else {
+				MySockets.Server.GetAUser(leaderID).MessageHandler("No group with that name exists.");
 			}
 		}
 
 		public void ChangeJoiningRule(string leaderID, string groupName, GroupJoinRule newRule) {
 			Group group = GetGroup(groupName);
-			if (string.Equals(leaderID, group.LeaderID, StringComparison.InvariantCultureIgnoreCase)) {
-				group.ChangeJoinRule(newRule);
+			if (group != null) {
+				if (string.Equals(leaderID, group.LeaderID, StringComparison.InvariantCultureIgnoreCase)) {
+					group.ChangeJoinRule(newRule);
+				}
+				else {
+					MySockets.Server.GetAUser(leaderID).MessageHandler("Only the group leader can change group joining rules.");
+				}
+			}
+			else {
+				MySockets.Server.GetAUser(leaderID).MessageHandler("No group with that name exists.");
 			}
 		}
 
 		public void RemovePlayerFromGroup(string leaderID, string groupName, string playerID) {
 			Group group = GetGroup(groupName);
-			if (string.Equals(leaderID, group.LeaderID, StringComparison.InvariantCultureIgnoreCase)) {
-				group.RemovePlayerFromGroup(playerID);
+			if (group != null) {
+				if (string.Equals(leaderID, group.LeaderID, StringComparison.InvariantCultureIgnoreCase)) {
+					group.RemovePlayerFromGroup(playerID);
+				}
+				else {
+					MySockets.Server.GetAUser(leaderID).MessageHandler("Only the group leader can remove players from the group.");
+				}
+			}
+			else {
+				MySockets.Server.GetAUser(leaderID).MessageHandler("No group with that name exists.");
 			}
 		}
 
 		public void AddPlayerToGroup(string leaderID, string groupName, string playerID) {
 			Group group = GetGroup(groupName);
-			if (string.Equals(leaderID, group.LeaderID, StringComparison.InvariantCultureIgnoreCase)) {
-				group.AddPlayerToGroup(playerID);
+			if (group != null) {
+				if (string.Equals(leaderID, group.LeaderID, StringComparison.InvariantCultureIgnoreCase)) {
+					group.AddPlayerToGroup(playerID);
+				}
+				else {
+					MySockets.Server.GetAUser(leaderID).MessageHandler("Only the group leader can add players to the group.");
+				}
+			}
+			else {
+				MySockets.Server.GetAUser(leaderID).MessageHandler("No group with that name exists.");
 			}
 		}
 
 		public void PromoteToLeader(string leaderID, string groupName, string newLeaderID) {
 			Group group = GetGroup(groupName);
-			if (string.Equals(leaderID, group.LeaderID, StringComparison.InvariantCultureIgnoreCase)) {
-				group.PromoteToLeader(newLeaderID);
+			if (group != null) {
+				if (string.Equals(leaderID, group.LeaderID, StringComparison.InvariantCultureIgnoreCase)) {
+					group.PromoteToLeader(newLeaderID);
+				}
+				else {
+					MySockets.Server.GetAUser(leaderID).MessageHandler("Only the group leader can promote another player to group leader.");
+				}
+			}
+			else {
+				MySockets.Server.GetAUser(leaderID).MessageHandler("No group with that name exists.");
 			}
 		}
 
@@ -188,45 +241,59 @@ namespace Groups {
 
 		public void RequestGroupJoin(string playerID, string groupName) {
 			Group group = GetGroup(groupName);
-			if (group.GroupRuleForVisibility == GroupVisibilityRule.Public) {
-				if (group.GroupRuleForJoining == GroupJoinRule.Request) {
-					group.RequestJoin(playerID);
-				}
-				else if (group.GroupRuleForJoining == GroupJoinRule.Friends_only) {
-					//Need to create a FriendList object for User class
-					if (!MySockets.Server.GetAUser(group.LeaderID).FriendsList.Contains(playerID)) {
-						//	"You are not a friend of the leader, you can not join the group";
+			if (group != null) {
+				if (group.GroupRuleForVisibility == GroupVisibilityRule.Public) {
+					if (group.GroupRuleForJoining == GroupJoinRule.Request) {
+						group.RequestJoin(playerID);
+					}
+					else if (group.GroupRuleForJoining == GroupJoinRule.Friends_only) {
+						if (!MySockets.Server.GetAUser(group.LeaderID).FriendsList.Contains(playerID)) {
+							MySockets.Server.GetAUser(playerID).MessageHandler("You are not a friend of the group leader. You can not join the group");
+						}
+						else {
+							group.RequestJoin(playerID);
+						}
 					}
 					else {
-						group.RequestJoin(playerID);
+						MySockets.Server.GetAUser(playerID).MessageHandler("The group is public, a request is not neccessary to join it.");
 					}
 				}
 				else {
-					//	"The group is public, a request is not neccessary to join it."
+					MySockets.Server.GetAUser(playerID).MessageHandler("You can not submit a request to join the group.");
 				}
 			}
 			else {
-				// "You can not submit a request to join the group."
+				MySockets.Server.GetAUser(playerID).MessageHandler("No group with that name exists.");
 			}
 		}
 
 		public void GetPendingRequests(string leaderID, string groupName) {
 			Group group = GetGroup(groupName);
-			if (string.Equals(leaderID, group.LeaderID)) {
-				group.GetPendingRequests();
+			if (group != null) {
+				if (string.Equals(leaderID, group.LeaderID)) {
+					group.GetPendingRequests();
+				}
+				else {
+					MySockets.Server.GetAUser(leaderID).MessageHandler("You are not the group leader and can not view pending requests.");
+				}
 			}
 			else {
-				MySockets.Server.GetAUser(leaderID).MessageHandler("You are not the group leader and can not view pending requests.");
+				MySockets.Server.GetAUser(leaderID).MessageHandler("No group with that name exists.");
 			}
 		}
 
 		public void GetPendingInvitations(string leaderID, string groupName) {
 			Group group = GetGroup(groupName);
-			if (string.Equals(leaderID, group.LeaderID)) {
-				group.GetPendingInvitationRequests();
+			if (group != null) {
+				if (string.Equals(leaderID, group.LeaderID)) {
+					group.GetPendingInvitationRequests();
+				}
+				else {
+					MySockets.Server.GetAUser(leaderID).MessageHandler("You are not the group leader and can not view group invitations.");
+				}
 			}
 			else {
-				MySockets.Server.GetAUser(leaderID).MessageHandler("You are not the group leader and can not view group invitations.");
+				MySockets.Server.GetAUser(leaderID).MessageHandler("No group with that name exists.");
 			}
 		}
 
@@ -250,49 +317,75 @@ namespace Groups {
 
 		public void InviteToGroup(string leaderID, string playerName, string groupName) {
 			Group group = GetGroup(groupName);
-			if (string.Equals(leaderID, group.LeaderID)) {
-				group.InvitePlayer(playerName);
+			if (group != null) {
+				if (string.Equals(leaderID, group.LeaderID)) {
+					group.InvitePlayer(playerName);
+				}
+				else {
+					MySockets.Server.GetAUser(leaderID).MessageHandler("You are not the group leader and can not invite players to join the group.");
+				}
 			}
 			else {
-				MySockets.Server.GetAUser(leaderID).MessageHandler("You are not the group leader and can not invite players to join the group.");
+				MySockets.Server.GetAUser(leaderID).MessageHandler("No group with that name exists.");
 			}
 		}
 
-		public void AcceptDenyJoinRequest(string playerName, string leaderID, bool accepted) {
+		public void AcceptDenyJoinRequest(string leaderID, string playerName, bool accepted) {
 			Group group = GetGroupByLeaderID(leaderID);
-			User.User player = MySockets.Server.GetAUserByFullName(playerName);
-			group.ApproveDenyRequest(player.UserID, accepted);
+			if (group != null) {
+				User.User player = MySockets.Server.GetAUserByFullName(playerName);
+				if (player != null) {
+					group.ApproveDenyRequest(player.UserID, accepted);
+				}
+				else {
+					MySockets.Server.GetAUser(leaderID).MessageHandler("No player with that name exists.");
+				}
+			}
+			else {
+				MySockets.Server.GetAUser(leaderID).MessageHandler("No group with that name exists.");
+			}
 		}
 
 		public void RewardXP(long xpAmount, string groupName) {
-			GetGroup(groupName).RewardXP(xpAmount);			
+			Group group = GetGroup(groupName);
+			if (group != null) {
+				group.RewardXP(xpAmount);
+			}
 		}
 
 		public void Say(string message, string groupName) {
-			GetGroup(groupName).SayToGroup(message);
+			Group group = GetGroup(groupName);
+			if (group != null && !string.IsNullOrEmpty(message)) {
+				group.SayToGroup(message);
+			}
 		}
 
 		public void Join(string playerID, string groupName) {
 			Group group = GetGroup(groupName);
-			//player was sent an invitation by group leader at some point
-			if (group.PendingInvitations.Contains(playerID)) {
-				group.AddPlayerToGroup(playerID);
-			}
-			else {
-				if (group.GroupRuleForJoining == GroupJoinRule.Open) {
+			if (group != null) {
+				//player was sent an invitation by group leader at some point
+				if (group.PendingInvitations.Contains(playerID)) {
 					group.AddPlayerToGroup(playerID);
 				}
-				else if (group.GroupRuleForJoining == GroupJoinRule.Friends_only) {
-					if (!MySockets.Server.GetAUser(group.LeaderID).FriendsList.Contains(playerID)) {
-						MySockets.Server.GetAUser(playerID).MessageHandler("You are not a friend of the leader, you can not join the group.");
-					}
-					else {
+				else {
+					if (group.GroupRuleForJoining == GroupJoinRule.Open) {
 						group.AddPlayerToGroup(playerID);
 					}
+					else if (group.GroupRuleForJoining == GroupJoinRule.Friends_only) {
+						if (!MySockets.Server.GetAUser(group.LeaderID).FriendsList.Contains(playerID)) {
+							MySockets.Server.GetAUser(playerID).MessageHandler("You are not a friend of the leader, you can not join the group.");
+						}
+						else {
+							group.AddPlayerToGroup(playerID);
+						}
+					}
+					else if (group.GroupRuleForJoining == GroupJoinRule.Request) {
+						MySockets.Server.GetAUser(playerID).MessageHandler("You can not freely join the group. Submit a request to join.");
+					}
 				}
-				else if (group.GroupRuleForJoining == GroupJoinRule.Request) {
-					MySockets.Server.GetAUser(playerID).MessageHandler("You can not join the group. Submit a request to join.");
-				}
+			}
+			else {
+				MySockets.Server.GetAUser(playerID).MessageHandler("No group with that name exists.");
 			}
 		}
 
