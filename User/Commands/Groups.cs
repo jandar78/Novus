@@ -6,7 +6,10 @@ using System.Threading.Tasks;
 
 namespace Commands {
 	public partial class CommandParser {
-
+		//The group commands will basically follow this following format: 
+		//group create The Ragtag Squad
+		//group invite willy wonka
+		//group disband
 		//this will further parse the command line and call the appropriate group commands
 		public static void Group(User.User player, List<string> commands) {
 			bool inGroup = !string.IsNullOrEmpty(player.GroupName);
@@ -32,6 +35,15 @@ namespace Commands {
 						break;
 					case "join":
 						Groups.Groups.GetInstance().Join(player.UserID, name);
+						break;
+					case "invite":
+						Groups.Groups.GetInstance().InviteToGroup(player.UserID, name, player.GroupName);
+						break;
+					case "decline":
+						Groups.Groups.GetInstance().DeclineInvite(player.UserID, name);
+						break;
+					case "uninvite":
+						Groups.Groups.GetInstance().Uninvite(player.UserID, name, player.GroupName);
 						break;
 					default:
 						break;

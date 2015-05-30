@@ -22,6 +22,11 @@ namespace Groups {
 			private set;
 		}
 
+		public List<string> PendingInvitations {
+			get;
+			private set;
+		}
+
 		public string LeaderID {
 			get;
 			private set;
@@ -50,12 +55,25 @@ namespace Groups {
 			GroupName = groupName;
 			PlayerList = new List<string>();
 			PendingRequests = new List<string>();
+			PendingInvitations = new List<string>();
+		}
+
+		public bool IsLeader(string playerID) {
+			return string.Equals(playerID, LeaderID, StringComparison.InvariantCultureIgnoreCase);
 		}
 
 		public void AddPlayerToGroup(string playerID) {
 			if (!PlayerList.Contains(playerID)) {
 				InformPlayersInGroup(MySockets.Server.GetAUser(playerID).Player.FullName + " has joined the group.");
+				
 				PlayerList.Add(playerID);
+				if (PendingInvitations.Contains(playerID)) {
+					PendingInvitations.Remove(playerID);
+				}
+				if (PendingRequests.Contains(playerID)) {
+					PendingRequests.Remove(playerID);
+				}
+
 				InformPlayerInGroup("You have joined '" + GroupName + "'.", playerID);
 			}
 		}
@@ -66,6 +84,20 @@ namespace Groups {
 				InformPlayersInGroup(MySockets.Server.GetAUser(playerID).Player.FullName + " has left the group.");
 				InformPlayerInGroup("You have left '" + GroupName + "'.", playerID);
 			}
+		}
+
+		public void RemovePendingInvitation(string playerID) {
+			if (PendingInvitations.Contains(playerID)) {
+				PendingInvitations.Remove(playerID);
+				MySockets.Server.GetAUser(playerID).MessageHandler("You are no longer invited to join the group.");
+				MySockets.Server.GetAUser(LeaderID).MessageHandler(MySockets.Server.GetAUser(playerID).Player.FullName + " has declined the invitation to join the group.");
+			}
+		}
+
+		public void InvitePlayer(string playerName) {
+			User.User user = MySockets.Server.GetAUserByFullName(playerName);
+			user.MessageHandler(string.Format("You have been invited to join the group \"{0}\"", GroupName));
+			MySockets.Server.GetAUser(LeaderID).MessageHandler("An invitation to join the group has been sent to " + user.Player.FullName + ".");
 		}
 
 		public void ChangeLootingRule(GroupLootRule newRule) {
@@ -105,6 +137,8 @@ namespace Groups {
 				MySockets.Server.GetAUser(playerID).MessageHandler(message);
 			}
 
+			PendingInvitations.Clear();
+			PendingRequests.Clear();
 			PlayerList.Clear();
 			LeaderID = null;
 			GroupName = null;
@@ -135,6 +169,23 @@ namespace Groups {
 		}
 
 		public void GetPendingRequests() {
+			StringBuilder sb = new StringBuilder();
+			sb.AppendLine("Pending Group Requests");
+			foreach (string playerID in PendingRequests) {
+				sb.AppendLine("\t" + MySockets.Server.GetAUser(playerID).Player.FullName);
+			}
+
+			MySockets.Server.GetAUser(LeaderID).MessageHandler(sb.ToString());
+		}
+
+		public void GetPendingInvitationRequests() {
+			StringBuilder sb = new StringBuilder();
+			sb.AppendLine("Pending Group Invitation Requests");
+			foreach (string playerID in PendingRequests) {
+				sb.AppendLine("\t" + MySockets.Server.GetAUser(playerID).Player.FullName);
+			}
+
+			MySockets.Server.GetAUser(LeaderID).MessageHandler(sb.ToString());
 		}
 
 		public void CancelJoinRequest(string playerID) {

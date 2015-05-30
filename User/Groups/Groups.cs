@@ -210,6 +210,54 @@ namespace Groups {
 			}
 		}
 
+		public void GetPendingRequests(string leaderID, string groupName) {
+			Group group = GetGroup(groupName);
+			if (string.Equals(leaderID, group.LeaderID)) {
+				group.GetPendingRequests();
+			}
+			else {
+				MySockets.Server.GetAUser(leaderID).MessageHandler("You are not the group leader and can not view pending requests.");
+			}
+		}
+
+		public void GetPendingInvitations(string leaderID, string groupName) {
+			Group group = GetGroup(groupName);
+			if (string.Equals(leaderID, group.LeaderID)) {
+				group.GetPendingInvitationRequests();
+			}
+			else {
+				MySockets.Server.GetAUser(leaderID).MessageHandler("You are not the group leader and can not view group invitations.");
+			}
+		}
+
+		public void DeclineInvite(string playerID, string groupName) {
+			string msg = null;
+			Group group = GetGroup(groupName);
+			if (group != null) {
+				if (group.PendingInvitations.Contains(playerID)) {
+					group.RemovePendingInvitation(playerID);
+				}
+				else {
+					msg = "You did not receive an invitation to join this group.";					
+				}
+			}
+			else {
+				msg = "No group with that name exists.";
+			}
+
+			MySockets.Server.GetAUser(playerID).MessageHandler(msg);
+		}
+
+		public void InviteToGroup(string leaderID, string playerName, string groupName) {
+			Group group = GetGroup(groupName);
+			if (string.Equals(leaderID, group.LeaderID)) {
+				group.InvitePlayer(playerName);
+			}
+			else {
+				MySockets.Server.GetAUser(leaderID).MessageHandler("You are not the group leader and can not invite players to join the group.");
+			}
+		}
+
 		public void AcceptDenyJoinRequest(string playerName, string leaderID, bool accepted) {
 			Group group = GetGroupByLeaderID(leaderID);
 			User.User player = MySockets.Server.GetAUserByFullName(playerName);
@@ -226,20 +274,44 @@ namespace Groups {
 
 		public void Join(string playerID, string groupName) {
 			Group group = GetGroup(groupName);
-			if (group.GroupRuleForJoining == GroupJoinRule.Open) {
+			//player was sent an invitation by group leader at some point
+			if (group.PendingInvitations.Contains(playerID)) {
 				group.AddPlayerToGroup(playerID);
 			}
-			else if (group.GroupRuleForJoining == GroupJoinRule.Friends_only) {
-				if (!MySockets.Server.GetAUser(group.LeaderID).FriendsList.Contains(playerID)) {
-					MySockets.Server.GetAUser(playerID).MessageHandler("You are not a friend of the leader, you can not join the group.");
+			else {
+				if (group.GroupRuleForJoining == GroupJoinRule.Open) {
+					group.AddPlayerToGroup(playerID);
+				}
+				else if (group.GroupRuleForJoining == GroupJoinRule.Friends_only) {
+					if (!MySockets.Server.GetAUser(group.LeaderID).FriendsList.Contains(playerID)) {
+						MySockets.Server.GetAUser(playerID).MessageHandler("You are not a friend of the leader, you can not join the group.");
+					}
+					else {
+						group.AddPlayerToGroup(playerID);
+					}
+				}
+				else if (group.GroupRuleForJoining == GroupJoinRule.Request) {
+					MySockets.Server.GetAUser(playerID).MessageHandler("You can not join the group. Submit a request to join.");
+				}
+			}
+		}
+
+		public void Uninvite(string leaderID, string playerName, string groupName) {
+			string msg = null;
+			Group group = GetGroup(groupName);
+			if (group != null) {
+				if (group.IsLeader(leaderID)) {
+					group.RemovePendingInvitation(MySockets.Server.GetAUserByFullName(playerName).UserID);
 				}
 				else {
-					group.AddPlayerToGroup(playerID);
+					msg = "You are not the group leader.  You can not perform this action.";
 				}
 			}
 			else {
-				MySockets.Server.GetAUser(playerID).MessageHandler("You can not join the group. Submit a request to join.");
+				msg = "No group by that name exists.";
 			}
+
+			MySockets.Server.GetAUserByFullName(leaderID).MessageHandler(msg);
 		}
 	}
 
