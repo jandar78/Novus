@@ -66,7 +66,9 @@ namespace Character {
         string LastTarget { get; set; }
         bool InCombat { get; set; }
         DateTime LastCombatTime { get; set; }
+		DateTime TimeOfDeath { get;	set; }
         string MainHand { get; set; }
+		string KillerID { get; set;	}
         #endregion Combat
 
         #endregion Properties
@@ -136,6 +138,7 @@ namespace Character {
        // Items.Wearable GetMainHandWeapon();
 
         void Loot(User.User looter, List<string> commands);
+		bool CanLoot(string looterID);
     }
 }
 

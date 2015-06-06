@@ -406,6 +406,11 @@ namespace Groups {
 
 			MySockets.Server.GetAUserByFullName(leaderID).MessageHandler(msg);
 		}
+
+		public void AssignMasterLooter(string leaderID, string masterID, string groupName) {
+			Group group = GetGroup(groupName);
+			group.AssignMasterLooter(leaderID, masterID);
+		}
 	}
 
 
@@ -420,7 +425,8 @@ namespace Groups {
 		First_to_loot,
 		Next_player_loots,
 		Chance_Loot,
-		Chance_vote
+		Chance_vote,
+		Master_Looter
 	};
 
 	//public = open to anyone, no group request is sent to the leader, players can just join.

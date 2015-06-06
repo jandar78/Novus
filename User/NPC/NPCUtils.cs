@@ -11,7 +11,7 @@ using Extensions;
 using CharacterEnums;
 
 namespace Character {
-	class NPCUtils {
+	public class NPCUtils {
 		private static NPCUtils Instance;
 		private static ConcurrentBag<string> _npcList;
 

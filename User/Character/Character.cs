@@ -1011,6 +1011,13 @@ namespace Character{
             if (IsDead()) {
                 List<Items.Iitem> result = new List<Items.Iitem>();
                 StringBuilder sb = new StringBuilder();
+
+				if (CanLoot(looter.UserID)) {
+					looter.MessageHandler("You did not deal the killing blow and can not loot this corpse at this time.");
+					return;
+				}
+
+
                 if (commands.Contains("all")) {
                     sb.AppendLine("You loot the following items from " + FirstName + ":");
                     Inventory.GetInventoryAsItemList().ForEach(i => {
@@ -1046,6 +1053,17 @@ namespace Character{
                 }
             }
         }
+
+		protected bool CanLoot(string looterID) {
+			bool youCanLootMe = true;
+			if (!string.Equals(looterID, ((Iactor)this).KillerID, StringComparison.InvariantCultureIgnoreCase)) {
+				if (DateTime.UtcNow < ((Iactor)this).TimeOfDeath.AddSeconds(30)) {
+					youCanLootMe = false;
+				}
+			}
+
+			return youCanLootMe;
+		}
 
 
         /// <summary>

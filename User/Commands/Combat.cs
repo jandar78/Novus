@@ -268,7 +268,7 @@ namespace Commands {
 
         public static User.User FindTargetByName(string name, int location) {
             User.User enemy = null;
-            foreach (User.User foe in MySockets.Server.GetAUserByName(name)) {
+            foreach (User.User foe in MySockets.Server.GetAUserByFirstName(name)) {
                 if (foe.Player.Location == location) {
                     enemy = foe;
                     break;
@@ -486,8 +486,16 @@ namespace Commands {
             player.MessageHandler(ParseMessage(GetMessage("Combat", status, MessageType.Self), player, enemy));
             player.MessageHandler(ParseMessage(GetMessage("Combat", status, MessageType.Target), player, enemy));
             Room.GetRoom(player.Player.Location).InformPlayersInRoom(ParseMessage(GetMessage("Combat", status, MessageType.Room), player, enemy), new List<string>(new string[] { player.UserID, enemy.UserID }));
-            SetCombatTimer(player, enemy);
+			if (dead) {
+				SetKiller(enemy, player);
+			}
+			SetCombatTimer(player, enemy);
         }
+
+		private static void SetKiller(User.User enemy, User.User player) {
+			enemy.Player.KillerID = player.UserID;
+			enemy.Player.TimeOfDeath = DateTime.UtcNow;
+		}
         		
 		//set player timer to minvalue
 		private static void SetCombatTimer(User.User player, User.User enemy) {
@@ -503,7 +511,7 @@ namespace Commands {
 			User.User enemy = null;
             if (commands.Count > 2) {
 
-                foreach (User.User foe in MySockets.Server.GetAUserByName(commands[2])) {
+                foreach (User.User foe in MySockets.Server.GetAUserByFirstName(commands[2])) {
                     if (foe.Player.Location == player.Player.Location) {
                         enemy = foe;
                     }

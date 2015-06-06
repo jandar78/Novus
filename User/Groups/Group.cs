@@ -17,6 +17,16 @@ namespace Groups {
 			private set;
 		}
 
+		private Dictionary<int, string> NextLooterList {
+			get;
+			set;
+		}
+
+		private int CurrentLooter {
+			get;
+			set;
+		}
+
 		public List<string> PendingRequests {
 			get;
 			private set;
@@ -32,6 +42,11 @@ namespace Groups {
 			private set;
 		}
 
+		private string MasterLooter {
+			get;
+			set;
+		}
+
 		public GroupLootRule GroupRuleForLooting {
 			get;
 			private set;
@@ -45,6 +60,11 @@ namespace Groups {
 		public GroupVisibilityRule GroupRuleForVisibility {
 			get;
 			private set;
+		}
+
+		private List<string> LastLootedCorpse {
+			get;
+			set;
 		}
 
 		public Group(string groupName) {
@@ -76,7 +96,41 @@ namespace Groups {
 
 				InformPlayerInGroup("You have joined '" + GroupName + "'.", playerID);
 			}
+
+			if (GroupRuleForLooting == GroupLootRule.Master_Looter && string.IsNullOrEmpty(MasterLooter)) {
+				MySockets.Server.GetAUser(LeaderID).MessageHandler("You have not yet assigned someone in the group as the master looter.");
+			}
 		}
+
+		public void AssignMasterLooter(string leaderID, string playerID) {
+			if (GroupRuleForLooting == GroupLootRule.Master_Looter) {
+				if (string.Equals(leaderID, LeaderID)) {
+					if (PlayerList.Contains(playerID)) {
+						MasterLooter = playerID;
+						InformPlayersInGroup(string.Format("{0} has been assigned by {1} as the group Master looter.", MySockets.Server.GetAUser(playerID).Player.FullName, MySockets.Server.GetAUser(LeaderID).Player.FullName));
+					}
+				}
+				else {
+					MySockets.Server.GetAUser(leaderID).MessageHandler("Only the group leader can assign a master looter.");
+				}
+			}
+			else {
+				MySockets.Server.GetAUser(leaderID).MessageHandler("You can only assign a master looter if the group looting rule is set to master looter.");
+			}
+		}
+
+		public void RemoveMasterLooter(string leaderID) {
+			if (string.Equals(leaderID, LeaderID)) {
+				InformPlayersInGroup(string.Format("{0} is no longer the group Master looter.", MySockets.Server.GetAUser(MasterLooter).Player.FullName);
+				MasterLooter = null;
+				
+			}
+			else {
+				MySockets.Server.GetAUser(leaderID).MessageHandler("Only the group leader can remove the master looter.");
+			}
+		}
+
+
 
 		public void RemovePlayerFromGroup(string playerID) {
 			if (PlayerList.Contains(playerID)) {
@@ -101,8 +155,27 @@ namespace Groups {
 		}
 
 		public void ChangeLootingRule(GroupLootRule newRule) {
-			GroupRuleForLooting = newRule;
-			InformPlayersInGroup("Group looting rule has been changed to " + newRule.ToString().Replace("_", " "));
+			if (GroupRuleForLooting != newRule) {
+				//zero out stuff for other rules
+				if (GroupRuleForLooting == GroupLootRule.Master_Looter) {
+					RemoveMasterLooter(LeaderID);
+				}
+				else if (GroupRuleForLooting == GroupLootRule.Next_player_loots) {
+					NextLooterList = null;
+					CurrentLooter = 0;
+				}
+				else if (GroupRuleForLooting == GroupLootRule.Chance_Loot) {
+					MasterLooter = null;
+					LastLootedCorpse = null;
+				}
+
+				if (newRule == GroupLootRule.Chance_Loot) {
+					LastLootedCorpse = new List<string>();
+				}
+
+				GroupRuleForLooting = newRule;
+				InformPlayersInGroup("Group looting rule has been changed to " + newRule.ToString().Replace("_", " "));
+			}
 		}
 
 		public void ChangeJoinRule(GroupJoinRule newRule) {
@@ -226,5 +299,126 @@ namespace Groups {
 				MySockets.Server.GetAUser(playerID).MessageHandler(message);
 			}
 		}
+
+		public void Loot(User.User looter, List<string> commands, Character.NPC npc) {
+			//okay the group looting rule is not free for all thats why we arrived here.  We now need to abide by the looting rule that governs the
+			//group.
+
+			//need to create the loot methods for each rule and also add master loot rule
+			switch (GroupRuleForLooting) {
+				case GroupLootRule.Leader_only:
+					OnlyLeaderLoots(looter, commands, npc);
+					break;
+				case GroupLootRule.Next_player_loots:
+					NextPlayerLoots(looter, commands, npc);
+					break;
+				case GroupLootRule.Chance_Loot:
+					ChanceLoot(looter, commands, npc);
+					break;
+				case GroupLootRule.Chance_vote:
+					break;
+				case GroupLootRule.Master_Looter:
+					MasterLooterLoots(looter, commands, npc);
+					break;
+			}
+		}
+
+
+		//one player will randomly be chosen as the loot winner and can loot something. Once he loots something looting should be opne for all for
+		//the corpse that was looted, otherwise another winner is randomly chosen again.
+		//this has the drawback that only one corpse is remembered and not all the corpses that got looted not cool.
+		private void ChanceLoot(User.User looter, List<string> commands, Character.NPC npc) {
+			//we don't have a loot winner yet so let's roll the dice
+			if (string.IsNullOrEmpty(MasterLooter)) {
+				int highestRoll = 0;
+				string winner = null;
+				foreach (string player in PlayerList) {
+					int currentRoll = Extensions.RandomNumber.GetRandomNumber().NextNumber(0, 20);
+					if (currentRoll > highestRoll) {
+						winner = player;
+					}
+				}
+			}
+
+			//so the looter was the winner or another player in the group is looting a corpse that was previously looted by a previous winner
+			if (string.Equals(looter.UserID, MasterLooter) || LastLootedCorpse.Contains(npc.ID)) {
+				if (npc.Loot(looter, commands, true)) {
+					//if player actually looted something
+					MasterLooter = null;
+					if (!LastLootedCorpse.Contains(npc.ID)) {
+						LastLootedCorpse.Add(npc.ID);
+					}
+				}
+				//we don't need to keep any old ID's since they probably rotted away anyways. Seriously doubt the group looted 100 bodies and then wanted to go
+				//back and re-loot one of the 50 first corpses.  This number is subject to change once testing starts happening.
+				if (LastLootedCorpse.Count > 100) {
+					LastLootedCorpse.RemoveRange(0, 49);
+				}
+			}
+			else {
+				MySockets.Server.GetAUser(looter.UserID).MessageHandler("You did not win the loot draw and can not loot this corpse.");
+			}
+
+		}
+
+		//the way this works is the current looter can either loot all or loot a specific item and then his turn is over and the next player gets a chance to loot.
+		//the next player can choose to loot something from the current corpse
+		private void NextPlayerLoots(User.User looter, List<string> commands, Character.NPC npc) {
+			if (NextLooterList == null) {
+				//create th elist of looters in no particular order
+				NextLooterList = new Dictionary<int, string>();
+				int index = 0;
+				foreach (string player in PlayerList) {
+					NextLooterList.Add(index, player);
+					index++;
+				}
+			}
+
+			if (looter.UserID == NextLooterList[CurrentLooter]) {
+				if (npc.Loot(looter, commands, true)) {
+					//if the player actually loots something then we'll increment the counter
+					CurrentLooter++;
+					if (CurrentLooter > NextLooterList.Count) {
+						CurrentLooter = 0;
+					}
+				}
+			}
+			else {
+				int playerPosition = 0;
+				foreach (var keyValue in NextLooterList) {
+					if (keyValue.Value == looter.UserID) {
+						break;
+					}
+					playerPosition++;
+				}
+
+				playerPosition -= CurrentLooter;
+
+				if (playerPosition < 0) {
+					playerPosition = playerPosition + NextLooterList.Count;
+				}
+
+				MySockets.Server.GetAUser(looter.UserID).MessageHandler(string.Format("You are not eligible to loot at this time, it will be your turn in {0} more lootings.", playerPosition));
+			}
+		}
+
+		private void OnlyLeaderLoots(User.User looter, List<string> commands, Character.Iactor npc) {
+			if (string.Equals(looter.UserID, LeaderID)) {
+				((Character.NPC)npc).Loot(looter, commands, true);
+			}
+			else {
+				looter.MessageHandler("Only the group leader can loot corpses killed by the group.");
+			}
+		}
+
+		private void MasterLooterLoots(User.User looter, List<string> commands, Character.Iactor npc) {
+			if (string.Equals(looter.UserID, MasterLooter)) {
+				((Character.NPC)npc).Loot(looter, commands, true);
+			}
+			else {
+				looter.MessageHandler("Only the master looter can loot corpses killed by the group.");
+			}
+		}
+
 	}
 }

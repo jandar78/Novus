@@ -24,10 +24,10 @@ namespace Commands {
 						Groups.Groups.GetInstance().DisbandGroup(player.UserID, player.GroupName);
 						break;
 					case "accept":
-						Groups.Groups.GetInstance().AcceptDenyJoinRequest(name, player.UserID, true);
+						Groups.Groups.GetInstance().AcceptDenyJoinRequest(player.UserID, name, true);
 						break;
 					case "deny":
-						Groups.Groups.GetInstance().AcceptDenyJoinRequest(name, player.UserID, false);
+						Groups.Groups.GetInstance().AcceptDenyJoinRequest(player.UserID, name, false);
 						break;
 					case "promote":
 						string promotedID = MySockets.Server.GetAUserByFullName(name).UserID;
@@ -45,7 +45,44 @@ namespace Commands {
 					case "uninvite":
 						Groups.Groups.GetInstance().Uninvite(player.UserID, name, player.GroupName);
 						break;
-					default:
+					case "list":
+						if (string.IsNullOrEmpty(name) || name.ToLower() == "all") {
+							player.MessageHandler(Groups.Groups.GetInstance().GetGroupNameOnlyList());
+						}
+						else {
+							player.MessageHandler(Groups.Groups.GetInstance().GetAllGroupInfo(name));
+						}
+						break;
+					case "request":
+						Groups.Groups.GetInstance().RequestGroupJoin(player.UserID, name);
+						break;
+					case "master":
+						Groups.Groups.GetInstance().AssignMasterLooter(player.UserID, name, player.GroupName);
+						break;
+					case "lootrule":
+						Groups.GroupLootRule newRule = Groups.GroupLootRule.Leader_only;
+						switch (commands[3]) {
+							case "master":
+								newRule = Groups.GroupLootRule.Master_Looter;
+								break;
+							case "leader":
+								newRule = Groups.GroupLootRule.Leader_only;
+								break;
+							case "chance":
+								newRule = Groups.GroupLootRule.Chance_Loot;
+								break;
+							case "first":
+								newRule = Groups.GroupLootRule.First_to_loot;
+								break;
+							case "next":
+								newRule = Groups.GroupLootRule.Next_player_loots;
+								break;
+						}
+						Groups.Groups.GetInstance().ChangeLootingRule(player.UserID, player.GroupName, newRule);
+						break;
+					case "joinrule":
+						break;
+					case "visibility":
 						break;
 				}
 			}
@@ -55,6 +92,7 @@ namespace Commands {
 		}
 
 		//Strips away the first two words which should be  "group" followed by the action word like "create" , "disband", "approve", "deny", etc.
+		//not doing a replace because the group name could contain those words or even a player name.
 		private static string RemoveWords(string fullCommand) {
 			for (int currentWord = 1; currentWord <= 2; currentWord++) {
 				fullCommand = fullCommand.Substring(fullCommand.IndexOf(' ')); 
