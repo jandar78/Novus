@@ -137,7 +137,7 @@ namespace Character {
 
        // Items.Wearable GetMainHandWeapon();
 
-        void Loot(User.User looter, List<string> commands);
+        bool Loot(User.User looter, List<string> commands, bool bypassCheck = false);
 		bool CanLoot(string looterID);
     }
 }

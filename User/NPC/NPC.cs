@@ -138,6 +138,23 @@ namespace Character {
 
 		}
 
+		public string Title {
+			get;
+			set;
+		}
+
+		public string FullName {
+			get {
+				return FirstName + " " + LastName;
+			}
+		}
+
+		public string FullHonors {
+			get {
+				return FullName + Title;
+			}
+		}
+
 		public DateTime NextAiAction {
 			get;
 			set;
@@ -312,6 +329,16 @@ namespace Character {
 		#endregion Leveling
 
 		#region Combat
+		public string KillerID {
+			get;
+			set;
+		}
+
+		public DateTime TimeOfDeath {
+			get;
+			set;
+		}
+
 		public bool CheckUnconscious {
 			get {
 				bool result = false;
@@ -994,7 +1021,7 @@ namespace Character {
 			return looted;
 		}
 
-		protected bool CanLoot(string looterID) {
+		public bool CanLoot(string looterID) {
 			bool youCanLootMe = true;
 			if (DateTime.UtcNow < ((Iactor)this).TimeOfDeath.AddSeconds(30)) {
 				youCanLootMe = false;

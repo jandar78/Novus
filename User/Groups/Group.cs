@@ -121,7 +121,7 @@ namespace Groups {
 
 		public void RemoveMasterLooter(string leaderID) {
 			if (string.Equals(leaderID, LeaderID)) {
-				InformPlayersInGroup(string.Format("{0} is no longer the group Master looter.", MySockets.Server.GetAUser(MasterLooter).Player.FullName);
+				InformPlayersInGroup(string.Format("{0} is no longer the group Master looter.", MySockets.Server.GetAUser(MasterLooter).Player.FullName));
 				MasterLooter = null;
 				
 			}

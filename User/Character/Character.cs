@@ -653,6 +653,16 @@ namespace Character{
 			}
 		}
 
+		public string KillerID {
+			get;
+			set;
+		}
+
+		public DateTime TimeOfDeath {
+			get;
+			set;
+		}
+
 		//Title will be titles the player can earn by completing quests/events and choose to display as the primary title
 		public string Title {
 			get;
@@ -1007,16 +1017,18 @@ namespace Character{
             return Items.Wearable.NONE;
         }
 
-        public void Loot(User.User looter, List<string> commands) {
+        public bool Loot(User.User looter, List<string> commands, bool bypassCheck = false) {
+			bool looted = false;
             if (IsDead()) {
                 List<Items.Iitem> result = new List<Items.Iitem>();
                 StringBuilder sb = new StringBuilder();
 
-				if (CanLoot(looter.UserID)) {
-					looter.MessageHandler("You did not deal the killing blow and can not loot this corpse at this time.");
-					return;
+				if (!bypassCheck) {
+					if (CanLoot(looter.UserID)) {
+						looter.MessageHandler("You did not deal the killing blow and can not loot this corpse at this time.");
+						return false;
+					}
 				}
-
 
                 if (commands.Contains("all")) {
                     sb.AppendLine("You loot the following items from " + FirstName + ":");
@@ -1024,6 +1036,7 @@ namespace Character{
                         sb.AppendLine(i.Name);
                         looter.Player.Inventory.AddItemToInventory(i);
                     });
+					looted = true;
                 }
                 else if (commands.Count > 2) { //the big one, should allow to loot individual item from the inventory
                     string itemName = Items.Items.ParseItemName(commands);
@@ -1039,6 +1052,7 @@ namespace Character{
                             looter.Player.Inventory.AddItemToInventory(i);
                             sb.AppendLine("You loot " + i.Name + " from " + FirstName);
                             index = -1; //we found it and don't need this to match anymore
+							looted = true;
                             //no need to break since we are checking on index and I doubt a player will have so many items in their inventory that it will
                             //take a long time to go through each of them
                         }
@@ -1052,9 +1066,10 @@ namespace Character{
                     Inventory.GetInventoryAsItemList().ForEach(i => sb.AppendLine(i.Name));
                 }
             }
+			return looted;
         }
 
-		protected bool CanLoot(string looterID) {
+		public bool CanLoot(string looterID) {
 			bool youCanLootMe = true;
 			if (!string.Equals(looterID, ((Iactor)this).KillerID, StringComparison.InvariantCultureIgnoreCase)) {
 				if (DateTime.UtcNow < ((Iactor)this).TimeOfDeath.AddSeconds(30)) {
