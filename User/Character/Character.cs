@@ -317,7 +317,9 @@ namespace Character{
                     {"PointsToSpend", this.PointsToSpend},
                     {"Level", this.Level},
                     {"Leveled", this.Leveled},
-                    {"MainHand", this.MainHand}
+                    {"MainHand", this.MainHand},
+					{"KillerID", this.KillerID},
+					{"Title", this.Title}
 
 				};
 
@@ -376,6 +378,8 @@ namespace Character{
                 playerCharacter["Level"] = this.Level;
                 playerCharacter["Leveled"] = this.Leveled;
                 playerCharacter["MainHand"] = this.MainHand;
+				playerCharacter["KillerID"] = this.KillerID;
+				playerCharacter["Title"] = this.Title;
 
                 BsonArray attributeList = new BsonArray();
                 BsonArray inventoryList = new BsonArray();
@@ -469,6 +473,8 @@ namespace Character{
             Leveled = found["Leveled"].AsBoolean;
             PointsToSpend = found["PointsToSpend"].AsInt32;
             MainHand = found["MainHand"].AsString != "" ? found["MainHand"].AsString : null;
+			Title = found.Contains("Title") ? found["Title"].AsString : "";
+			KillerID = found.Contains("KillerID") ? found["KillerID"].AsString : "";
 
 			BsonArray playerAttributes = found["Attributes"].AsBsonArray;
             BsonArray inventoryList = found["Inventory"].AsBsonArray;

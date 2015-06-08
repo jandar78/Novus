@@ -67,15 +67,17 @@ namespace Groups {
 			set;
 		}
 
-		public Group(string groupName) {
+		public Group(string groupName, string leaderID) {
 			if (string.IsNullOrEmpty(groupName)) {
 				groupName = "The filthy scallywags"; //eventually get a terrible random group name from a list in the DB
 			}
 
 			GroupName = groupName;
+			LeaderID = leaderID;
 			PlayerList = new List<string>();
 			PendingRequests = new List<string>();
 			PendingInvitations = new List<string>();
+			AddPlayerToGroup(leaderID);
 		}
 
 		public bool IsLeader(string playerID) {
@@ -87,6 +89,7 @@ namespace Groups {
 				InformPlayersInGroup(MySockets.Server.GetAUser(playerID).Player.FullName + " has joined the group.");
 				
 				PlayerList.Add(playerID);
+				MySockets.Server.GetAUser(playerID).GroupName = GroupName;
 				if (PendingInvitations.Contains(playerID)) {
 					PendingInvitations.Remove(playerID);
 				}
@@ -105,6 +108,7 @@ namespace Groups {
 		public void AssignMasterLooter(string leaderID, string playerID) {
 			if (GroupRuleForLooting == GroupLootRule.Master_Looter) {
 				if (string.Equals(leaderID, LeaderID)) {
+					playerID = MySockets.Server.GetAUserByFullName(playerID).UserID;
 					if (PlayerList.Contains(playerID)) {
 						MasterLooter = playerID;
 						InformPlayersInGroup(string.Format("{0} has been assigned by {1} as the group Master looter.", MySockets.Server.GetAUser(playerID).Player.FullName, MySockets.Server.GetAUser(LeaderID).Player.FullName));
@@ -220,6 +224,7 @@ namespace Groups {
 		public void RequestJoin(string playerID) {
 			PendingRequests.Add(playerID);
 			string message = string.Format("{0} requests permission to join the group.", MySockets.Server.GetAUser(playerID).Player.FullName);
+			MySockets.Server.GetAUser(playerID).MessageHandler("Your request to join the group has been sent to the group leader.");
 			InformGroupLeader(message);
 		}
 
@@ -234,7 +239,7 @@ namespace Groups {
 					msg = "Your join request has been denied by " + MySockets.Server.GetAUser(LeaderID).Player.FullName;
 				}
 
-				InformPlayerInGroup(msg, playerID);
+				MySockets.Server.GetAUser(playerID).MessageHandler("You request to join the group has been " + (accepted ? "approved" : "denied") + ".");
 			}
 			else {
 				InformGroupLeader(MySockets.Server.GetAUser(LeaderID).Player.FullName + " was not found in the pending request list.");

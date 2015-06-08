@@ -31,7 +31,6 @@ namespace Groups {
 		}
 
 		public void CreateGroup(string leaderID, string groupName) {
-			string message = null;
 			string msgID = "GroupCreated";
 
 			if (!IsPlayerInGroup(leaderID)) {
@@ -41,7 +40,8 @@ namespace Groups {
 							MySockets.Server.GetAUser(leaderID).MessageHandler("You must provide a name for the group.");
 						}
 						else {
-							_groupList.Add(new Group(groupName));
+							_groupList.Add(new Group(groupName, leaderID));
+							MySockets.Server.GetAUser(leaderID).GroupName = groupName;
 						}
 					}
 					catch (Exception) { //you never know
@@ -56,7 +56,7 @@ namespace Groups {
 				msgID = "LeaderInOtherGroup";
 			}
 
-			MySockets.Server.GetAUser(leaderID).MessageHandler(string.Format(GetMessageFromDB(msgID), message));
+			MySockets.Server.GetAUser(leaderID).MessageHandler(string.Format(GetMessageFromDB(msgID), groupName));
 		}
 
 		private bool GroupAlreadyExists(string groupName) {
@@ -89,11 +89,18 @@ namespace Groups {
 
 		public string GetGroupNameOnlyList() {
 			StringBuilder sb = new StringBuilder();
-			foreach (Group group in _groupList) {
-				if (group.GroupRuleForVisibility != GroupVisibilityRule.Private) {
-					sb.AppendLine(group.GroupName);
+			if (_groupList.Count > 0) {
+				sb.AppendLine("Available Groups:");
+				foreach (Group group in _groupList) {
+					if (group.GroupRuleForVisibility != GroupVisibilityRule.Private) {
+						sb.AppendLine(group.GroupName);
+					}
 				}
 			}
+			else {
+				sb.AppendLine("There are no groups available.");
+			}
+
 			return sb.ToString();
 		}
 
@@ -245,6 +252,7 @@ namespace Groups {
 				if (group.GroupRuleForVisibility == GroupVisibilityRule.Public) {
 					if (group.GroupRuleForJoining == GroupJoinRule.Request) {
 						group.RequestJoin(playerID);
+
 					}
 					else if (group.GroupRuleForJoining == GroupJoinRule.Friends_only) {
 						if (!MySockets.Server.GetAUser(group.LeaderID).FriendsList.Contains(playerID)) {
@@ -410,6 +418,21 @@ namespace Groups {
 		public void AssignMasterLooter(string leaderID, string masterID, string groupName) {
 			Group group = GetGroup(groupName);
 			group.AssignMasterLooter(leaderID, masterID);
+		}
+
+		public void ChangeVisibilityRule(string leaderID, string groupName, GroupVisibilityRule newRule) {
+			Group group = GetGroup(groupName);
+			if (group != null) {
+				if (string.Equals(leaderID, group.LeaderID, StringComparison.InvariantCultureIgnoreCase)) {
+					group.ChangeVisibilityRule(newRule);
+				}
+				else {
+					MySockets.Server.GetAUser(leaderID).MessageHandler("Only the group leader can change group visibility rules.");
+				}
+			}
+			else {
+				MySockets.Server.GetAUser(leaderID).MessageHandler("No group with that name exists.");
+			}
 		}
 	}
 

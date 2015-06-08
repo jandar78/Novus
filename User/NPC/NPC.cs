@@ -525,6 +525,8 @@ namespace Character {
 				npcCharacter.Add("LastCombatTime", this.LastCombatTime);
 				npcCharacter.Add("Experience", this.Experience);
 				npcCharacter.Add("Level", this.Level);
+				npcCharacter.Add("KillerID", this.KillerID);
+				npcCharacter.Add("Title", this.Title);
 
 				BsonArray attributeList = new BsonArray();
 
@@ -589,6 +591,8 @@ namespace Character {
 				npcCharacter["LastCombatTime"] = this.LastCombatTime;
 				npcCharacter["Experience"] = this.Experience;
 				npcCharacter["Level"] = this.Level;
+				npcCharacter["KillerID"] = this.KillerID;
+				npcCharacter["Title"] = this.Title;
 
 				BsonArray playerAttributes = new BsonArray();
 				BsonArray xpTracker = new BsonArray();
@@ -671,6 +675,8 @@ namespace Character {
 			Fsm.globalState = Fsm.GetStateFromName(found["AiGlobalState"].AsString);
 			Experience = found["Experience"].AsInt64;
 			Level = found["Level"].AsInt32;
+			Title = found.Contains("Title") ? found["Title"].AsString : "";
+			KillerID = found.Contains("KillerID") ? found["KillerID"].AsString : "";
 
 			//if you just use var instead of casting it like this you will be in a world of pain and suffering when dealing with subdocuments.
 			BsonArray playerAttributes = found["Attributes"].AsBsonArray;
@@ -767,9 +773,10 @@ namespace Character {
 		public void DecreaseXPReward(double amount) {
 			double individualAmount = amount / (double)damageTracker.Count;
 
+			var damageList = new Dictionary<string, double>(damageTracker);
 			//totalDecrease needs to be divided amongst all players who are in the XP List
-			foreach (KeyValuePair<string, double> pair in damageTracker) {
-				damageTracker[pair.Key] = pair.Value - (individualAmount);
+			foreach (KeyValuePair<string, double> pair in damageList) {
+				damageTracker[pair.Key] = pair.Value + (individualAmount);
 			}
 
 			Save();
