@@ -111,7 +111,8 @@ namespace Groups {
 					playerID = MySockets.Server.GetAUserByFullName(playerID).UserID;
 					if (PlayerList.Contains(playerID)) {
 						MasterLooter = playerID;
-						InformPlayersInGroup(string.Format("{0} has been assigned by {1} as the group Master looter.", MySockets.Server.GetAUser(playerID).Player.FullName, MySockets.Server.GetAUser(LeaderID).Player.FullName));
+						InformPlayersInGroup(string.Format("{0} has been assigned by {1} as the group Master looter.", MySockets.Server.GetAUser(playerID).Player.FullName, MySockets.Server.GetAUser(LeaderID).Player.FullName), new List<string>() { playerID });
+						InformPlayerInGroup(string.Format("You have been designated the group Master Looter by {0}.", MySockets.Server.GetAUser(LeaderID).Player.FullName), playerID);
 					}
 				}
 				else {
@@ -125,7 +126,8 @@ namespace Groups {
 
 		public void RemoveMasterLooter(string leaderID) {
 			if (string.Equals(leaderID, LeaderID)) {
-				InformPlayersInGroup(string.Format("{0} is no longer the group Master looter.", MySockets.Server.GetAUser(MasterLooter).Player.FullName));
+				InformPlayersInGroup(string.Format("{0} is no longer the group Master looter.", MySockets.Server.GetAUser(MasterLooter).Player.FullName), new List<string>() { MasterLooter });
+				InformPlayerInGroup("You are no longer the group Master looter.", MasterLooter);
 				MasterLooter = null;
 				
 			}
@@ -139,7 +141,7 @@ namespace Groups {
 		public void RemovePlayerFromGroup(string playerID) {
 			if (PlayerList.Contains(playerID)) {
 				PlayerList.Remove(playerID);
-				InformPlayersInGroup(MySockets.Server.GetAUser(playerID).Player.FullName + " has left the group.");
+				InformPlayersInGroup(MySockets.Server.GetAUser(playerID).Player.FullName + " has left the group.", new List<string>() { playerID });
 				InformPlayerInGroup("You have left '" + GroupName + "'.", playerID);
 			}
 		}
@@ -195,7 +197,8 @@ namespace Groups {
 		public void PromoteToLeader(string newLeaderID) {
 			if (PlayerList.Contains(newLeaderID)) {
 				LeaderID = newLeaderID;
-				InformPlayersInGroup(MySockets.Server.GetAUser(LeaderID).Player.FullName + " has been promoted to group leader.");
+				InformPlayersInGroup(MySockets.Server.GetAUser(LeaderID).Player.FullName + " has been promoted to group leader.", new List<string>(){ LeaderID });
+				InformGroupLeader("You have been promoted to group leader of " + GroupName);
 			}
 		}
 
@@ -239,7 +242,7 @@ namespace Groups {
 					msg = "Your join request has been denied by " + MySockets.Server.GetAUser(LeaderID).Player.FullName;
 				}
 
-				MySockets.Server.GetAUser(playerID).MessageHandler("You request to join the group has been " + (accepted ? "approved" : "denied") + ".");
+				MySockets.Server.GetAUser(playerID).MessageHandler("Your request to join the group has been " + (accepted ? "approved" : "denied") + ".");
 			}
 			else {
 				InformGroupLeader(MySockets.Server.GetAUser(LeaderID).Player.FullName + " was not found in the pending request list.");
@@ -283,8 +286,9 @@ namespace Groups {
 			}
 		}
 
-		public void SayToGroup(string message) {
-			InformPlayersInGroup(message);
+		public void SayToGroup(string message, string playerToIgnore) {
+			InformPlayersInGroup(MySockets.Server.GetAUser(playerToIgnore).Player.FullName + " says to the group \"" + message + "\"", new List<string>(){ playerToIgnore });
+			InformPlayerInGroup("You say to the group \"" + message + "\"", playerToIgnore);
 		}
 
 		public bool HasPlayer(string playerID) {
@@ -299,9 +303,14 @@ namespace Groups {
 			MySockets.Server.GetAUser(playerID).MessageHandler(message);
 		}
 
-		private void InformPlayersInGroup(string message) {
+		private void InformPlayersInGroup(string message, List<string> idToIgnore = null) {
+			if (idToIgnore == null) {
+				idToIgnore = new List<string>();
+			}
 			foreach (string playerID in PlayerList) {
-				MySockets.Server.GetAUser(playerID).MessageHandler(message);
+				if (!idToIgnore.Contains(playerID)) {
+					MySockets.Server.GetAUser(playerID).MessageHandler(message);
+				}
 			}
 		}
 

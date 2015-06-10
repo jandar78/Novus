@@ -183,11 +183,11 @@ namespace Groups {
 			}
 		}
 
-		public void RemovePlayerFromGroup(string leaderID, string groupName, string playerID) {
+		public void RemovePlayerFromGroup(string leaderID, string playerName, string groupName) {
 			Group group = GetGroup(groupName);
 			if (group != null) {
 				if (string.Equals(leaderID, group.LeaderID, StringComparison.InvariantCultureIgnoreCase)) {
-					group.RemovePlayerFromGroup(playerID);
+					group.RemovePlayerFromGroup(MySockets.Server.GetAUserByFullName(playerName).UserID);
 				}
 				else {
 					MySockets.Server.GetAUser(leaderID).MessageHandler("Only the group leader can remove players from the group.");
@@ -361,10 +361,10 @@ namespace Groups {
 			}
 		}
 
-		public void Say(string message, string groupName) {
+		public void Say(string message, string groupName, string playerID) {
 			Group group = GetGroup(groupName);
 			if (group != null && !string.IsNullOrEmpty(message)) {
-				group.SayToGroup(message);
+				group.SayToGroup(message, playerID);
 			}
 		}
 
@@ -403,6 +403,7 @@ namespace Groups {
 			if (group != null) {
 				if (group.IsLeader(leaderID)) {
 					group.RemovePendingInvitation(MySockets.Server.GetAUserByFullName(playerName).UserID);
+					msg = "The group invitation for " + playerName + " has been removed.";
 				}
 				else {
 					msg = "You are not the group leader.  You can not perform this action.";

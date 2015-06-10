@@ -14,7 +14,7 @@ namespace Commands {
 		public static void Group(User.User player, List<string> commands) {
 			bool inGroup = !string.IsNullOrEmpty(player.GroupName);
 			string name = RemoveWords(commands[0]);
-
+			User.User user = null;
 			if (commands.Count > 2) {
 				switch (commands[2]) {
 					case "create":
@@ -30,8 +30,17 @@ namespace Commands {
 						Groups.Groups.GetInstance().AcceptDenyJoinRequest(player.UserID, name, false);
 						break;
 					case "promote":
-						string promotedID = MySockets.Server.GetAUserByFullName(name).UserID;
-						Groups.Groups.GetInstance().PromoteToLeader(player.UserID, player.GroupName, promotedID);
+						user = MySockets.Server.GetAUserByFullName(name); 
+						if (user == null){
+							user = MySockets.Server.GetAUserByFirstName(name).FirstOrDefault(); 
+						}
+
+						if (user != null) {
+							Groups.Groups.GetInstance().PromoteToLeader(player.UserID, player.GroupName, user.UserID);
+						}
+						else {
+							player.MessageHandler("No player by that name was found.  If you only used a first name try including the last name as well.");
+						}
 						break;
 					case "join":
 						Groups.Groups.GetInstance().Join(player.UserID, name);
@@ -45,6 +54,10 @@ namespace Commands {
 					case "uninvite":
 						Groups.Groups.GetInstance().Uninvite(player.UserID, name, player.GroupName);
 						break;
+					case "kick":
+					case "remove":
+						Groups.Groups.GetInstance().RemovePlayerFromGroup(player.UserID, name, player.GroupName);
+						break;
 					case "list":
 						if (string.IsNullOrEmpty(name) || name.ToLower() == "all") {
 							player.MessageHandler(Groups.Groups.GetInstance().GetGroupNameOnlyList());
@@ -57,7 +70,16 @@ namespace Commands {
 						Groups.Groups.GetInstance().RequestGroupJoin(player.UserID, name);
 						break;
 					case "master":
-						Groups.Groups.GetInstance().AssignMasterLooter(player.UserID, name, player.GroupName);
+						user = MySockets.Server.GetAUserByFullName(name);
+						if (user == null) {
+							user = MySockets.Server.GetAUserByFirstName(name).FirstOrDefault();
+						}
+						if (user == null) {
+							player.MessageHandler("No player by that name was found.  If you only used a first name try including the last name as well.");
+						}
+						else {
+							Groups.Groups.GetInstance().AssignMasterLooter(player.UserID, name, player.GroupName);
+						}
 						break;
 					case "lootrule":
 						Groups.GroupLootRule newRule = Groups.GroupLootRule.Leader_only;
@@ -81,8 +103,39 @@ namespace Commands {
 						Groups.Groups.GetInstance().ChangeLootingRule(player.UserID, player.GroupName, newRule);
 						break;
 					case "joinrule":
+						Groups.GroupJoinRule joinRule = Groups.GroupJoinRule.Friends_only;
+						if (commands.Count > 3) {
+							switch (commands[3]) {
+								case "friends":
+									joinRule = Groups.GroupJoinRule.Friends_only;
+									break;
+								case "open":
+									joinRule = Groups.GroupJoinRule.Open;
+									break;
+								case "request":
+									joinRule = Groups.GroupJoinRule.Request;
+									break;
+							}
+							Groups.Groups.GetInstance().ChangeJoiningRule(player.UserID, player.GroupName, joinRule);
+						}
+						else {
+							player.MessageHandler("What rule do you want to change to?");
+						}
 						break;
 					case "visibility":
+						Groups.GroupVisibilityRule visibilityRule = Groups.GroupVisibilityRule.Private;
+						switch (commands[3]) {
+							case "private":
+								visibilityRule = Groups.GroupVisibilityRule.Private;
+								break;
+							case "public":
+								visibilityRule = Groups.GroupVisibilityRule.Public;
+								break;
+						}
+						Groups.Groups.GetInstance().ChangeVisibilityRule(player.UserID, player.GroupName, visibilityRule);
+						break;
+					case "say":
+						Groups.Groups.GetInstance().Say(name, player.GroupName, player.UserID);
 						break;
 				}
 			}
@@ -94,11 +147,15 @@ namespace Commands {
 		//Strips away the first two words which should be  "group" followed by the action word like "create" , "disband", "approve", "deny", etc.
 		//not doing a replace because the group name could contain those words or even a player name.
 		private static string RemoveWords(string fullCommand) {
-			for (int currentWord = 1; currentWord <= 2; currentWord++) {
-				fullCommand = fullCommand.Substring(fullCommand.IndexOf(' ')); 
+			string[] splitString = fullCommand.Split(' ');
+			splitString = splitString.Skip(2).ToArray();
+
+			fullCommand = "";
+			foreach (string words in splitString) {
+				fullCommand += words + " ";
 			}
 						
-			return fullCommand;
+			return fullCommand.Trim();
 		}
 	}
 }

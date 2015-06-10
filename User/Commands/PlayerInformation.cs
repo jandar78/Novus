@@ -158,7 +158,7 @@ namespace Commands {
 					return;
 				}
 
-				toPlayerList = MySockets.Server.GetAUserByName(commands[2]).Where(p => p.Player.Location == player.Player.Location).ToList();
+				toPlayerList = MySockets.Server.GetAUserByFirstName(commands[2]).Where(p => p.Player.Location == player.Player.Location).ToList();
 			}	
 
 			User.User toPlayer = null;
@@ -208,7 +208,7 @@ namespace Commands {
 
 		//a tell is a private message basically, location is not a factor
 		private static void Tell(User.User player, List<string> commands) {
-			List<User.User> toPlayerList = MySockets.Server.GetAUserByName(commands[2]).ToList();
+			List<User.User> toPlayerList = MySockets.Server.GetAUserByFirstName(commands[2]).ToList();
 			User.User toPlayer = null;
 			string message = "";
 
