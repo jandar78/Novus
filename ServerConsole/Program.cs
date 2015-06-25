@@ -14,7 +14,7 @@ namespace ServerConsole {
 
 		//this shouldn't be a static class eventually.
 		public static void Main(string[] args) {
-			Console.Title = "Server";
+			Console.Title = "Novus MUD Server 0.7";
 			string databasePath;
 			//start the Mongodatabase if the server is running
 			try {
@@ -44,7 +44,7 @@ namespace ServerConsole {
 
 			MudTimer.StartUpTimers();
 
-			server.IPAddress = "192.168.1.107";
+			server.IPAddress = "192.168.1.112";
 			server.Port = 1301;
 
 			try {

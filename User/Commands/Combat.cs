@@ -266,7 +266,7 @@ namespace Commands {
             return enemy;
         }
 
-        public static User.User FindTargetByName(string name, int location) {
+        public static User.User FindTargetByName(string name, string location) {
             User.User enemy = null;
             foreach (User.User foe in MySockets.Server.GetAUserByFirstName(name)) {
                 if (foe.Player.Location == location) {

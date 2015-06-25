@@ -127,6 +127,14 @@
             this.idValue = new System.Windows.Forms.TextBox();
             this.id = new System.Windows.Forms.Label();
             this.tabPage2 = new System.Windows.Forms.TabPage();
+            this.groupBox10 = new System.Windows.Forms.GroupBox();
+            this.weatherValues = new System.Windows.Forms.ListBox();
+            this.groupBox9 = new System.Windows.Forms.GroupBox();
+            this.forestValue = new System.Windows.Forms.CheckBox();
+            this.noPvpValue = new System.Windows.Forms.CheckBox();
+            this.darkCaveValue = new System.Windows.Forms.CheckBox();
+            this.indoorValue = new System.Windows.Forms.CheckBox();
+            this.outdoorValue = new System.Windows.Forms.CheckBox();
             this.saveRoom = new System.Windows.Forms.Button();
             this.roomLoad = new System.Windows.Forms.Button();
             this.newRoom = new System.Windows.Forms.Button();
@@ -177,14 +185,13 @@
             this.toolTip1 = new System.Windows.Forms.ToolTip(this.components);
             this.statusStrip1 = new System.Windows.Forms.StatusStrip();
             this.databaseConnectionStatusValue = new System.Windows.Forms.ToolStripStatusLabel();
-            this.groupBox9 = new System.Windows.Forms.GroupBox();
-            this.outdoorValue = new System.Windows.Forms.CheckBox();
-            this.indoorValue = new System.Windows.Forms.CheckBox();
-            this.darkCaveValue = new System.Windows.Forms.CheckBox();
-            this.noPvpValue = new System.Windows.Forms.CheckBox();
-            this.forestValue = new System.Windows.Forms.CheckBox();
-            this.groupBox10 = new System.Windows.Forms.GroupBox();
-            this.weatherValues = new System.Windows.Forms.ListBox();
+            this.addRoomGroup = new System.Windows.Forms.GroupBox();
+            this.addRoomDown = new System.Windows.Forms.Button();
+            this.addRoomUp = new System.Windows.Forms.Button();
+            this.addRoomEast = new System.Windows.Forms.Button();
+            this.addRoomWest = new System.Windows.Forms.Button();
+            this.addRoomSouth = new System.Windows.Forms.Button();
+            this.addRoomNorth = new System.Windows.Forms.Button();
             this.tabControl1.SuspendLayout();
             this.tabPage1.SuspendLayout();
             this.itemTypeGroup.SuspendLayout();
@@ -197,14 +204,15 @@
             this.weaponGroup.SuspendLayout();
             this.isGroupbox.SuspendLayout();
             this.tabPage2.SuspendLayout();
+            this.groupBox10.SuspendLayout();
+            this.groupBox9.SuspendLayout();
             this.groupBox5.SuspendLayout();
             this.tabPage3.SuspendLayout();
             this.doorAttributeGroup.SuspendLayout();
             this.tabPage4.SuspendLayout();
             this.groupBox8.SuspendLayout();
             this.statusStrip1.SuspendLayout();
-            this.groupBox9.SuspendLayout();
-            this.groupBox10.SuspendLayout();
+            this.addRoomGroup.SuspendLayout();
             this.SuspendLayout();
             // 
             // tabControl1
@@ -1333,6 +1341,7 @@
             // 
             // tabPage2
             // 
+            this.tabPage2.Controls.Add(this.addRoomGroup);
             this.tabPage2.Controls.Add(this.groupBox10);
             this.tabPage2.Controls.Add(this.groupBox9);
             this.tabPage2.Controls.Add(this.saveRoom);
@@ -1358,6 +1367,88 @@
             this.tabPage2.TabIndex = 1;
             this.tabPage2.Text = "Room";
             this.tabPage2.UseVisualStyleBackColor = true;
+            // 
+            // groupBox10
+            // 
+            this.groupBox10.Controls.Add(this.weatherValues);
+            this.groupBox10.Location = new System.Drawing.Point(308, 289);
+            this.groupBox10.Name = "groupBox10";
+            this.groupBox10.Size = new System.Drawing.Size(364, 163);
+            this.groupBox10.TabIndex = 59;
+            this.groupBox10.TabStop = false;
+            this.groupBox10.Text = "Weather";
+            // 
+            // weatherValues
+            // 
+            this.weatherValues.FormattingEnabled = true;
+            this.weatherValues.Location = new System.Drawing.Point(23, 20);
+            this.weatherValues.Name = "weatherValues";
+            this.weatherValues.Size = new System.Drawing.Size(181, 121);
+            this.weatherValues.TabIndex = 0;
+            // 
+            // groupBox9
+            // 
+            this.groupBox9.Controls.Add(this.forestValue);
+            this.groupBox9.Controls.Add(this.noPvpValue);
+            this.groupBox9.Controls.Add(this.darkCaveValue);
+            this.groupBox9.Controls.Add(this.indoorValue);
+            this.groupBox9.Controls.Add(this.outdoorValue);
+            this.groupBox9.Location = new System.Drawing.Point(727, 22);
+            this.groupBox9.Name = "groupBox9";
+            this.groupBox9.Size = new System.Drawing.Size(118, 141);
+            this.groupBox9.TabIndex = 58;
+            this.groupBox9.TabStop = false;
+            this.groupBox9.Text = "Room Type";
+            // 
+            // forestValue
+            // 
+            this.forestValue.AutoSize = true;
+            this.forestValue.Location = new System.Drawing.Point(20, 114);
+            this.forestValue.Name = "forestValue";
+            this.forestValue.Size = new System.Drawing.Size(55, 17);
+            this.forestValue.TabIndex = 5;
+            this.forestValue.Text = "Forest";
+            this.forestValue.UseVisualStyleBackColor = true;
+            // 
+            // noPvpValue
+            // 
+            this.noPvpValue.AutoSize = true;
+            this.noPvpValue.Location = new System.Drawing.Point(20, 91);
+            this.noPvpValue.Name = "noPvpValue";
+            this.noPvpValue.Size = new System.Drawing.Size(64, 17);
+            this.noPvpValue.TabIndex = 4;
+            this.noPvpValue.Text = "No PVP";
+            this.noPvpValue.UseVisualStyleBackColor = true;
+            // 
+            // darkCaveValue
+            // 
+            this.darkCaveValue.AutoSize = true;
+            this.darkCaveValue.Location = new System.Drawing.Point(20, 68);
+            this.darkCaveValue.Name = "darkCaveValue";
+            this.darkCaveValue.Size = new System.Drawing.Size(77, 17);
+            this.darkCaveValue.TabIndex = 3;
+            this.darkCaveValue.Text = "Dark Cave";
+            this.darkCaveValue.UseVisualStyleBackColor = true;
+            // 
+            // indoorValue
+            // 
+            this.indoorValue.AutoSize = true;
+            this.indoorValue.Location = new System.Drawing.Point(20, 45);
+            this.indoorValue.Name = "indoorValue";
+            this.indoorValue.Size = new System.Drawing.Size(61, 17);
+            this.indoorValue.TabIndex = 2;
+            this.indoorValue.Text = "Indoors";
+            this.indoorValue.UseVisualStyleBackColor = true;
+            // 
+            // outdoorValue
+            // 
+            this.outdoorValue.AutoSize = true;
+            this.outdoorValue.Location = new System.Drawing.Point(20, 22);
+            this.outdoorValue.Name = "outdoorValue";
+            this.outdoorValue.Size = new System.Drawing.Size(69, 17);
+            this.outdoorValue.TabIndex = 1;
+            this.outdoorValue.Text = "Outdoors";
+            this.outdoorValue.UseVisualStyleBackColor = true;
             // 
             // saveRoom
             // 
@@ -1475,7 +1566,7 @@
             this.displayInGameValue.Location = new System.Drawing.Point(308, 35);
             this.displayInGameValue.Multiline = true;
             this.displayInGameValue.Name = "displayInGameValue";
-            this.displayInGameValue.Size = new System.Drawing.Size(394, 221);
+            this.displayInGameValue.Size = new System.Drawing.Size(364, 221);
             this.displayInGameValue.TabIndex = 14;
             this.toolTip1.SetToolTip(this.displayInGameValue, "How room will look like displayed in game.");
             // 
@@ -1848,87 +1939,75 @@
             this.databaseConnectionStatusValue.Size = new System.Drawing.Size(103, 17);
             this.databaseConnectionStatusValue.Text = "Database OFFLINE";
             // 
-            // groupBox9
+            // addRoomGroup
             // 
-            this.groupBox9.Controls.Add(this.forestValue);
-            this.groupBox9.Controls.Add(this.noPvpValue);
-            this.groupBox9.Controls.Add(this.darkCaveValue);
-            this.groupBox9.Controls.Add(this.indoorValue);
-            this.groupBox9.Controls.Add(this.outdoorValue);
-            this.groupBox9.Location = new System.Drawing.Point(727, 22);
-            this.groupBox9.Name = "groupBox9";
-            this.groupBox9.Size = new System.Drawing.Size(118, 141);
-            this.groupBox9.TabIndex = 58;
-            this.groupBox9.TabStop = false;
-            this.groupBox9.Text = "Room Type";
+            this.addRoomGroup.Controls.Add(this.addRoomDown);
+            this.addRoomGroup.Controls.Add(this.addRoomUp);
+            this.addRoomGroup.Controls.Add(this.addRoomEast);
+            this.addRoomGroup.Controls.Add(this.addRoomWest);
+            this.addRoomGroup.Controls.Add(this.addRoomSouth);
+            this.addRoomGroup.Controls.Add(this.addRoomNorth);
+            this.addRoomGroup.Location = new System.Drawing.Point(688, 181);
+            this.addRoomGroup.Name = "addRoomGroup";
+            this.addRoomGroup.Size = new System.Drawing.Size(269, 233);
+            this.addRoomGroup.TabIndex = 60;
+            this.addRoomGroup.TabStop = false;
+            this.addRoomGroup.Text = "Add Room";
             // 
-            // outdoorValue
+            // addRoomDown
             // 
-            this.outdoorValue.AutoSize = true;
-            this.outdoorValue.Location = new System.Drawing.Point(20, 22);
-            this.outdoorValue.Name = "outdoorValue";
-            this.outdoorValue.Size = new System.Drawing.Size(69, 17);
-            this.outdoorValue.TabIndex = 1;
-            this.outdoorValue.Text = "Outdoors";
-            this.outdoorValue.UseVisualStyleBackColor = true;
+            this.addRoomDown.Location = new System.Drawing.Point(98, 179);
+            this.addRoomDown.Name = "addRoomDown";
+            this.addRoomDown.Size = new System.Drawing.Size(75, 23);
+            this.addRoomDown.TabIndex = 71;
+            this.addRoomDown.Text = "Down";
+            this.addRoomDown.UseVisualStyleBackColor = true;
             // 
-            // indoorValue
+            // addRoomUp
             // 
-            this.indoorValue.AutoSize = true;
-            this.indoorValue.Location = new System.Drawing.Point(20, 45);
-            this.indoorValue.Name = "indoorValue";
-            this.indoorValue.Size = new System.Drawing.Size(61, 17);
-            this.indoorValue.TabIndex = 2;
-            this.indoorValue.Text = "Indoors";
-            this.indoorValue.UseVisualStyleBackColor = true;
+            this.addRoomUp.Location = new System.Drawing.Point(98, 141);
+            this.addRoomUp.Name = "addRoomUp";
+            this.addRoomUp.Size = new System.Drawing.Size(75, 23);
+            this.addRoomUp.TabIndex = 70;
+            this.addRoomUp.Text = "Up";
+            this.addRoomUp.UseVisualStyleBackColor = true;
             // 
-            // darkCaveValue
+            // addRoomEast
             // 
-            this.darkCaveValue.AutoSize = true;
-            this.darkCaveValue.Location = new System.Drawing.Point(20, 68);
-            this.darkCaveValue.Name = "darkCaveValue";
-            this.darkCaveValue.Size = new System.Drawing.Size(77, 17);
-            this.darkCaveValue.TabIndex = 3;
-            this.darkCaveValue.Text = "Dark Cave";
-            this.darkCaveValue.UseVisualStyleBackColor = true;
+            this.addRoomEast.Location = new System.Drawing.Point(178, 59);
+            this.addRoomEast.Name = "addRoomEast";
+            this.addRoomEast.Size = new System.Drawing.Size(75, 23);
+            this.addRoomEast.TabIndex = 69;
+            this.addRoomEast.Text = "East";
+            this.addRoomEast.UseVisualStyleBackColor = true;
             // 
-            // noPvpValue
+            // addRoomWest
             // 
-            this.noPvpValue.AutoSize = true;
-            this.noPvpValue.Location = new System.Drawing.Point(20, 91);
-            this.noPvpValue.Name = "noPvpValue";
-            this.noPvpValue.Size = new System.Drawing.Size(64, 17);
-            this.noPvpValue.TabIndex = 4;
-            this.noPvpValue.Text = "No PVP";
-            this.noPvpValue.UseVisualStyleBackColor = true;
+            this.addRoomWest.Location = new System.Drawing.Point(16, 59);
+            this.addRoomWest.Name = "addRoomWest";
+            this.addRoomWest.Size = new System.Drawing.Size(75, 23);
+            this.addRoomWest.TabIndex = 68;
+            this.addRoomWest.Text = "West";
+            this.addRoomWest.UseVisualStyleBackColor = true;
             // 
-            // forestValue
+            // addRoomSouth
             // 
-            this.forestValue.AutoSize = true;
-            this.forestValue.Location = new System.Drawing.Point(20, 114);
-            this.forestValue.Name = "forestValue";
-            this.forestValue.Size = new System.Drawing.Size(55, 17);
-            this.forestValue.TabIndex = 5;
-            this.forestValue.Text = "Forest";
-            this.forestValue.UseVisualStyleBackColor = true;
+            this.addRoomSouth.Location = new System.Drawing.Point(98, 88);
+            this.addRoomSouth.Name = "addRoomSouth";
+            this.addRoomSouth.Size = new System.Drawing.Size(75, 23);
+            this.addRoomSouth.TabIndex = 67;
+            this.addRoomSouth.Text = "South";
+            this.addRoomSouth.UseVisualStyleBackColor = true;
             // 
-            // groupBox10
+            // addRoomNorth
             // 
-            this.groupBox10.Controls.Add(this.weatherValues);
-            this.groupBox10.Location = new System.Drawing.Point(308, 289);
-            this.groupBox10.Name = "groupBox10";
-            this.groupBox10.Size = new System.Drawing.Size(351, 163);
-            this.groupBox10.TabIndex = 59;
-            this.groupBox10.TabStop = false;
-            this.groupBox10.Text = "Weather";
-            // 
-            // weatherValues
-            // 
-            this.weatherValues.FormattingEnabled = true;
-            this.weatherValues.Location = new System.Drawing.Point(23, 20);
-            this.weatherValues.Name = "weatherValues";
-            this.weatherValues.Size = new System.Drawing.Size(181, 121);
-            this.weatherValues.TabIndex = 0;
+            this.addRoomNorth.Location = new System.Drawing.Point(98, 30);
+            this.addRoomNorth.Name = "addRoomNorth";
+            this.addRoomNorth.Size = new System.Drawing.Size(75, 23);
+            this.addRoomNorth.TabIndex = 66;
+            this.addRoomNorth.Text = "North";
+            this.addRoomNorth.UseVisualStyleBackColor = true;
+            this.addRoomNorth.Click += new System.EventHandler(this.addRoomNorth_Click);
             // 
             // Form1
             // 
@@ -1961,6 +2040,9 @@
             this.isGroupbox.PerformLayout();
             this.tabPage2.ResumeLayout(false);
             this.tabPage2.PerformLayout();
+            this.groupBox10.ResumeLayout(false);
+            this.groupBox9.ResumeLayout(false);
+            this.groupBox9.PerformLayout();
             this.groupBox5.ResumeLayout(false);
             this.groupBox5.PerformLayout();
             this.tabPage3.ResumeLayout(false);
@@ -1972,9 +2054,7 @@
             this.groupBox8.PerformLayout();
             this.statusStrip1.ResumeLayout(false);
             this.statusStrip1.PerformLayout();
-            this.groupBox9.ResumeLayout(false);
-            this.groupBox9.PerformLayout();
-            this.groupBox10.ResumeLayout(false);
+            this.addRoomGroup.ResumeLayout(false);
             this.ResumeLayout(false);
             this.PerformLayout();
 
@@ -2143,6 +2223,13 @@
         private System.Windows.Forms.CheckBox forestValue;
         private System.Windows.Forms.GroupBox groupBox10;
         private System.Windows.Forms.ListBox weatherValues;
+        private System.Windows.Forms.GroupBox addRoomGroup;
+        private System.Windows.Forms.Button addRoomDown;
+        private System.Windows.Forms.Button addRoomUp;
+        private System.Windows.Forms.Button addRoomEast;
+        private System.Windows.Forms.Button addRoomWest;
+        private System.Windows.Forms.Button addRoomSouth;
+        private System.Windows.Forms.Button addRoomNorth;
     }
 }
 

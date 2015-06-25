@@ -22,8 +22,8 @@ namespace Character {
         bool Leveled { get; set; }
         bool IsLevelUp { get; }
         string ID { get; set; }
-        int Location { get; set; }
-        int LastLocation { get; set; }
+        string Location { get; set; }
+        string LastLocation { get; set; }
         bool IsNPC { get; set; }     
         string FirstName { get; set; }
         string LastName { get; set; }

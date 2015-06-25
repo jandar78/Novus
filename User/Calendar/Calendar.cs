@@ -145,7 +145,7 @@ namespace Calendar {
 
 		//this method needs to be broken down a bit more
 		//i'm going to comment the hell out of this because it's confusing even to me
-		public static void ApplyWeather(int lowerEnd, int upperEnd){
+		public static void ApplyWeather(List<string> zone){
               BsonDocument weather = MongoUtils.MongoData.GetCollection("World", "Globals").FindOneAs<BsonDocument>(Query.EQ("_id", "Weather"));
 			   
 			//if the time for the wheather to change has elapsed let's change it
@@ -176,7 +176,7 @@ namespace Calendar {
 			    	pattern = intensityArray[intensity][strength.ToString().CamelCaseWord()].AsBsonDocument;
 			    }
                    
-                   ApplyWeatherPattern(weather, weatherEnum, intensityArray, intensity, pattern, lowerEnd, upperEnd);
+                   ApplyWeatherPattern(weather, weatherEnum, intensityArray, intensity, pattern, zone);
                    
 			    //let's update the DB
 			    weather["CurrentMessage"] = (pattern != null ? pattern["Message"].AsString : "");
@@ -186,7 +186,7 @@ namespace Calendar {
 		     }
 		}
 
-          private static void ApplyWeatherPattern(BsonDocument weather, Weather weatherEnum, BsonArray intensityArray, int intensity, BsonDocument pattern, int lowerEnd, int upperEnd) {
+          private static void ApplyWeatherPattern(BsonDocument weather, Weather weatherEnum, BsonArray intensityArray, int intensity, BsonDocument pattern, List<string> zones) {
               //this tuple will contain the increase/decrease sequence
               Tuple<string, int> tupe = null;
 
@@ -208,14 +208,14 @@ namespace Calendar {
                   //let's get the end sequence
                   BsonDocument oldPattern = intensityArray[weather["CurrentIntensity"].AsInt32][((WeatherStrength)weather["CurrentIntensity"].AsInt32).ToString().CamelCaseWord()].AsBsonDocument;
                   BsonArray endSequence = oldPattern["EndSequence"].AsBsonArray;
-                  Func<BsonArray, Tuple<string, int>, string, string, bool> endScript = GetScript(lowerEnd, upperEnd);
+                  Func<BsonArray, Tuple<string, int>, string, string, bool> endScript = GetScript(zones);
                   //execute the script
                   while (endScript(endSequence, tupe, weatherEnum.ToString().ToUpper(), pattern["Message"].AsString)) { tupe = null; }
               }
               //it's other than CLEAR and it's not the same intensity
               if (weatherEnum != Weather.Clear && weather["CurrentIntensity"].AsInt32 != intensity) {
                   BsonArray startSequence = pattern["StartSequence"].AsBsonArray;
-                  Func<BsonArray, Tuple<string, int>, string, string, bool> script = GetScript(lowerEnd, upperEnd);
+                  Func<BsonArray, Tuple<string, int>, string, string, bool> script = GetScript(zones);
                   while (script(startSequence, tupe, weatherEnum.ToString().ToUpper(), pattern["Message"].AsString)) { tupe = null; }
               }
           }
@@ -260,37 +260,41 @@ namespace Calendar {
               return false;
           }
 
-		//Neat way of making a pseudo auto script for automatic wheather messages
-        private static Func<BsonArray, Tuple<string, int>, string, string, bool> GetScript(int lowerEnd, int upperEnd) {
-			int step = 0;
+        //Neat way of making a pseudo auto script for automatic wheather messages
+        private static Func<BsonArray, Tuple<string, int>, string, string, bool> GetScript(List<string> zones) {
+            int step = 0;
 
-            Func<BsonArray, Tuple<string, int>, string, string, bool> result = delegate(BsonArray sequence, Tuple<string, int> tuple, string type, string message) {
-                Rooms.Room room = null;
-				//the sequence has ended nothing left to do here
-				if (step >= sequence.Count) {
-					for (int low = lowerEnd; low <= upperEnd; low++) {
-                        room = Rooms.Room.GetRoom(low);
-                        room.Weather = type;
-                        room.WeatherMessage = message;
-					}
+            Func<BsonArray, Tuple<string, int>, string, string, bool> result = delegate (BsonArray sequence, Tuple<string, int> tuple, string type, string message) {
+            Rooms.Room room = null;
+            //the sequence has ended nothing left to do here
+            if (step >= sequence.Count) {
+                    foreach (string zone in zones) { //loop through each zone
+                        for (int low = 0; low <= 999; low++) { //apply to it to rooms in zone Todo: get the number of rooms in the zone and use that as the low, high numbers
+                            room = Rooms.Room.GetRoom(zone + low);
+                            room.Weather = type;
+                            room.WeatherMessage = message;
+                        }
+                    }
 					return false;
 				}
 
-				for (int low = lowerEnd; low <= upperEnd; low++) {
-                    room = Rooms.Room.GetRoom(low);
-					if (room.IsOutdoors) {
-						
-						//ok if the tuple is not null then we are going to process it first. As of now it is just one single message with a wait time
-						//this can be modified to include more steps easily by making item1 a list and using steps to keep track
-						if (tuple != null){
-							room.InformPlayersInRoom(tuple.Item1, new List<string>(new string[] { }));
-							System.Threading.Thread.Sleep(tuple.Item2 * 1000);
-							return true; //we still want the other sequence to execute we will set the tuple to null in the body of the while loop
-						}
-						//run the main sequence script
-						room.InformPlayersInRoom(sequence[step]["Step"].AsString, new List<string>(new string[] { }));
-					}
-				}
+                foreach (string zone in zones) {
+                    for (int low = 0; low <= 999; low++) {//Todo: get low/high numbers from room count in zone from database
+                        room = Rooms.Room.GetRoom(zone + low);
+                        if (room.IsOutdoors) {
+
+                            //ok if the tuple is not null then we are going to process it first. As of now it is just one single message with a wait time
+                            //this can be modified to include more steps easily by making item1 a list and using steps to keep track
+                            if (tuple != null) {
+                                room.InformPlayersInRoom(tuple.Item1, new List<string>(new string[] { }));
+                                System.Threading.Thread.Sleep(tuple.Item2 * 1000);
+                                return true; //we still want the other sequence to execute we will set the tuple to null in the body of the while loop
+                            }
+                            //run the main sequence script
+                            room.InformPlayersInRoom(sequence[step]["Step"].AsString, new List<string>(new string[] { }));
+                        }
+                    }
+                }
 
 				System.Threading.Thread.Sleep(sequence[step]["Wait"].AsInt32 * 1000);
 				step++;

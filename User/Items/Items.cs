@@ -32,7 +32,7 @@ namespace Items {
         [BsonDictionaryOptions(DictionaryRepresentation.ArrayOfDocuments)]
         public Dictionary<ItemsType, int> ItemType { get; set; }
         public Wearable WornOn { get; set; }
-        public int Location { get; set; }
+        public string Location { get; set; }
         public bool IsMovable { get; set; }
         public BsonArray Triggers { get; set; }
         public string Owner { get; set; }

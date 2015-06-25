@@ -246,9 +246,9 @@ namespace Commands {
             bool itemFound = false;
             Room room = Room.GetRoom(player.Player.Location);
 
-            int location;
+            string location;
             if (string.Equals(commands[commands.Count - 1], "inventory", StringComparison.InvariantCultureIgnoreCase)) {
-                location = -1;
+                location = null;
                 commands.RemoveAt(commands.Count - 1); //get rid of "inventory" se we can parse an index specifier if there is one
             }
             else {
@@ -264,7 +264,7 @@ namespace Commands {
 
             int index = 1;
 
-            if (location != -1) {//player didn't specify it was in his inventory check room first
+            if (!string.IsNullOrEmpty(location)) {//player didn't specify it was in his inventory check room first
                 foreach (string itemID in room.GetObjectsInRoom(Room.RoomObjects.Items)) {
                     Items.Iitem inventoryItem = Items.Items.GetByID(itemID);
                     inventoryItem = KeepOpening(itemNameToGet, inventoryItem, itemPosition, index);

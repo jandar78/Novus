@@ -194,23 +194,23 @@ namespace Rooms {
     #region Helper Methods for door scripts
     public class DoorHelpers {
         [LuaAccessible]
-        public static void OpenDoor(int roomID, string direction) {
+        public static void OpenDoor(string roomID, string direction) {
             CommandParser.OpenDoorOverride(roomID, direction);         
         }
 
         [LuaAccessible]
-        public static void CloseDoor(int roomID, string direction) {
+        public static void CloseDoor(string roomID, string direction) {
             CommandParser.CloseDoorOverride(roomID, direction);
         }
 
         [LuaAccessible]
-        public static void LockDoor(int roomID, string direction) {
+        public static void LockDoor(string roomID, string direction) {
             CommandParser.LockDoorOverride(roomID, direction);
             
         }
 
         [LuaAccessible]
-        public static void UnlockDoor(int roomID, string direction) {
+        public static void UnlockDoor(string roomID, string direction) {
             CommandParser.UnlockDoorOverride(roomID, direction);
             
         }
@@ -221,7 +221,7 @@ namespace Rooms {
         }
 
         [LuaAccessible]
-        public static void CreateNPC(int mobTypeID, int location, int amount) {
+        public static void CreateNPC(int mobTypeID, string location, int amount) {
             amount = amount * Rooms.Room.GetRoom(location).GetObjectsInRoom(Room.RoomObjects.Players).Count;
 
             for (int i = 0; i < amount; i++) {

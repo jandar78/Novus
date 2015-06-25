@@ -204,7 +204,7 @@ namespace Commands {
 
        
         //could be an item or an npc, we'll figure it out
-        private static string GetObjectInPosition(int position, string name, int location) {
+        private static string GetObjectInPosition(int position, string name, string location) {
             string result = "";
             string[] parsedName = name.Split('.');
             
@@ -216,7 +216,7 @@ namespace Commands {
             return result;
         }
 
-        private static string GetItemInPosition(int position, string name, int location, string[] parsedName) {
+        private static string GetItemInPosition(int position, string name, string location, string[] parsedName) {
             string result = "";
 
             MongoUtils.MongoData.ConnectToDatabase();
@@ -241,7 +241,7 @@ namespace Commands {
             return result;
         }
 
-        private static string GetNPCInPosition(int position, string name, int location, string[] parsedName) {
+        private static string GetNPCInPosition(int position, string name, string location, string[] parsedName) {
             string result = "";
             
             MongoUtils.MongoData.ConnectToDatabase();

@@ -112,12 +112,12 @@ namespace Character {
 			set;
 		}
 
-		public int Location {
+		public string Location {
 			get;
 			set;
 		}
 
-		public int LastLocation {
+		public string LastLocation {
 			get;
 			set;
 		}
@@ -449,7 +449,7 @@ namespace Character {
 			Age = 17;   //Do we want an age? And are we going to advance it every in game year?  Players could be 400+ years old rather quick.
 			Weight = 180.0d; //pounds or kilos?
 			Height = 70.0d;  //inches or centimeters?
-			Location = 1000;
+			Location = "A0";
 			InCombat = false;
 			LastCombatTime = DateTime.MinValue.ToUniversalTime();
 			IsNPC = true;
@@ -660,7 +660,7 @@ namespace Character {
 			_stanceState = (CharacterStanceState)Enum.Parse(typeof(CharacterStanceState), found["StanceState"].AsString.CamelCaseWord());
 			_actionState = (CharacterActionState)Enum.Parse(typeof(CharacterActionState), found["ActionState"].AsString.CamelCaseWord());
 			Description = found["Description"].AsString;
-			Location = found["Location"].AsInt32;
+			Location = found["Location"].AsString;
 			Height = found["Height"].AsDouble;
 			Weight = found["Weight"].AsDouble;
 			IsNPC = found["IsNPC"].AsBoolean;

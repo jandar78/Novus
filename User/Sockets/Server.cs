@@ -96,8 +96,8 @@ namespace MySockets
 			//then we are going to update the value of the socket who's user is currently logging in with the user that is sitting in limbo
 			//and then we are going to get rid of the socket/user pair that are still in limbo
 			List<KeyValuePair<Socket, User.User>> check = clientSocketList.Where(u => u.Value.UserID == userID).ToList();
-			KeyValuePair<Socket, User.User> newClient = check.Where(c => c.Value.CurrentState == User.User.UserState.LOGGING_IN).SingleOrDefault();
-			KeyValuePair<Socket, User.User> oldClient = check.Where(c => c.Value.CurrentState == User.User.UserState.LIMBO).SingleOrDefault();
+			KeyValuePair<Socket, User.User> newClient = check.Where(c => c.Value.CurrentState == User.User.UserState.LOGGING_IN).FirstOrDefault();
+			KeyValuePair<Socket, User.User> oldClient = check.Where(c => c.Value.CurrentState == User.User.UserState.LIMBO).FirstOrDefault();
 			if (!clientSocketList.TryUpdate(newClient.Key, oldClient.Value, newClient.Value)){
 				return false;
 			}

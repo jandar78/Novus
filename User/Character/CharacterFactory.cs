@@ -95,7 +95,7 @@ namespace CharacterFactory {
                 npc.Description = descriptions[0]["Description"].AsString;
             }
             npc.MobTypeID = template["MobTypeID"].AsInt32;
-            npc.Location = template["Location"].AsInt32;
+            npc.Location = template["Location"].AsString;
             npc.Weight = template["Weight"].AsDouble;
             npc.Height = template["Height"].AsDouble;
             npc.LastCombatTime = DateTime.MinValue.ToUniversalTime();

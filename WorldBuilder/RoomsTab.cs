@@ -11,7 +11,9 @@ using MongoDB.Bson;
 using MongoDB.Driver;
 using MongoDB.Driver.Builders;
 using MongoDB.Bson.Serialization;
+using MongoDB.Driver.Linq;
 using Extensions;
+using System.Text.RegularExpressions;
 
 namespace WorldBuilder {
     public partial class Form1 : Form {
@@ -44,9 +46,7 @@ namespace WorldBuilder {
         private void roomLoad_Click(object sender, EventArgs e) {
             if (!IsEmpty(roomIdValue.Text)) {
                 if (ConnectedToDB) {
-                    int roomId = 0;
-                    int.TryParse(roomIdValue.Text, out roomId);
-                    Rooms.Room room = Rooms.Room.GetRoom(roomId);
+                    Rooms.Room room = Rooms.Room.GetRoom(roomIdValue.Text);
                     FillRoomControls(room);
                 }
             }
@@ -69,6 +69,7 @@ namespace WorldBuilder {
         }
 
         private void FillExits(List<Rooms.Exits> exits) {
+            roomExitsValue.Items.Clear();
             exitsInRoom = new List<Rooms.Exits>();
             foreach (Rooms.Exits exit in exits) {
                 roomExitsValue.Items.Add(exit.Direction);
@@ -86,16 +87,14 @@ namespace WorldBuilder {
         }
 
         private void roomModifierValue_DoubleClick(object sender, EventArgs e) {
-            Rooms.RoomModifier modifier = modifiersInRoom.Where(mod => mod.Name == roomModifierValue.SelectedValue).SingleOrDefault();
+            Rooms.RoomModifier modifier = modifiersInRoom.Where(mod => mod.Name == roomModifierValue.SelectedValue.ToString()).SingleOrDefault();
 
         }
 
         private Rooms.Room LoadRoomInformation() {
             var roomIdToParse = roomsListValue.SelectedItem.ToString();
-            int roomId = 0;
             roomIdToParse = roomIdToParse.Substring(roomIdToParse.IndexOf('(') + 1).Replace(")", "");
-            int.TryParse(roomIdToParse, out roomId);
-            Rooms.Room room = Rooms.Room.GetRoom(roomId);
+            Rooms.Room room = Rooms.Room.GetRoom(roomIdValue.Text);
             FillRoomControls(room);
             return room;
         }
@@ -166,7 +165,7 @@ namespace WorldBuilder {
             return (directionCorrected + exit.Description + ".");
         }
 
-        private string HintCheck(int roomId) {
+        private string HintCheck(string roomId) {
             StringBuilder sb = new StringBuilder();
             //let's display the room hints if the player passes the check
             foreach (Rooms.RoomModifier mod in Rooms.Room.GetModifiers(roomId)) {
@@ -176,5 +175,67 @@ namespace WorldBuilder {
             }
             return sb.ToString();
         }
+
+        private void addRoomNorth_Click(object sender, EventArgs e) {
+            AddAdjacentRoom(RoomDirection.North);
+        }
+
+        private void AddAdjacentRoom(RoomDirection direction) {
+            int roomID = GetNewRoomId();
+        }
+
+        private int GetNewRoomId() {
+            int id = 0;
+            MongoCollection roomCollection = MongoUtils.MongoData.GetCollection("World", "Rooms");
+            List<BsonDocument> roomCursor = roomCollection.AsQueryable<BsonDocument>().Where(r => r["_id"].AsString.StartsWith(GetZoneCode(roomIdValue.Text))).ToList();
+                //.FindAs<BsonDocument>(Query.Matches("_id", new BsonRegularExpression(roomIdValue.Text.Substring(0, 1) + "\\d", "/i/m"))).ToList();
+            //id = ParseRoomID(rooms.Max(r => r["_id"].AsString));
+            id += 1;
+
+            //if (id >  rooms.Count) { //okay let's not waste any good room ID's lets find the missing one in the mix and return it
+               
+            //}
+
+            return id;
+        }
+
+
+        //Room ID's will consist of a alpha characters followed by three digits
+        //this will allow us to have literally as many zones as we want with as many rooms as we want.
+        //A0001, AAB7654, A354738, etc, etc.
+        private int ParseRoomID(string roomId) {
+            int ignore = 0;
+            foreach (char alpha in roomId) {
+                if (!char.IsDigit(alpha)) {
+                    ignore++;
+                }
+                else {
+                    break;
+                }
+            }
+
+            int id = 0;
+            int.TryParse(roomId.Substring(ignore), out id);
+
+            return id;
+        }
+
+        private string GetZoneCode(string roomId) {
+            int include = 0;
+            foreach (char alpha in roomId) {
+                if (char.IsDigit(alpha)) {
+                    include++;
+                }
+                else {
+                    break;
+                }
+            }
+
+            return roomId.Substring(0, include);
+        }
+
+        private enum RoomDirection {
+            North, South, West, East, Up, Down
+        };
     }
 }

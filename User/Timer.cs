@@ -88,17 +88,28 @@ namespace MudTime
 		}
 
 		private static void weatherTimerTick(uint ticks, EventArgs e) {
-			//pick an area in which to change the weather
-			//this should eventually just randomly choose a low number and a high number from an areas(s)
-			int lowerEnd = 1000;
-			int upperEnd = 1011;
+            //pick an area in which to change the weather
+                        
+            List<string> zones = MongoUtils.MongoData.GetDatabase("Rooms").GetCollectionNames().ToList();
+            int numberOfZones = Extensions.RandomNumber.GetRandomNumber().NextNumber(0, zones.Count);
+
+            List<string> zonesToAffect = new List<string>();
+
+            for (int i = 0; i < numberOfZones; i++) {
+                string zoneToAdd = zones[Extensions.RandomNumber.GetRandomNumber().NextNumber(0, zones.Count)];
+                while (!zonesToAffect.Contains(zoneToAdd)) {
+                    zoneToAdd = zones[Extensions.RandomNumber.GetRandomNumber().NextNumber(0, zones.Count)];
+                }
+
+                zonesToAffect.Add(zoneToAdd);
+            }
 
             int firstPick = Extensions.RandomNumber.GetRandomNumber().NextNumber(0,5);
             int secondPick = Extensions.RandomNumber.GetRandomNumber().NextNumber(0,5);
 			
 			//they do not match often at all, I had 1 match within 20+ attempts and I stopped checking at that point
 			if (firstPick == secondPick) {
-				Calendar.Calendar.ApplyWeather(lowerEnd, upperEnd);				
+				Calendar.Calendar.ApplyWeather(zonesToAffect);				
 			}
 		}
 

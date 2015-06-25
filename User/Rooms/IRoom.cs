@@ -6,8 +6,15 @@ using System.Threading.Tasks;
 
 namespace Rooms {
     interface IRoom {
-        int Id { get; set; }
+        string Id { get; set; }
         string Title { get; set; }
+        string Zone {
+            get;
+        }
+
+        int RoomId {
+            get;
+        }
        
         string Description { get; set; }
         bool IsDark { get; }

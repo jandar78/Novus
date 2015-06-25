@@ -107,10 +107,10 @@ namespace Commands {
             //they said 'all' so we are going to remove everything
             if (commands.Count > 2 && string.Equals(commands[2].ToLower(), "all", StringComparison.InvariantCultureIgnoreCase)) {
                 foreach (KeyValuePair<Items.Wearable, Items.Iitem> item in player.Player.Equipment.GetEquipment()) {
-                    if(player.Player.Equipment.UnequipItem(item.Value, player.Player));
+                    if (player.Player.Equipment.UnequipItem(item.Value, player.Player)) {
+                    }
                 }
 
-                
                 msgOthers = string.Format("{0} removes all his equipment.", player.Player.FirstName);
             }
             else {
@@ -380,9 +380,9 @@ namespace Commands {
                 commandIndex++;
             }
 
-            int location;
+            string location;
             if (string.Equals(commands[commands.Count - 1], "inventory", StringComparison.InvariantCultureIgnoreCase)) {
-                location = -1;
+                location = null;
                 commands.RemoveAt(commands.Count - 1); //get rid of "inventory" se we can parse an index specifier if there is one
             }
             else {
@@ -396,7 +396,7 @@ namespace Commands {
             Items.Iitem containerItem = null;
 
             //using a recursive method we will dig down into each sub container looking for the appropriate container
-            if (location != -1) {
+            if (!string.IsNullOrEmpty(location)) {
                 TraverseItems(player, containerName.ToString().Trim(), itemName.ToString().Trim(), containerPosition, itemPosition, out retrievedItem, out containerItem);
 
                 //player is an idiot and probably wanted to put it in his inventory but didn't specify it so let's check there as well
@@ -456,7 +456,7 @@ namespace Commands {
             List<string> commandAltered = ParseItemPositions(commands, "from", out itemPosition, out itemName);
             ParseContainerPosition(commandAltered, commands[3], out containerPosition, out containerName);
           
-            int location = player.Player.Location;
+            string location = player.Player.Location;
            
             Items.Iitem retrievedItem = null;
             Items.Iitem containerItem = null;
@@ -481,7 +481,7 @@ namespace Commands {
                     msgOthers = string.Format("{0} grabs {1}.", player.Player.FirstName, retrievedItem.Name.ToLower());
                 }
 
-                retrievedItem.Location = -1;
+                retrievedItem.Location = null;
                 retrievedItem.Owner = player.UserID;
                 retrievedItem.Save();
                 player.Player.Inventory.AddItemToInventory(retrievedItem);

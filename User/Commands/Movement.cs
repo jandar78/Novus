@@ -154,7 +154,7 @@ namespace Commands {
 		}
 
 		#region Open things
-        public static bool OpenDoor(int roomID, string doorDirection) {
+        public static bool OpenDoor(string roomID, string doorDirection) {
             Door door = FindDoor(roomID, new List<string>() { doorDirection, doorDirection });
             if (door.Openable) {
                 if (!door.Open && !door.Locked && !door.Destroyed) {
@@ -165,7 +165,7 @@ namespace Commands {
             return false;
         }
 
-        public static bool OpenDoorOverride(int roomID, string doorDirection) {
+        public static bool OpenDoorOverride(string roomID, string doorDirection) {
             Door door = FindDoor(roomID, new List<string>() { doorDirection, doorDirection });
             if (door.Openable) {
                     OpenADoor(door);
@@ -188,9 +188,9 @@ namespace Commands {
         private static void OpenContainer(User.User player, List<string> commands) {
             //this is a quick work around for knowing which container to open without implementing the dot operator
             //I need to come back and make it work like with NPCS once I've tested everything works correctly
-            int location;
+            string location;
             if (string.Equals(commands[commands.Count - 1], "inventory", StringComparison.InvariantCultureIgnoreCase)) {
-                location = -1;
+                location = null;
                 commands.RemoveAt(commands.Count - 1); //get rid of "inventory" se we can parse an index specifier if there is one
             }
             else {
@@ -208,7 +208,7 @@ namespace Commands {
             
             int index = 1;
             Room room = Room.GetRoom(location);
-            if (location != -1) {//player didn't specify it was in his inventory check room first
+            if (!string.IsNullOrEmpty(location)) {//player didn't specify it was in his inventory check room first
                 foreach (string itemID in room.GetObjectsInRoom(Room.RoomObjects.Items)) {
                     Items.Iitem inventoryItem = Items.Items.GetByID(itemID);
                     inventoryItem = KeepOpening(itemNameToGet, inventoryItem, itemPosition);
@@ -334,9 +334,9 @@ namespace Commands {
 		}
 
         private static void CloseContainer(User.User player, List<string> commands) {
-            int location;
+            string location;
             if (string.Equals(commands[commands.Count - 1], "inventory", StringComparison.InvariantCultureIgnoreCase)) {
-                location = -1;
+                location = null;
                 commands.RemoveAt(commands.Count - 1); //get rid of "inventory" se we can parse an index specifier if there is one
             }
             else {
@@ -360,7 +360,7 @@ namespace Commands {
             //in his inventory.  I should probably check room containers first then player inventory otherwise the player can 
             //specify "inventory" to just do it in their inventory container.
 
-            if (location != -1) {//player didn't specify it was in his inventory check room first
+            if (!string.IsNullOrEmpty(location)) {//player didn't specify it was in his inventory check room first
                 foreach (string itemID in room.GetObjectsInRoom(Room.RoomObjects.Items)) {
                     Items.Iitem inventoryItem = Items.Items.GetByID(itemID);
                     if (string.Equals(inventoryItem.Name, itemNameToGet, StringComparison.InvariantCultureIgnoreCase)) {
@@ -401,7 +401,7 @@ namespace Commands {
             door.UpdateDoorStatus();
         }
 
-        public static bool CloseDoorOverride(int roomID, string doorDirection) {
+        public static bool CloseDoorOverride(string roomID, string doorDirection) {
             Door door = FindDoor(roomID, new List<string>() { doorDirection, doorDirection });
             if (door.Openable) {
                 //we only care thats it's open and not destroyed, we bypass any other check
@@ -461,7 +461,7 @@ namespace Commands {
 			//ok not a door so then we'll check containers in the room
 		}
 
-        public static bool LockDoorOverride(int roomID, string doorDirection) {
+        public static bool LockDoorOverride(string roomID, string doorDirection) {
             Door door = FindDoor(roomID, new List<string>() { doorDirection, doorDirection });
             if (!door.Open && !door.Destroyed) {
                 door.Locked = true;
@@ -470,7 +470,7 @@ namespace Commands {
             return false;
         }
 
-        public static bool UnlockDoorOverride(int roomID, string doorDirection) {
+        public static bool UnlockDoorOverride(string roomID, string doorDirection) {
             Door door = FindDoor(roomID, new List<string>() { doorDirection, doorDirection });
             if (!door.Open && !door.Destroyed) {
                 door.Locked = false;
@@ -662,7 +662,7 @@ namespace Commands {
 		#endregion Actions
 
 		#region Helper methods
-		private static Door FindDoor(int location, List<string> commands) {
+		private static Door FindDoor(string location, List<string> commands) {
 			//this needs to be somewhat smart if the player types "break door" we should assume he wants to break the only door
 			//in the room, otherwise if he passes in "break iron door" we should be able to figure out he wants to break the door
 			//made of iron and if he passes "break west iron door"  he wants to break the iron door in the west exit.

@@ -12,6 +12,7 @@ using MongoDB.Driver;
 using MongoDB.Driver.Builders;
 using MongoDB.Bson.Serialization;
 using LuaInterface;
+using System.Text.RegularExpressions;
 
 namespace WorldBuilder {
     public partial class Form1 : Form {
@@ -92,10 +93,6 @@ namespace WorldBuilder {
             MessageBox.Show(msg, "Validation error", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
         }
 
-      
-
-       
-
-       
+     
     }
 }

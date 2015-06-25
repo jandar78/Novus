@@ -117,13 +117,13 @@ namespace Character {
 			}
 		}
 
-		public static List<Iactor> GetAnNPCByName(string name, int location = 0) {
+		public static List<Iactor> GetAnNPCByName(string name, string location = null) {
 			List<Iactor> npcList = null;
 			MongoUtils.MongoData.ConnectToDatabase();
 			MongoDatabase character = MongoUtils.MongoData.GetDatabase("Characters");
 			MongoCollection npcCollection = character.GetCollection("NPCCharacters");
 			IMongoQuery query;
-			if (location == 0) {
+			if (string.IsNullOrEmpty(location)) {
 				query = Query.EQ("FirstName", name.CamelCaseWord());
 			}
 			else {

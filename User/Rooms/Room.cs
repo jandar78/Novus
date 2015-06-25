@@ -44,7 +44,7 @@ namespace Rooms {
 
         private List<Triggers.ITrigger> _triggers;
 
-        public int Id { get; set; }
+        public string Id { get; set; }
         public string Title {
             get {
                 if (IsDark) {
@@ -56,6 +56,19 @@ namespace Rooms {
                 _title = value;
             }
         }
+
+        public string Zone {
+            get {
+                return GetZoneCode(Id);
+            }
+        }
+
+        public int RoomId {
+            get {
+                return ParseRoomID(Id);
+            }
+        }
+
         public BsonArray Descriptions { get; set; }
         public BsonArray Conditions { get; set; }
         public string CurrentCondition { get; set; }
@@ -126,7 +139,7 @@ namespace Rooms {
 
             foreach (BsonDocument doc in Exits) {
                 Exits exit = new Exits();
-                exit.availableExits.Add(doc["Name"].AsString, GetRoom(doc["LeadsToRoom"].AsInt32)); //causing stackoverflow because exits point to each other
+                exit.availableExits.Add(doc["Name"].AsString, GetRoom(doc["LeadsToRoom"].AsString)); //causing stackoverflow because exits point to each other
                 //if it has door grab that as well
                 //this query looks for a door with an id of either "roomid-adjecentroomid" or "adjacentroomid-roomid"
                 string oneWay = Id.ToString() + "-" + exit.availableExits[doc["Name"].AsString].Id;
@@ -406,7 +419,7 @@ namespace Rooms {
             Room room = null;
 
             foreach (BsonDocument doc in roomsFound) {
-                room = Room.GetRoom(doc["_id"].AsInt32);
+                room = Room.GetRoom(doc["_id"].AsString);
 
                 BsonArray modArray = doc["Modifiers"].AsBsonArray;
 
@@ -439,7 +452,7 @@ namespace Rooms {
             }
         }
 
-        public static List<Dictionary<string, string>> GetModifierEffects(double roomId) {
+        public static List<Dictionary<string, string>> GetModifierEffects(string roomId) {
             List<Dictionary<string, string>> affects = new List<Dictionary<string, string>>();
             foreach (RoomModifier mod in GetModifiers(roomId)) {
                 foreach (Dictionary<string, string> dic in mod.Affects) {
@@ -452,10 +465,10 @@ namespace Rooms {
             return affects;
         }
 
-        public static List<RoomModifier> GetModifiers(double roomId) {
+        public static List<RoomModifier> GetModifiers(string roomId) {
             List<RoomModifier> roomModifierList = new List<RoomModifier>();
 
-            BsonDocument roomFound = MongoUtils.MongoData.GetCollection("World", "Rooms").FindOneAs<BsonDocument>(Query.EQ("_id", roomId));
+            BsonDocument roomFound = MongoUtils.MongoData.GetCollection("Rooms", GetZoneCode(roomId)).FindOneAs<BsonDocument>(Query.EQ("_id", roomId));
             BsonArray modifiers = roomFound["Modifiers"].AsBsonArray;
 
             MongoDatabase worldDB = MongoUtils.MongoData.GetDatabase("World");
@@ -493,10 +506,10 @@ namespace Rooms {
             return roomModifierList;
         }
 
-        public static Room GetRoom(int roomID) {
+        public static Room GetRoom(string roomID) {
             Room room = null;
 
-            MongoCollection roomCollection = MongoUtils.MongoData.GetCollection("World", "Rooms");
+            MongoCollection roomCollection = MongoUtils.MongoData.GetCollection("Rooms", GetZoneCode(roomID));
             IMongoQuery query = Query.EQ("_id", roomID);
             BsonDocument roomDocument = roomCollection.FindOneAs<BsonDocument>(query);
 
@@ -553,5 +566,35 @@ namespace Rooms {
             Title = doc["Title"].AsString;
         }
 
+        private static int ParseRoomID(string roomId) {
+            int ignore = 0;
+            foreach (char alpha in roomId) {
+                if (!char.IsDigit(alpha)) {
+                    ignore++;
+                }
+                else {
+                    break;
+                }
+            }
+
+            int id = 0;
+            int.TryParse(roomId.Substring(ignore), out id);
+
+            return id;
+        }
+
+        private static string GetZoneCode(string roomId) {
+            int include = 0;
+            foreach (char alpha in roomId) {
+                if (char.IsDigit(alpha)) {
+                    include++;
+                }
+                else {
+                    break;
+                }
+            }
+
+            return roomId.Substring(0, include);
+        }
     }
 }

@@ -20,7 +20,7 @@ namespace Items {
         bool IsWearable { get; set; } 
         int MinimumLevel { get; set; }
         Wearable WornOn { get; set; }
-        int Location { get; set; }
+        string Location { get; set; }
         Dictionary<ItemsType, int> ItemType { get; set; }
         void DeteriorateCondition();
         void ImproveCondition();
