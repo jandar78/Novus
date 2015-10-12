@@ -8,6 +8,7 @@ using MongoDB.Bson;
 using MongoDB.Driver.Builders;
 using MongoUtils;
 using Extensions;
+using ClientHandling;
 
 namespace Calendar {
 	public static class Calendar {
@@ -264,7 +265,7 @@ namespace Calendar {
         private static Func<BsonArray, Tuple<string, int>, string, string, bool> GetScript(List<string> zones) {
             int step = 0;
 
-            Func<BsonArray, Tuple<string, int>, string, string, bool> result = delegate (BsonArray sequence, Tuple<string, int> tuple, string type, string message) {
+            Func<BsonArray, Tuple<string, int>, string, string, bool> result = delegate (BsonArray sequence, Tuple<string, int> tuple, string type, string weatherMsg) {
             Rooms.Room room = null;
             //the sequence has ended nothing left to do here
             if (step >= sequence.Count) {
@@ -272,26 +273,32 @@ namespace Calendar {
                         for (int low = 0; low <= 999; low++) { //apply to it to rooms in zone Todo: get the number of rooms in the zone and use that as the low, high numbers
                             room = Rooms.Room.GetRoom(zone + low);
                             room.Weather = type;
-                            room.WeatherMessage = message;
+                            room.WeatherMessage = weatherMsg;
                         }
                     }
 					return false;
 				}
 
+				Message message = new Message();
                 foreach (string zone in zones) {
                     for (int low = 0; low <= 999; low++) {//Todo: get low/high numbers from room count in zone from database
                         room = Rooms.Room.GetRoom(zone + low);
-                        if (room.IsOutdoors) {
+						message.InstigatorID = room.Id;
+						message.InstigatorType = Message.ObjectType.Room;
 
+						if (room.IsOutdoors) {
                             //ok if the tuple is not null then we are going to process it first. As of now it is just one single message with a wait time
                             //this can be modified to include more steps easily by making item1 a list and using steps to keep track
                             if (tuple != null) {
-                                room.InformPlayersInRoom(tuple.Item1, new List<string>(new string[] { }));
-                                System.Threading.Thread.Sleep(tuple.Item2 * 1000);
+								message.Room = tuple.Item1;
+                                room.InformPlayersInRoom(message, new List<string>() { });
+
+								System.Threading.Thread.Sleep(tuple.Item2 * 1000);
                                 return true; //we still want the other sequence to execute we will set the tuple to null in the body of the while loop
                             }
-                            //run the main sequence script
-                            room.InformPlayersInRoom(sequence[step]["Step"].AsString, new List<string>(new string[] { }));
+							//run the main sequence script
+							message.Room = sequence[step]["Step"].AsString;
+                            room.InformPlayersInRoom(message, new List<string>() { });
                         }
                     }
                 }

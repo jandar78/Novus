@@ -5,6 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Extensions;
 using Triggers;
+using AI.PathFinding;
 
 namespace AI {
     public interface IState {
@@ -51,7 +52,71 @@ namespace AI {
         }
     }
 
-    public class Wander : IState {
+	public class WalkTo : IState {
+
+		private static WalkTo _walkTo;
+		private WalkTo() { }
+		public static WalkTo GetState() {
+			return _walkTo ?? (_walkTo = new WalkTo());
+		}
+		public void Enter(Character.NPC actor) {
+			actor.NextAiAction = DateTime.Now.AddSeconds(Extensions.RandomNumber.GetRandomNumber().NextNumber(0, 2)).ToUniversalTime();
+		}
+
+		public void Exit(Character.NPC actor) {
+		}
+
+		public override string ToString() {
+			return "WalkTo";
+		}
+
+		public void Execute(Character.NPC actor, ITrigger trigger = null) {
+			if (actor.StanceState != CharacterEnums.CharacterStanceState.Laying_unconcious &&
+				actor.StanceState != CharacterEnums.CharacterStanceState.Laying_dead &&
+				actor.StanceState != CharacterEnums.CharacterStanceState.Decomposing) {
+				if (DateTime.Now.ToUniversalTime() > actor.NextAiAction) {
+					//so it's time for this AI state to execute
+					//will move the NPC towards a specific room, this should be used when doing AI pathfinding and we have found a path
+					//it will need an end location since the start is the NPC current location.
+					string message = "";
+					//Get NPC path Queue
+					//Peek next room ID to walk to
+					//Find that roomID from the available exits
+					//Walk in that direction -new State
+					//if path is blocked - perform some action (unlock, open, emote)
+					//Find new path or wait until another trigger causes a new state change
+
+					if (trigger.MessageOverrideAsString.Count > 0) {
+						message = trigger.MessageOverrideAsString[RandomNumber.GetRandomNumber().NextNumber(0, trigger.MessageOverrideAsString.Count)];
+					}
+					
+					Commands.CommandParser.ExecuteCommand(actor, "directionToGo", message);
+				}
+			}
+			//either way we are not staying in this state, it's just a blip state
+			actor.NextAiAction = DateTime.Now.AddSeconds(Extensions.RandomNumber.GetRandomNumber().NextNumber(60, 121)).ToUniversalTime(); //set when we want this action to execute next
+			actor.Fsm.RevertState();
+			actor.Save();
+		}
+	}
+
+	public class FindPath {
+	     
+		public FindPath(string startPoint, string endPoint) {
+			Rooms.Room room = Rooms.Room.GetRoom(startPoint);
+			Rooms.Room endRoom = Rooms.Room.GetRoom(endPoint);
+			TreeNode rootNode = new TreeNode(room);
+			rootNode.Parent = rootNode;
+		//	rootNode.Distance = 0;
+			TreeTraverser traverser = new TreeTraverser(rootNode, endRoom.Id, endRoom.RoomId, room.Zone == endRoom.Zone);
+			
+			List<string> pathToFollow = traverser.TraverseTree();//should be the path to our endPoint.....I hope.		
+			pathToFollow.ToString();
+        }
+	}
+
+
+	public class Wander : IState {
         private static Wander _wander;
         private Wander() { }
 
@@ -64,6 +129,7 @@ namespace AI {
                 Rooms.Room room = Rooms.Room.GetRoom(actor.Location);
                 room.GetRoomExits();
                 List<Rooms.Exits> availableExits = room.RoomExits;
+				FindPath findPath = new FindPath(actor.Location, "A9");
                 if (DateTime.Now.ToUniversalTime() > actor.NextAiAction) {//so it's time for this AI state to execute
                     Commands.CommandParser.ExecuteCommand(actor, availableExits[Extensions.RandomNumber.GetRandomNumber().NextNumber(0, availableExits.Count)].Direction);
                     actor.NextAiAction = DateTime.Now.AddSeconds(Extensions.RandomNumber.GetRandomNumber().NextNumber(60, 121)).ToUniversalTime(); //set when we want this action to execute next
@@ -91,7 +157,39 @@ namespace AI {
 
     }
 
-    public class Speak : IState {
+	public class Stay : IState {
+		private static Stay _stay;
+		private Stay() { }
+
+		public static Stay GetState() {
+			return _stay ?? (_stay = new Stay());
+		}
+
+		public void Execute(Character.NPC actor, ITrigger trigger = null) {
+			if (!actor.IsDead() && !actor.InCombat) {
+				//Will stay in place until forced into combat or a script puts it in another state
+				actor.NextAiAction = DateTime.Now.AddSeconds(5).ToUniversalTime();
+			}
+
+			if (actor.InCombat) {
+				actor.Fsm.ChangeState(Combat.GetState(), actor);
+			}
+		}
+
+		public void Enter(Character.NPC actor) {
+			actor.NextAiAction = DateTime.Now.AddSeconds(5).ToUniversalTime();
+		}
+
+		public void Exit(Character.NPC actor) { 
+		}
+
+		public override string ToString() {
+			return "Stay";
+		}
+
+	}
+
+	public class Speak : IState {
         private static Speak _speak;
         private Speak() { }
 

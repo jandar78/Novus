@@ -198,16 +198,17 @@ namespace Commands {
             //there's a lot of sentence  
             string[] vowel = new string[] { "a", "e", "i", "o", "u" };
 
+			RoomExits exitDirection = (RoomExits)Enum.Parse(typeof(RoomExits), exit.Direction.CamelCaseWord());
             if (room.IsDark) {
                 exit.Description = "something";
             }
 
             if (string.IsNullOrEmpty(exit.Description)) {
-                exit.Description = exit.availableExits[exit.Direction.CamelCaseWord()].Title.ToLower();
+                exit.Description = exit.availableExits[exitDirection].Title.ToLower();
             }
 
             if (exit.Description.Contains("that leads to")) {
-                exit.Description += exit.availableExits[exit.Direction.CamelCaseWord()].Title.ToLower();
+                exit.Description += exit.availableExits[exitDirection].Title.ToLower();
             }
 
             string directionCorrected = "To the " + exit.Direction.CamelCaseWord().FontColor(Utils.FontForeColor.CYAN) + " there is ";
@@ -226,7 +227,7 @@ namespace Commands {
                     exit.Description = "somewhere";
                 }
                 else {
-                    exit.Description = exit.availableExits[exit.Direction.CamelCaseWord()].Title.ToLower();
+                    exit.Description = exit.availableExits[exitDirection].Title.ToLower();
                 }
             }
 

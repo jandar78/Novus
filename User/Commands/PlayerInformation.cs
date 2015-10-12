@@ -9,6 +9,7 @@ using MongoDB.Driver;
 using MongoDB.Bson;
 using MongoDB.Driver.Builders;
 using Extensions;
+using ClientHandling;
 
 namespace Commands {
 	public partial class CommandParser {
@@ -117,52 +118,73 @@ namespace Commands {
         }
 
 		private static void Emote(User.User player, List<string> commands) {
+			Message message = new Message();
 			string temp = "";
-			if (commands[0].Trim().Length > 6) temp = commands[0].Substring(6).Trim();
-			else {
-				player.MessageHandler("You go to do something but what?.");
-				return;
+			if (commands[0].Trim().Length > 6) {
+				temp = commands[0].Substring(6).Trim();
 			}
-            if (!player.Player.IsNPC) {
-                player.MessageHandler(player.Player.FirstName + " " + temp + (temp.EndsWith(".") == false ? "." : ""));
+			else {
+				message.Self = "You go to do something but what?.";
+			}
+
+            if (!player.Player.IsNPC && !string.IsNullOrEmpty(temp)) {
+                message.Self = player.Player.FirstName + " " + temp + (temp.EndsWith(".") == false ? "." : "");
             }
+
             Room room = Room.GetRoom(player.Player.Location);
-            room.InformPlayersInRoom((room.IsDark == true ? "Someone" : player.Player.FirstName) + " " + temp + (temp.EndsWith(".") == false ? "." : ""), new List<string>(new string[] { player.UserID }));
+			message.Room = (room.IsDark == true ? "Someone" : player.Player.FirstName) + " " + temp + (temp.EndsWith(".") == false ? "." : "");
+			message.InstigatorID = player.UserID;
+			message.InstigatorType = player.Player.IsNPC == false ? Message.ObjectType.Player : Message.ObjectType.Npc;
+			player.MessageHandler(message.Self);
+            room.InformPlayersInRoom(message, new List<string>(){ player.UserID });
 		}
 
 		private static void Say(User.User player, List<string> commands) {
+			Message message = new Message();
             string temp ="";
             if (commands[0].Length > 4)	temp = commands[0].Substring(4);
             else{
-                if (player.Player.IsNPC) {
+                if (!player.Player.IsNPC) {
                     player.MessageHandler("You decide to stay quiet since you had nothing to say.");
                     return;
                 }
             }
             Room room = Room.GetRoom(player.Player.Location);
-            player.MessageHandler("You say \"" + temp + "\"");
-			room.InformPlayersInRoom((room.IsDark == true ? "Someone" : player.Player.FirstName) + " says \"" + temp + "\"",
-				new List<string>(new string[] { player.UserID })); 
+
+			message.Self = "You say \"" + temp + "\"";
+			message.Room = (room.IsDark == true ? "Someone" : player.Player.FirstName) + " says \"" + temp + "\"";
+			message.InstigatorID = player.UserID;
+			message.InstigatorType = player.Player.IsNPC == false ? Message.ObjectType.Player : Message.ObjectType.Npc;
+
+			if (player.Player.IsNPC) {
+				player.MessageHandler(message);
+			}
+			else {
+				player.MessageHandler(message.Self);
+			}
+
+			room.InformPlayersInRoom(message, new List<string>(){ player.UserID }); 
 		}
 
 	    //a whisper is a private message but with a chance that other players may hear what was said, other player has to be in the same room
         //TODO: need to add the ability for others to listen in on the whisper if they have the skill
 		private static void Whisper(User.User player, List<string> commands){
+			Message message = new Message();
+			message.InstigatorID = player.UserID;
+			message.InstigatorType = player.Player.IsNPC == false ? Message.ObjectType.Player : Message.ObjectType.Npc;
+
 			List<User.User> toPlayerList = new List<User.User>();
             Room room = Room.GetRoom(player.Player.Location);
 			if (commands.Count > 2){
 				if (commands[2].ToUpper() == "SELF") {
-					player.MessageHandler("You turn your head towards your own shoulder and whisper quietly to yourself.");
-					room.InformPlayersInRoom((room.IsDark == true ? "Someone" : player.Player.FirstName) + " whispers into " + player.Player.Gender == "MALE" ? "his" : "her" + " own shoulder.", 
-						new List<string>(new string[] { player.UserID })); ;
-					return;
+					message.Self = "You turn your head towards your own shoulder and whisper quietly to yourself.";
+					message.Room = (room.IsDark == true ? "Someone" : player.Player.FirstName) + " whispers into " + player.Player.Gender == "MALE" ? "his" : "her" + " own shoulder.";
 				}
 
 				toPlayerList = MySockets.Server.GetAUserByFirstName(commands[2]).Where(p => p.Player.Location == player.Player.Location).ToList();
 			}	
 
 			User.User toPlayer = null;
-			string message = "";
 
 			if (toPlayerList.Count < 1) {
 				player.MessageHandler("You whisper to no one. Creepy.");
@@ -183,9 +205,12 @@ namespace Commands {
 
 			bool fullName = true;
 			if (toPlayer == null) {
-				message = "You try and whisper to " + commands[2].CamelCaseWord() + " but they're not around.";
+				message.Self = "You try and whisper to " + commands[2].CamelCaseWord() + " but they're not around.";
 			}
 			else {
+				message.TargetID = toPlayer.UserID;
+				message.TargetType = player.Player.IsNPC == false ? Message.ObjectType.Player : Message.ObjectType.Npc;
+
 				int startAt = commands[0].ToLower().IndexOf(toPlayer.Player.FirstName.ToLower() + " " + toPlayer.Player.LastName.ToLower());
 				if (startAt == -1 || startAt > 11) {
 					startAt = commands[0].ToLower().IndexOf(toPlayer.Player.FirstName.ToLower());
@@ -197,13 +222,22 @@ namespace Commands {
 				if (fullName) startAt += toPlayer.Player.LastName.Length + 1;
 
 				if (commands[0].Length > startAt) {
-					message = commands[0].Substring(startAt);
-					player.MessageHandler("You whisper to " + toPlayer.Player.FirstName + " \"" + message + "\"");
-					toPlayer.MessageHandler((room.IsDark == true ? "Someone" : player.Player.FirstName) + " whispers to you \"" + message + "\"");
+					string whisper = commands[0].Substring(startAt);
+					message.Self = "You whisper to " + toPlayer.Player.FirstName + " \"" + whisper + "\"";
+					message.Target = (room.IsDark == true ? "Someone" : player.Player.FirstName) + " whispers to you \"" + whisper + "\"";
 					//this is where we would display what was whispered to players with high perception?
-					room.InformPlayersInRoom((room.IsDark == true ? "Someone" : player.Player.FirstName) + " whispers something to " + toPlayer.Player.FirstName, new List<string>(new string[] { player.UserID, toPlayer.UserID }));
+					message.Room = (room.IsDark == true ? "Someone" : player.Player.FirstName) + " whispers something to " + toPlayer.Player.FirstName;
 				}
 			}
+
+			if (player.Player.IsNPC) {
+				player.MessageHandler(message);
+			}
+			else {
+				player.MessageHandler(message.Self);
+			}
+			room.InformPlayersInRoom(message, new List<string>(){ player.UserID, toPlayer != null ? toPlayer.UserID : ""});
+			
 		}
 
 		//a tell is a private message basically, location is not a factor

@@ -9,6 +9,7 @@ using MongoDB.Driver;
 using MongoDB.Bson;
 using MongoDB.Driver.Builders;
 using Extensions;
+using ClientHandling;
 
 namespace Commands {
     public partial class CommandParser {
@@ -36,27 +37,34 @@ namespace Commands {
             //2.get the item from the DB
             List<Items.Iitem> items = Items.Items.GetByName(itemName.ToString().Trim(), player.UserID);
             Items.Iitem item = items[itemPosition - 1];
-           
-            //3.have player drop item
-            string msgPlayer = null;
+
+			//3.have player drop item
+			Message message = new Message();
+			message.InstigatorID = player.UserID;
+			message.InstigatorType = player.Player.IsNPC == false ? Message.ObjectType.Player : Message.ObjectType.Npc;
 
             if (item != null) {
                 player.Player.Inventory.RemoveInventoryItem(item, player.Player.Equipment);
                 item.Location = player.Player.Location;
-                item.Owner = item.Location.ToString();
+				item.Owner = player.UserID;
                 item.Save();
 
                 //4.Inform room and player of action
-                string msgOthers = string.Format("{0} drops {1}", player.Player.FirstName, item.Name);
-                room.InformPlayersInRoom(msgOthers, new List<string>(new string[] { player.UserID }));
-                msgPlayer = string.Format("You drop {0}", item.Name);
+                message.Room = string.Format("{0} drops {1}", player.Player.FirstName, item.Name);
+                room.InformPlayersInRoom(message, new List<string>(new string[] { player.UserID }));
+                message.Self = string.Format("You drop {0}", item.Name);
             }
             else {
-                msgPlayer = "You are not carrying anything of the sorts.";
+                message.Self = "You are not carrying anything of the sorts.";
             }
-            
-            player.MessageHandler(msgPlayer);
-        }
+
+			if (player.Player.IsNPC) {
+				player.MessageHandler(message);
+			}
+			else {
+				player.MessageHandler(message.Self);
+			}
+		}
 
         private static void Loot(User.User player, List<string> commands) {
             Character.Iactor npc = null;
@@ -69,7 +77,16 @@ namespace Commands {
                     npc = Character.NPCUtils.GetAnNPCByID(GetObjectInPosition(pos, commands[2], player.Player.Location));
                 }
             }
-            else {
+			if (npc == null) {
+				var npcList = Character.NPCUtils.GetAnNPCByName(commands[2], player.Player.Location);
+				if (npcList.Count > 1) {
+					npc = npcList.SingleOrDefault(n => n.Location == player.Player.Location);
+				}
+				else {
+					npc = npcList[0];
+				}
+			}
+            if (npc == null) {
                 npc = Character.NPCUtils.GetAnNPCByID(player.Player.CurrentTarget);
             }
 
@@ -101,8 +118,9 @@ namespace Commands {
         public static void Unequip(User.User player, List<string> commands) {
             StringBuilder itemName = new StringBuilder();
             int itemPosition = 1;
-            string msgPlayer = null;
-            string msgOthers = null;
+			Message message = new Message();
+			message.InstigatorID = player.UserID;
+			message.InstigatorType = player.Player.IsNPC == false ? Message.ObjectType.Player : Message.ObjectType.Npc;
 
             //they said 'all' so we are going to remove everything
             if (commands.Count > 2 && string.Equals(commands[2].ToLower(), "all", StringComparison.InvariantCultureIgnoreCase)) {
@@ -111,7 +129,7 @@ namespace Commands {
                     }
                 }
 
-                msgOthers = string.Format("{0} removes all his equipment.", player.Player.FirstName);
+                message.Room = string.Format("{0} removes all his equipment.", player.Player.FirstName);
             }
             else {
                 string[] position = commands[commands.Count - 1].Split('.'); //we are separating based on using the decimal operator after the name of the npc/item
@@ -133,35 +151,41 @@ namespace Commands {
 
                 if (item != null) {
                     player.Player.Equipment.UnequipItem(item, player.Player);
-                    msgOthers = string.Format("{0} unequips {1}", player.Player.FirstName, item.Name);
-                    msgPlayer = string.Format("You unequip {0}", item.Name);
+                    message.Room = string.Format("{0} unequips {1}", player.Player.FirstName, item.Name);
+                    message.Self = string.Format("You unequip {0}", item.Name);
                 }
                 else {
                     if (commands.Count == 2) {
-                        msgPlayer = "Unequip what?";
+                        message.Self = "Unequip what?";
                     }
                     else {
-                        msgPlayer = "You don't seem to be equipping that at the moment.";
+						message.Self = "You don't seem to be equipping that at the moment.";
                     }
                 }
             }
 
-            player.MessageHandler(msgPlayer);
-            Room.GetRoom(player.Player.Location).InformPlayersInRoom(msgOthers, new List<string>(new string[] { player.UserID }));
+			if (player.Player.IsNPC) {
+				player.MessageHandler(message);
+			}
+			else {
+				player.MessageHandler(message.Self);
+			}
+			Room.GetRoom(player.Player.Location).InformPlayersInRoom(message, new List<string>(){ player.UserID });
         }
 
         public static void Equip(User.User player, List<string> commands) {
             StringBuilder itemName = new StringBuilder();
             int itemPosition = 1;
-            string msgOthers = null;
-            string msgPlayer = null;
+			Message message = new Message();
+			message.InstigatorID = player.UserID;
+			message.InstigatorType = player.Player.IsNPC == false ? Message.ObjectType.Player : Message.ObjectType.Npc;
 
             //we need to make a list of items to wear from the players inventory and sort them based on stats
             if (commands.Count > 2 && string.Equals(commands[2].ToLower(), "all", StringComparison.InvariantCultureIgnoreCase)) {
                 foreach (Items.Iitem item in player.Player.Inventory.GetAllItemsToWear()) {
                     if (player.Player.Equipment.EquipItem(item, player.Player.Inventory)) {
-                        msgPlayer += string.Format("You equip {0}.\n", item.Name);
-                        msgOthers = string.Format("{0} equips {1}.\n", player.Player.FirstName, item.Name);
+                        message.Self += string.Format("You equip {0}.\n", item.Name);
+                        message.Room += string.Format("{0} equips {1}.\n", player.Player.FirstName, item.Name);
                     }
                 }
             }
@@ -180,8 +204,7 @@ namespace Commands {
                 }
 
                 List<Items.Iitem> items = Items.Items.GetByName(itemName.ToString().Trim(), player.UserID);
-                msgPlayer = null;
-
+                
                 //players need to specify an indexer or we will just give them the first one we found that matched
                 Items.Iitem item = items[itemPosition - 1];
 
@@ -198,22 +221,27 @@ namespace Commands {
                         clothing.Wear();
                     }
 
-                    msgOthers = string.Format("{0} equips {1}.", player.Player.FirstName, item.Name);
-                    msgPlayer = string.Format("You equip {0}.", item.Name);
+                    message.Room = string.Format("{0} equips {1}.", player.Player.FirstName, item.Name);
+                    message.Self = string.Format("You equip {0}.", item.Name);
                 }
                 else if (weapon.IsWieldable) {
-                    msgPlayer = "This item can only be wielded not worn.";
+                    message.Self = "This item can only be wielded not worn.";
                 }
                 else if (!item.IsWearable || !weapon.IsWieldable) {
-                    msgPlayer = "That doesn't seem like something you can wear.";
+                    message.Self = "That doesn't seem like something you can wear.";
                 }
                 else {
-                    msgPlayer = "You don't seem to have that in your inventory to be able to wear.";
+                    message.Self = "You don't seem to have that in your inventory to be able to wear.";
                 }
             }
-            
-            player.MessageHandler(msgPlayer);
-            Room.GetRoom(player.Player.Location).InformPlayersInRoom(msgOthers, new List<string>(new string[] { player.UserID }));
+
+			if (player.Player.IsNPC) {
+				player.MessageHandler(message);
+			}
+			else {
+				player.MessageHandler(message.Self);
+			}
+			Room.GetRoom(player.Player.Location).InformPlayersInRoom(message, new List<string>(){ player.UserID });
         }
 
         public static void Wield(User.User player, List<string> commands) {
@@ -231,8 +259,10 @@ namespace Commands {
             foreach (string word in commands) {
                 itemName.Append(word + " ");
             }
-            
-            string msgPlayer = null;
+
+			Message message = new Message();
+			message.InstigatorID = player.UserID;
+			message.InstigatorType = player.Player.IsNPC == false ? Message.ObjectType.Player : Message.ObjectType.Npc;
 
             List<Items.Iitem> items = Items.Items.GetByName(itemName.ToString().Trim(), player.UserID);
             Items.Iitem item = items[itemPosition - 1];
@@ -248,27 +278,33 @@ namespace Commands {
                 item.Save();
                 //TODO: check weapon for any wield perks/curses
 
-                string msgOthers = string.Format("{0} wields {1}", player.Player.FirstName, item.Name);
-                Room.GetRoom(player.Player.Location).InformPlayersInRoom(msgOthers, new List<string>(new string[] { player.UserID }));
-                msgPlayer = string.Format("You wield {0}", item.Name);
+                message.Room = string.Format("{0} wields {1}", player.Player.FirstName, item.Name);
+                message.Self = string.Format("You wield {0}", item.Name);
             }
             else if (player.Player.Equipment.GetWieldedWeapons().Count == 2) {
-                msgPlayer =  "You are already wielding two weapons...and you don't seem to have a third hand.";
+                message.Self =  "You are already wielding two weapons...and you don't seem to have a third hand.";
             }
             else if (item.IsWearable) {
-                msgPlayer = "This item can only be wielded not worn.";
+				message.Self = "This item can only be wielded not worn.";
             }
             else if (!item.IsWearable) {
-                msgPlayer = "That not something you can wear or would want to wear.";
+				message.Self = "That not something you can wear or would want to wear.";
             }
             else {
-                msgPlayer = "You don't seem to have that in your inventory to be able to wear.";
+				message.Self = "You don't seem to have that in your inventory to be able to wear.";
             }
 
-            player.MessageHandler(msgPlayer);
-        }
+			if (player.Player.IsNPC) {
+				player.MessageHandler(message);
+			}
+			else {
+				player.MessageHandler(message.Self);
+			}
 
-        public static void Eat(User.User player, List<string> commands) {
+			Room.GetRoom(player.Player.Location).InformPlayersInRoom(message, new List<string>(new string[] { player.UserID }));
+		}
+
+        public static void Eat(User.User player, List<string> commands) {		
             Items.Iitem item = GetItem(commands, player.Player.Location.ToString());
             if (item == null) {
                 player.MessageHandler("You don't seem to be carrying that to eat it.");
@@ -329,9 +365,8 @@ namespace Commands {
 
         private static void Consume(User.User player, List<string> commands, string action, Items.Iitem item){
             string upDown = "gain";
-            StringBuilder msgPlayer = new StringBuilder();
-            string msgOtherPlayers = null;
-                        
+			Message message = new Message();
+                                   
             Dictionary<string, double> affectAttributes = null;
             
             Items.Iedible food = item as Items.Iedible;
@@ -343,8 +378,8 @@ namespace Commands {
                     upDown = "lost";
                 }
 
-                msgPlayer.AppendLine(string.Format("You {0} {1} and {2} {3:F1} points of {4}.", action, item.Name, upDown, Math.Abs(attribute.Value), attribute.Key));
-                msgOtherPlayers = string.Format("{0} {1}s {2}", player.Player.FirstName.CamelCaseWord(), action, item.Name);
+                message.Self += string.Format("You {0} {1} and {2} {3:F1} points of {4}.\n", action, item.Name, upDown, Math.Abs(attribute.Value), attribute.Key);
+                message.Room = string.Format("{0} {1}s {2}", player.Player.FirstName.CamelCaseWord(), action, item.Name);
             }
 
             //now remove it from the players inventory
@@ -356,9 +391,14 @@ namespace Commands {
             MongoCollection col = db.GetCollection("Items");
             col.Remove(Query.EQ("_id", item.Id));
 
-            Room.GetRoom(player.Player.Location).InformPlayersInRoom(msgOtherPlayers, new List<string>(new string[] { player.UserID })); 
-            player.MessageHandler(msgPlayer.ToString());
-        }
+            Room.GetRoom(player.Player.Location).InformPlayersInRoom(message, new List<string>{ player.UserID });
+			if (player.Player.IsNPC) {
+				player.MessageHandler(message);
+			}
+			else {
+				player.MessageHandler(message.Self);
+			}
+		}
 
         //container commands
         public static void Put(User.User player, List<string> commands) {
@@ -402,7 +442,6 @@ namespace Commands {
                 //player is an idiot and probably wanted to put it in his inventory but didn't specify it so let's check there as well
                 if (containerItem == null) {
                     foreach (Items.Iitem tempContainer in player.Player.Inventory.GetInventoryAsItemList()) {
-                        //Items.Iitem tempContainer = Items.Items.GetByID(id);
                         containerItem = KeepOpening(containerName.CamelCaseString(), tempContainer, containerPosition);
                         if (string.Equals(containerItem.Name, containerName.CamelCaseString(), StringComparison.InvariantCultureIgnoreCase)) {
                             break;
@@ -464,21 +503,20 @@ namespace Commands {
             //using a recursive method we will dig down into each sub container and look for the appropriate item/container
             TraverseItems(player, containerName.ToString().Trim(), itemName.ToString().Trim(), containerPosition, itemPosition, out retrievedItem, out containerItem);
 
-            string msg = null;
-            string msgOthers = null;
+			Message message = new Message();
 
             if (retrievedItem != null) {
                 Items.Icontainer container = containerItem as Items.Icontainer;
                 if (containerItem != null) {
                     retrievedItem = container.RetrieveItem(retrievedItem.Id.ToString());
-                    msg = "You take " + retrievedItem.Name.ToLower() + " out of " + containerItem.Name.ToLower() + ".";
+                    message.Self = "You take " + retrievedItem.Name.ToLower() + " out of " + containerItem.Name.ToLower() + ".";
 
-                    msgOthers = string.Format("{0} takes {1} out of {2}", player.Player.FirstName, retrievedItem.Name.ToLower(), containerItem.Name.ToLower());
+                    message.Room = string.Format("{0} takes {1} out of {2}", player.Player.FirstName, retrievedItem.Name.ToLower(), containerItem.Name.ToLower());
                     
                 }
                 else {
-                    msg = "You get " + retrievedItem.Name.ToLower();
-                    msgOthers = string.Format("{0} grabs {1}.", player.Player.FirstName, retrievedItem.Name.ToLower());
+					message.Self = "You get " + retrievedItem.Name.ToLower();
+					message.Room = string.Format("{0} grabs {1}.", player.Player.FirstName, retrievedItem.Name.ToLower());
                 }
 
                 retrievedItem.Location = null;
@@ -487,13 +525,18 @@ namespace Commands {
                 player.Player.Inventory.AddItemToInventory(retrievedItem);
             }
             else {
-                msg = "You can't seem to find " + itemName.ToString().Trim().ToLower() + " to grab it.";
+				message.Self = "You can't seem to find " + itemName.ToString().Trim().ToLower() + " to grab it.";
             }
 
-            Room.GetRoom(player.Player.Location).InformPlayersInRoom(msgOthers, new List<string>(new string[] { player.UserID }));
-            player.MessageHandler(msg);
+            Room.GetRoom(player.Player.Location).InformPlayersInRoom(message, new List<string>(){ player.UserID });
+			if (player.Player.IsNPC) {
+				player.MessageHandler(message);
+			}
+			else {
+				player.MessageHandler(message.Self);
+			}
 
-        }
+		}
 
         private static void ParseContainerPosition(List<string> commands, string separator, out int containerPosition, out string containerName) {
             containerName = "";
@@ -611,8 +654,8 @@ namespace Commands {
                     break;
             }
             commands.RemoveRange(0, 2);
-            List<string> message = new List<string>(); ;
-            Room room = Room.GetRoom(player.Player.Location);
+            Message message = new Message();
+			Room room = Room.GetRoom(player.Player.Location);
 
             
             lightItem = FindLightInEquipment(commands, player, room);
@@ -622,20 +665,24 @@ namespace Commands {
 
                 if (lightItem.isLit == false) {
                     message = lightItem.Ignite();
-                    message[1] = ParseMessage(message[1], player, null);
+                    message.Room = ParseMessage(message.Room, player, null);
                 }
                 else {
-                    message.Add("It's already on!");
+                    message.Self = "It's already on!";
                 }
             }
             else {
-                message.Add("You don't see anything to " + command + ".");
+                message.Self ="You don't see anything to " + command + ".";
             }
 
-            player.MessageHandler(message[0]);
-            if (message.Count > 1) {
-                room.InformPlayersInRoom(message[1], new List<string>(new string[] { player.UserID }));
-            }
+			if (player.Player.IsNPC) {
+				player.MessageHandler(message);
+			}
+			else {
+				player.MessageHandler(message.Self);
+			}
+			room.InformPlayersInRoom(message, new List<string>(new string[] { player.UserID }));
+            
         }
 
         private static Items.Iiluminate FindLightInEquipment(List<string> commands, User.User player, Rooms.Room room) {
@@ -706,7 +753,7 @@ namespace Commands {
 
             commands.RemoveRange(0, 2);
 
-            List<string> message = new List<string>();
+            Message message = new Message();
             Room room = Room.GetRoom(player.Player.Location);
 
             lightItem = FindLightInEquipment(commands, player, room);
@@ -714,22 +761,24 @@ namespace Commands {
             if (lightItem != null) {
                 if (lightItem.isLit) {
                     message = lightItem.Extinguish();
-                    if (message.Count > 1) {
-                        message[1] = string.Format(message[1], player.Player.FirstName);
-                    }
+                    message.Room = string.Format(message.Room, player.Player.FirstName);
+                    
                 }
                 else {
-                    message.Add("It's already off!");
+                    message.Self = "It's already off!";
                 }
             }
             else {
-                message.Add("You don't see anything to " + command + ".");
+                message.Self = "You don't see anything to " + command + ".";
             }
 
-            player.MessageHandler(message[0]);
-            if (message.Count > 1) {
-                room.InformPlayersInRoom(message[1], new List<string>(new string[] { player.UserID }));
-            }
+			if (player.Player.IsNPC) {
+				player.MessageHandler(message);
+			}
+			else {
+				player.MessageHandler(message.Self);
+			}
+			room.InformPlayersInRoom(message, new List<string>(new string[] { player.UserID }));
         }
 
 

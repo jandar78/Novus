@@ -10,6 +10,7 @@ using MongoDB.Bson;
 using MongoDB.Driver.Builders;
 using MongoDB.Driver.Linq;
 using Extensions;
+using ClientHandling;
 
 namespace Commands {
     public partial class CommandParser {
@@ -181,6 +182,9 @@ namespace Commands {
         //called from the MOVE command
         private static void ApplyRoomModifier(User.User player) {
             StringBuilder sb = new StringBuilder();
+			Message message = new Message();
+			message.InstigatorID = player.UserID;
+			message.InstigatorType = player.Player.IsNPC == false ? Message.ObjectType.Player : Message.ObjectType.Npc;
             //Todo:  Check the player bonuses to see if they are immune or have resistance to the modifier
             foreach (Dictionary<string, string> modifier in Rooms.Room.GetModifierEffects(player.Player.Location)) {
                 player.Player.ApplyEffectOnAttribute("Hitpoints", double.Parse(modifier["Value"]));
@@ -192,13 +196,20 @@ namespace Commands {
 
                 sb.Append(String.Format(modifier["DescriptionSelf"], positiveValue));
                 if (!player.Player.IsNPC) {
-                    player.MessageHandler("\r" + sb.ToString());
+                    message.Self = "\r" + sb.ToString();
                 }
                 sb.Clear();
                 sb.Append(String.Format(modifier["DescriptionOthers"], player.Player.FirstName,
                            player.Player.Gender.ToString() == "Male" ? "he" : "she", positiveValue));
 
-                Room.GetRoom(player.Player.Location).InformPlayersInRoom("\r" + sb.ToString(), new List<string>(new string[] { player.UserID }));
+				message.Room = "\r" + sb.ToString();
+                Room.GetRoom(player.Player.Location).InformPlayersInRoom(message, new List<string>(){ player.UserID });
+				if (player.Player.IsNPC) {
+					player.MessageHandler(message);
+				}
+				else {
+					player.MessageHandler(message.Self);
+				}
             }
         }
 

@@ -48,6 +48,7 @@ namespace Commands {
             ItemCommands.Add("TURNOFF", new CommandDelegate(DeActivate));
             ItemCommands.Add("DEACTIVATE", new CommandDelegate(DeActivate));
             ItemCommands.Add("SWITCHOFF", new CommandDelegate(DeActivate));
+			ItemCommands.Add("LOOT", new CommandDelegate(Loot));
             //these two may be the same as equip and unequip we'll see
             //ItemCommands.Add("WEAR", new CommandDelegate(Wear));
             //ItemCommands.Add("REMOVE", new CommandDelegate(Remove));

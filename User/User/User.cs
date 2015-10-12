@@ -1,4 +1,5 @@
-﻿using System;
+﻿using ClientHandling;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -133,9 +134,14 @@ namespace User
         }
 		#endregion Constructors
 
-        public void MessageHandler(string message) {
+
+		/// <summary>
+		/// Use this call for players to receive the Message.Room message and for NPCS to parse all messages for triggers
+		/// </summary>
+		/// <param name="message"></param>
+        public void MessageHandler(Message message) {
             if (!this.Player.IsNPC) {
-                OutBuffer = message;
+                OutBuffer = message.Room;
             }
             else {
                 Character.Inpc npc = _character as Character.Inpc;
@@ -144,5 +150,15 @@ namespace User
                 }
             }
         }
+
+		/// <summary>
+		/// This should only be used for players to handle Message.Self
+		/// </summary>
+		/// <param name="message"></param>
+		public void MessageHandler(string message) {
+			if (!this.Player.IsNPC) {
+				OutBuffer = message;
+			}
+		}
 	}
 }

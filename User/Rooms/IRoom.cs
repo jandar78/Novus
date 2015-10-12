@@ -5,7 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 
 namespace Rooms {
-    interface IRoom {
+    public interface IRoom {
         string Id { get; set; }
         string Title { get; set; }
         string Zone {
@@ -22,7 +22,7 @@ namespace Rooms {
         string Type { get; set; }
         List<Exits> RoomExits { get; }
 
-        Exits GetRoomExit(string direction);
+        Exits GetRoomExit(RoomExits direction);
         List<string> GetObjectsInRoom(Room.RoomObjects objectType, double percentage);
         RoomTypes GetRoomType();
         void Save();

@@ -14,6 +14,7 @@ using System.Threading;
 using MongoDB.Bson.Serialization;
 using MongoDB.Bson.Serialization.Attributes;
 using MongoDB.Bson.Serialization.Options;
+using ClientHandling;
 
 //An explanation on how rooms, exits and doors work
 //Rooms have exits whose direction points to the room it connects to.  These connections can have doors in between them that can block the player
@@ -116,11 +117,11 @@ namespace Rooms {
         //constructor
         public Room() { }
 
-        public Exits GetRoomExit(string direction = null) {
+        public Exits GetRoomExit(RoomExits direction = Rooms.RoomExits.None) {
             GetRoomExits();
             Exits result = null;
-            if (!string.IsNullOrEmpty(direction)) {
-                result = RoomExits.Where(e => e.Direction.ToUpper() == direction.ToUpper()).SingleOrDefault();
+            if (direction != Rooms.RoomExits.None) {
+                result = RoomExits.Where(e => e.Direction.ToUpper() == direction.ToString().ToUpper()).SingleOrDefault();
             }
             else {
                 result = RoomExits.FirstOrDefault();
@@ -139,23 +140,23 @@ namespace Rooms {
 
             foreach (BsonDocument doc in Exits) {
                 Exits exit = new Exits();
-                exit.availableExits.Add(doc["Name"].AsString, GetRoom(doc["LeadsToRoom"].AsString)); //causing stackoverflow because exits point to each other
+                exit.availableExits.Add((RoomExits)Enum.Parse(typeof(RoomExits),doc["Name"].AsString), GetRoom(doc["LeadsToRoom"].AsString)); //causing stackoverflow because exits point to each other
                 //if it has door grab that as well
                 //this query looks for a door with an id of either "roomid-adjecentroomid" or "adjacentroomid-roomid"
-                string oneWay = Id.ToString() + "-" + exit.availableExits[doc["Name"].AsString].Id;
-                string anotherWay = exit.availableExits[doc["Name"].AsString].Id + "-" + Id.ToString();
+                string oneWay = Id.ToString() + "-" + exit.availableExits[(RoomExits)Enum.Parse(typeof(RoomExits), doc["Name"].AsString)].Id;
+                string anotherWay = exit.availableExits[(RoomExits)Enum.Parse(typeof(RoomExits), doc["Name"].AsString)].Id + "-" + Id.ToString();
                 
                 Door door = Door.GetDoor(oneWay, anotherWay);
-                
+				RoomExits exitDirection = (RoomExits)Enum.Parse(typeof(RoomExits), doc["Name"].AsString);
                 if (door != null) {
-                    exit.doors.Add(doc["Name"].AsString, door);
+                    exit.doors.Add(exitDirection, door);
                 }
 
-                exit.Direction = doc["Name"].AsString.ToLower();
+                exit.Direction = exitDirection.ToString().ToLower();
 
                 //door description overrides it unless it's blank
                 if (exit.doors.Count > 0) {
-                    string doorDescription = exit.doors.ContainsKey(exit.Direction.CamelCaseWord()) == true ? (exit.doors[exit.Direction.CamelCaseWord()].Destroyed == true ? exit.doors[exit.Direction.CamelCaseWord()].Description + " that leads to " + exit.Description : exit.doors[exit.Direction.CamelCaseWord()].Description) : "";
+                    string doorDescription = exit.doors.ContainsKey(exitDirection) ? (exit.doors[exitDirection].Destroyed == true ? exit.doors[exitDirection].Description + " that leads to " + exit.Description : exit.doors[exitDirection].Description) : "";
                     if (!string.IsNullOrEmpty(doorDescription)) exit.Description = doorDescription;
                 }
 
@@ -166,7 +167,8 @@ namespace Rooms {
 
         public string GetDirectionOfDoor(int doorId) {
             GetRoomExits(); //populate the Exit list
-            string direction = null;
+			RoomExits direction = Rooms.RoomExits.None;
+
             //only get the exits that have doors
             foreach(Exits exit in RoomExits){
                 if (!exit.HasDoor) {
@@ -175,7 +177,7 @@ namespace Rooms {
               direction = exit.doors.Where(d => d.Value.Id.Contains(doorId.ToString())).Select(d => d.Key).SingleOrDefault();
             }
 
-            return direction;
+            return direction.ToString();
         }
 
         public RoomTypes GetRoomType() {
@@ -257,18 +259,18 @@ namespace Rooms {
 
         //just an overload since Lua will return any of our lists as objects. We just cast and call the real method.
         //I tried just using generic methods like Table2List<T>() but it didn't work out, Lua still complained.
-        public void InformPlayersInRoom(string message, List<object> ignoreId) {
+        public void InformPlayersInRoom(Message message, List<object> ignoreId) {
             InformPlayersInRoom(message, ignoreId.Select(s => s.ToString()).ToList());
         }
 
-        public void InformPlayersInRoom(string message, List<string> ignoreId) {
-            if (!string.IsNullOrEmpty(message)) {
+        public void InformPlayersInRoom(Message message, List<string> ignoreId) {
+            if (!string.IsNullOrEmpty(message.Room)) {
                 GetPlayersInRoom();
                 foreach (string id in players) {
                     if (!ignoreId.Contains(id)) { 
                         User.User otherUser = MySockets.Server.GetAUser(id);
                         if (otherUser != null && otherUser.CurrentState == User.User.UserState.TALKING) {
-                            otherUser.MessageHandler(message);
+                            otherUser.MessageHandler(message.Room);
                         }
                     }
                 }
@@ -284,12 +286,14 @@ namespace Rooms {
                 }
 
                 //Here we want to see if this room has any triggers or if any of the exits have any triggers
-                CheckRoomTriggers(message);
+                CheckRoomTriggers(message.Room);
                 GetRoomExits();
                 if (RoomExits != null) {
+					RoomExits exitDirection = Rooms.RoomExits.None;
                     foreach (Exits exit in RoomExits) {
-                        if (exit.doors.Count > 0 && exit.doors[exit.Direction.CamelCaseWord()].Listener) {
-                            string methodToCall = exit.doors[exit.Direction.CamelCaseWord()].CheckPhrase(message);
+						exitDirection = (Rooms.RoomExits)Enum.Parse(typeof(Rooms.RoomExits), exit.Direction.CamelCaseWord());
+                        if (exit.doors.Count > 0 && exit.doors[exitDirection].Listener) {
+                            string methodToCall = exit.doors[exitDirection].CheckPhrase(message.Room);
                         }
                     }
                 }
@@ -410,46 +414,52 @@ namespace Rooms {
 
         //static methods that don't apply to creating a room object
         public static void ApplyRoomModifiers(int tick) {
-            MongoCollection roomCollection = MongoUtils.MongoData.GetCollection("World", "Rooms");
+            List<MongoCollection> roomCollection = MongoUtils.MongoData.GetCollections("Rooms");
             MongoCollection modifierCollection = MongoUtils.MongoData.GetCollection("World", "RoomModifiers");
-            MongoCursor roomsFound = roomCollection.FindAs<BsonDocument>(Query.Exists("Modifiers"));
+			foreach (MongoCollection collection in roomCollection) {
+				MongoCursor roomsFound = collection.FindAs<BsonDocument>(Query.Exists("Modifiers"));
 
-            //allright this isn't as bad as it seems this actually executed pretty fast and it's running on a separate thread anyways since it's
-            //coming off a timer event
-            Room room = null;
+				//allright this isn't as bad as it seems this actually executed pretty fast and it's running on a separate thread anyways since it's
+				//coming off a timer event
+				Room room = null;
+				Message message = new Message();
 
-            foreach (BsonDocument doc in roomsFound) {
-                room = Room.GetRoom(doc["_id"].AsString);
+				foreach (BsonDocument doc in roomsFound) {
+					room = Room.GetRoom(doc["_id"].AsString);
 
-                BsonArray modArray = doc["Modifiers"].AsBsonArray;
+					BsonArray modArray = doc["Modifiers"].AsBsonArray;
 
-                foreach (BsonDocument mods in modArray.Where(m => m.AsBsonDocument.Count() > 0)) {
-                    BsonDocument modFound = modifierCollection.FindOneAs<BsonDocument>(Query.EQ("_id", mods["id"]));
+					foreach (BsonDocument mods in modArray.Where(m => m.AsBsonDocument.Count() > 0)) {
+						BsonDocument modFound = modifierCollection.FindOneAs<BsonDocument>(Query.EQ("_id", mods["id"]));
 
-                    if (modFound["Timer"].AsInt32 > 0 && tick % modFound["Timer"].AsInt32 == 0) { //we only want to go through the rooms where the timer has hit
-                        BsonArray affectArray = modFound["Affects"].AsBsonArray;
-                        //we want to show the value always as positive to the players, only internally should they be negative
-                        foreach (BsonDocument affect in affectArray) {
-                            double makePositive = 1;
+						if (modFound["Timer"].AsInt32 > 0 && tick % modFound["Timer"].AsInt32 == 0) { //we only want to go through the rooms where the timer has hit
+							BsonArray affectArray = modFound["Affects"].AsBsonArray;
+							//we want to show the value always as positive to the players, only internally should they be negative
+							foreach (BsonDocument affect in affectArray) {
+								double makePositive = 1;
 
-                            if (affect["Value"].AsDouble < 0) {
-                                makePositive = -1;
-                            }
+								if (affect["Value"].AsDouble < 0) {
+									makePositive = -1;
+								}
 
-                            foreach (string playerid in room.players) {
-                                User.User user = MySockets.Server.GetAUser(playerid);
+								foreach (string playerid in room.players) {
+									User.User user = MySockets.Server.GetAUser(playerid);
 
-                                if (user != null) {
-                                    user.Player.ApplyEffectOnAttribute("Hitpoints", affect["Value"].AsDouble);
-                                    user.MessageHandler(String.Format(affect["DescriptionSelf"].AsString, affect["Value"].AsDouble * makePositive));
-                                    room.InformPlayersInRoom(String.Format(affect["DescriptionOthers"].AsString, user.Player.FirstName,
-                                                        user.Player.Gender.ToString() == "Male" ? "his" : "her"), new List<string>(new string[] { user.UserID }));
-                                }
-                            }
-                        }
-                    }
-                }
-            }
+									if (user != null) {
+										user.Player.ApplyEffectOnAttribute("Hitpoints", affect["Value"].AsDouble);
+										user.MessageHandler(String.Format(affect["DescriptionSelf"].AsString, affect["Value"].AsDouble * makePositive));
+										message.Room = String.Format(affect["DescriptionOthers"].AsString, user.Player.FirstName,
+															user.Player.Gender.ToString() == "Male" ? "his" : "her");
+										message.InstigatorID = user.Player.ID;
+										message.InstigatorType = Message.ObjectType.Player;
+										room.InformPlayersInRoom(message, new List<string>() { user.UserID });
+									}
+								}
+							}
+						}
+					}
+				}
+			}
         }
 
         public static List<Dictionary<string, string>> GetModifierEffects(string roomId) {
@@ -526,7 +536,7 @@ namespace Rooms {
             List<Triggers.ITrigger> triggerList = new List<Triggers.ITrigger>();
             if (triggers != null) {
                 foreach (BsonDocument doc in triggers) {
-                   global::Triggers.GeneralTrigger triggerToAdd = new Triggers.GeneralTrigger(doc, "Room");
+                   Triggers.GeneralTrigger triggerToAdd = new Triggers.GeneralTrigger(doc, global::Triggers.TriggerType.Room);
                    triggerList.Add(triggerToAdd);
                 }
             }
@@ -586,7 +596,7 @@ namespace Rooms {
         private static string GetZoneCode(string roomId) {
             int include = 0;
             foreach (char alpha in roomId) {
-                if (char.IsDigit(alpha)) {
+                if (char.IsLetter(alpha)) {
                     include++;
                 }
                 else {

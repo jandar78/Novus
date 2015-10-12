@@ -10,6 +10,8 @@ using Extensions;
 using CharacterEnums;
 using System.Collections.Concurrent;
 using Triggers;
+using Quests;
+using ClientHandling;
 
 namespace Character {
 	public class NPC : Iactor, Inpc {
@@ -17,7 +19,7 @@ namespace Character {
 		private Dictionary<string, double> damageTracker;
 		private Inventory _inventory;
 		private Equipment _equipment;
-
+        private List<Quest> _quests;
 		#endregion private things
 
 		#region Public Members
@@ -37,6 +39,18 @@ namespace Character {
 				_equipment = value;
 			}
 		}
+
+        public List<Quest> Quests {
+            get {
+                if (_quests == null) {
+                    _quests = new List<Quest>();
+                }
+                return _quests;
+            }
+            set {
+                _quests = value;
+            }
+        }
 		public Queue<string> Messages;
 		public List<ITrigger> Triggers;
 		#endregion Public Members
@@ -442,6 +456,7 @@ namespace Character {
 			damageTracker = new Dictionary<string, double>();
 			Triggers = new List<ITrigger>();
 			Bonuses = new StatBonuses();
+			Quests = new List<Quest>();
 
 			FirstName = "";
 			LastName = "";
@@ -661,8 +676,8 @@ namespace Character {
 			_actionState = (CharacterActionState)Enum.Parse(typeof(CharacterActionState), found["ActionState"].AsString.CamelCaseWord());
 			Description = found["Description"].AsString;
 			Location = found["Location"].AsString;
-			Height = found["Height"].AsDouble;
-			Weight = found["Weight"].AsDouble;
+			Height = (double)found["Height"].AsDouble;
+			Weight = (double)found["Weight"].AsDouble;
 			IsNPC = found["IsNPC"].AsBoolean;
 			MobTypeID = found["MobTypeID"].AsInt32;
 			NextAiAction = found["NextAiAction"].ToUniversalTime();
@@ -681,7 +696,10 @@ namespace Character {
 			//if you just use var instead of casting it like this you will be in a world of pain and suffering when dealing with subdocuments.
 			BsonArray playerAttributes = found["Attributes"].AsBsonArray;
 			BsonArray xpTracker = found["XpTracker"].AsBsonArray;
-			BsonDocument triggers = found["Triggers"].AsBsonDocument;
+			BsonArray triggers = null;
+            if (found.Contains("Triggers")) triggers = found["Triggers"].AsBsonArray;
+			BsonArray questIds = null;
+			if (found.Contains("QuestIds")) questIds = found["QuestIds"].AsBsonArray;
 			BsonArray bonusesList = null;
 			if (found.Contains("Bonuses")) {
 				bonusesList = found["Bonuses"].AsBsonArray;
@@ -715,12 +733,24 @@ namespace Character {
 				}
 			}
 
-			ITrigger trigger = new GeneralTrigger(triggers, "NPC");
-			Triggers.Add(trigger);
+			foreach (BsonDocument triggerdoc in triggers) {
+				ITrigger trigger = new GeneralTrigger(triggerdoc, TriggerType.NPC);
+				Triggers.Add(trigger);
+			}
+
+			if (questIds != null) {
+				foreach (BsonDocument questDoc in questIds) {
+					Quest quest = new Quest(questDoc["QuestID"].AsString);
+					Quests.Add(quest);
+				}
+			}
 
 			if (bonusesList != null && bonusesList.Count > 0) {
 				Bonuses.LoadFromBson(bonusesList);
 			}
+
+			Inventory.playerID = ID;
+			Equipment.playerID = ID;
 		}
 
 		public void CalculateXP() {
@@ -782,8 +812,13 @@ namespace Character {
 			Save();
 		}
 
-		public void ParseMessage(string message) {
+		public void ParseMessage(Message message) {
+            //send the message to the AI logic 
 			Fsm.InterpretMessage(message, this);
+            //send the message to the Quest logic
+            foreach (IQuest quest in Quests) {
+				quest.ProcessQuestStep(message, this);
+            }
 		}
 
 		public void SetActionState(CharacterActionState state) {
@@ -958,11 +993,17 @@ namespace Character {
 		}
 
 		public bool Loot(User.User looter, List<string> commands, bool byPassCheck = false) {
+			Message message = new Message();
+			message.InstigatorID = looter.UserID;
+			message.InstigatorType = looter.Player.IsNPC == false ? Message.ObjectType.Player : Message.ObjectType.Npc;
+			message.TargetID = this.ID;
+			message.TargetType = this.IsNPC == false ? Message.ObjectType.Player : Message.ObjectType.Npc;
+
 			bool looted = false;
 			if (IsDead()) {
 				List<Items.Iitem> result = new List<Items.Iitem>();
 				StringBuilder sb = new StringBuilder();
-
+				bool hasLoot = false;
 				if (!byPassCheck) {
 					//Let's see if who's looting was the killer otherwise we check the time of death
 					//also check if looter is part of a group if so then the group will provide the loot logic.
@@ -995,7 +1036,7 @@ namespace Character {
 
 					looted = true;
 				}
-				else if (commands.Count > 2) { //the big one, should allow to loot individual item from the inventory
+				else if (commands.Count > 3) { //the big one, should allow to loot individual item from the inventory
 					string itemName = Items.Items.ParseItemName(commands);
 					int index = 1;
 					int position = 1;
@@ -1009,8 +1050,8 @@ namespace Character {
 							looter.Player.Inventory.AddItemToInventory(Inventory.RemoveInventoryItem(i, this.Equipment));
 
 							sb.AppendLine("You loot " + i.Name + " from " + FirstName);
-							Rooms.Room.GetRoom(looter.Player.Location).InformPlayersInRoom(string.Format("{0} loots {1} from {3}'s lifeless body.", looter.Player.FirstName, i.Name, FirstName), new List<string>() { ID });
-							index = -1; //we found it and don't need this to match anymore
+							message.Room = string.Format("{0} loots {1} from {3}'s lifeless body.", looter.Player.FirstName, i.Name, FirstName);
+                            index = -1; //we found it and don't need this to match anymore
 							looted = true;
 						}
 						else {
@@ -1020,11 +1061,24 @@ namespace Character {
 				}
 				else {
 					sb.AppendLine(FirstName + " was carrying: ");
-					Inventory.GetInventoryAsItemList().ForEach(i => sb.AppendLine(i.Name));
+					
+					foreach (var item in Inventory.GetInventoryAsItemList()) {
+						sb.AppendLine(item.Name);
+						hasLoot = true;
+					}
 				}
-
-				looter.MessageHandler(sb.ToString());
+				message.Self = hasLoot ? sb.ToString() : sb.ToString() + "Nothing\r\n";
 			}
+
+			if (looter.Player.IsNPC) {
+				looter.MessageHandler(message);
+			}
+			else {
+				looter.MessageHandler(message.Self);
+            }
+
+			Rooms.Room.GetRoom(looter.Player.Location).InformPlayersInRoom(message, new List<string>() { ID });
+
 			return looted;
 		}
 

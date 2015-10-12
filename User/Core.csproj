@@ -20,6 +20,7 @@
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
+    <UseVSHostingProcess>true</UseVSHostingProcess>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>pdbonly</DebugType>
@@ -123,6 +124,9 @@
     <Compile Include="NPC\States.cs" />
     <Compile Include="NPC\AI.cs" />
     <Compile Include="NPC\NPC.cs" />
+    <Compile Include="NPC\TreeNode.cs" />
+    <Compile Include="Quests\IQuest.cs" />
+    <Compile Include="Quests\Quest.cs" />
     <Compile Include="Rooms\IRoom.cs" />
     <Compile Include="Triggers\IScript.cs" />
     <Compile Include="Triggers\ITrigger.cs" />
@@ -130,6 +134,7 @@
     <Compile Include="Triggers\ScriptFactory.cs" />
     <Compile Include="Triggers\ScriptMethods.cs" />
     <Compile Include="Triggers\Trigger.cs" />
+    <Compile Include="Triggers\TriggerEventArgs.cs" />
     <Compile Include="Utils.cs" />
     <Compile Include="Commands\CommandList.cs" />
     <Compile Include="Commands\Combat.cs" />

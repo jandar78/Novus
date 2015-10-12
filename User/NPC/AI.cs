@@ -5,6 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Extensions;
 using MongoDB.Bson;
+using ClientHandling;
 
 namespace AI {
     public class FSM {
@@ -90,7 +91,7 @@ namespace AI {
             }
         }
 
-        public void InterpretMessage(string message, Character.Iactor actor) {
+        public void InterpretMessage(Message message, Character.Iactor actor) {
             Character.NPC npc = actor as Character.NPC;
             MessageParser parser = new MessageParser(message, actor, npc.Triggers);
             

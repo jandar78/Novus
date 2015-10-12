@@ -16,8 +16,8 @@ using Triggers;
 namespace Rooms {
     public class Exits {
 		 
-	 public Dictionary<string, Room> availableExits;
-	 public Dictionary<string, Door> doors;
+	 public Dictionary<RoomExits, Room> availableExits;
+	 public Dictionary<RoomExits, Door> doors;
 
       public bool HasDoor {
              get {
@@ -30,8 +30,8 @@ namespace Rooms {
 	 public string Direction { get; set; }
 
        public Exits() {
-			  availableExits = new Dictionary<string, Room>();
-			  doors = new Dictionary<string, Door>();
+			  availableExits = new Dictionary<RoomExits, Room>();
+			  doors = new Dictionary<RoomExits, Door>();
         }
     }
 
@@ -122,7 +122,7 @@ namespace Rooms {
 
         private void LoadTriggers() {
             foreach (BsonDocument doc in Triggers) {
-                Triggers.GeneralTrigger trigger = new Triggers.GeneralTrigger(doc, "Door");
+                Triggers.GeneralTrigger trigger = new Triggers.GeneralTrigger(doc, TriggerType.Door);
                 trigger.script.AddVariable(this, "door");
 				if (trigger.script.ScriptType == ScriptFactory.ScriptTypes.Lua) {
 					LuaScript luaScript = trigger.script as LuaScript;

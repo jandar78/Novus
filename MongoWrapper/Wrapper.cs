@@ -48,6 +48,13 @@ namespace MongoUtils
 			return result;
 		}
 
+        /// <summary>
+        /// Evnetually the parameters for this should be converted to Enums and then we won't have any typos for the different collections
+        /// and database names.
+        /// </summary>
+        /// <param name="dbName"></param>
+        /// <param name="collection"></param>
+        /// <returns></returns>
         static public MongoCollection GetCollection(string dbName, string collection) {
             ConnectToDatabase();
             if (IsConnected()) {
@@ -56,5 +63,15 @@ namespace MongoUtils
 
             return null;
         }
+
+		public static List<MongoCollection> GetCollections(string dbName) {
+			List<MongoCollection> collections = new List<MongoCollection>();
+			MongoDatabase db = GetDatabase(dbName);
+			foreach (var collectionName in db.GetCollectionNames()) {
+				collections.Add(db.GetCollection(collectionName));
+			}
+
+			return collections;
+		}
 	}
 }

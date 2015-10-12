@@ -1,4 +1,5 @@
-﻿using System;
+﻿using ClientHandling;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -10,7 +11,7 @@ namespace Character {
         void CalculateXP();
         void IncreaseXPReward(string id, double damage);
 		void DecreaseXPReward(double amount);
-        void ParseMessage(string message);
+        void ParseMessage(Message message);
         AI.FSM Fsm { get; set; }
         DateTime NextAiAction { get; set; }
     }

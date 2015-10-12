@@ -143,9 +143,6 @@ namespace Character{
             Inventory = new Inventory();
             Equipment = new Equipment();
             Bonuses = new StatBonuses();
-
-            Inventory.playerID = this.ID;
-            Equipment.playerID = this.ID;
             
             Attributes = new Dictionary<string, Attribute>();
 
@@ -260,7 +257,11 @@ namespace Character{
             PointsToSpend = 0;
 
             Inventory = new Inventory();
+			Equipment = new Equipment();
             Bonuses = new StatBonuses();
+
+			Inventory.playerID = ID;
+			Equipment.playerID = ID;
 
 			Attributes = new Dictionary<string, Attribute>();
 
@@ -524,6 +525,9 @@ namespace Character{
             if (bonusesList.Count > 0) {
                 Bonuses.LoadFromBson(bonusesList);
             }
+
+			Inventory.playerID = ID;
+			Equipment.playerID = ID;
 
 		}
 

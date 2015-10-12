@@ -17,6 +17,8 @@ using Triggers;
 //TODO: Booby traps that can be placed on things, like doors, exits, items, etc.  It should just be an item that has a booby trap type of trigger that can be
 //deactivated, removed, reset, etc.  Should be fun to make, not everything should have a slot for booby trap placements though.
 
+//Item triggers can give the players a tip as to where they can go to start a quest.  This could also mean they can tell the player where they can be given to to complete/start a quest.
+
 namespace Items {
     public sealed partial class Items : Iitem, Iweapon, Iedible, Icontainer, Iiluminate, Iclothing, Ikey {
         

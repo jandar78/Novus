@@ -15,8 +15,10 @@ namespace Rooms {
 			DARK_CAVE = 1 << 3, 
 			NO_PVP = 1 << 4, 
 			FOREST  = 1 << 5,
-            COLLAPSIBLE = 1 << 6 //walls or ceiling can close in, can be triggered on/off
-		}
+            COLLAPSIBLE = 1 << 6, //walls or ceiling can close in, can be triggered on/off
+			DEADLY = 1 << 7 //lava, falling basically a room where death is guaranteed
+		};
 
+	public enum RoomExits { None, Up, Down, North, East, South, West};
 		
 }

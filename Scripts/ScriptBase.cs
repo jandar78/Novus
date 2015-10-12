@@ -5,7 +5,6 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-
 namespace Scripts {
 	public abstract class ScriptBase : IScript {
 		public object ParseStepDocument<T>(BsonDocument stepDoc, TempLvlChar currentUser, T owningScript) {

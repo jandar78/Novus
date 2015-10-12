@@ -14,5 +14,10 @@ namespace Triggers {
         string StateToExecute { get; set; }
 
         void HandleEvent(object o, EventArgs e);
+
+        /// <summary>
+        ///  Will make the trigger execute the script without an actual event being thrown or any event args passed in
+        /// </summary>
+        void HandleEvent();
     }
 }

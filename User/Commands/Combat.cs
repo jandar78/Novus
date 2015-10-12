@@ -9,6 +9,7 @@ using MongoDB.Driver;
 using MongoDB.Bson;
 using MongoDB.Driver.Builders;
 using Extensions;
+using ClientHandling;
 
 namespace Commands {
 	public partial class CommandParser {
@@ -222,30 +223,50 @@ namespace Commands {
         /// <param name="defense"></param>
         /// <param name="attack"></param>
         private static void SendRoundOutcomeMessage(User.User player, User.User enemy, Room room, double damage, double defense, double attack) {
-            //TODO: Get the message based weapon type/special weapon (blunt, blade, axe, pole, etc.)
-            //Get the weapon type and append it to the "Hit" or "Miss" type when getting the message 
-            //ex: HitSword, HitClub, MissAxe, MissUnarmed could even get really specific HitRustyShortSword, MissLegendaryDaggerOfBlindness
-            //Make a method to figure out the type by having a lookup table in the DB that points to a weapon type string
-            if (damage < 0) {
-                player.MessageHandler(ParseMessage(GetMessage("Combat", "Hit", MessageType.Self), player, enemy, damage, defense, attack));
-                enemy.MessageHandler(ParseMessage(GetMessage("Combat", "Hit", MessageType.Target), player, enemy, damage, defense, attack));
-                string roomMessage = ParseMessage(GetMessage("Combat", "Hit", MessageType.Room), player, enemy, damage, defense, attack);
+			//TODO: Get the message based weapon type/special weapon (blunt, blade, axe, pole, etc.)
+			//Get the weapon type and append it to the "Hit" or "Miss" type when getting the message 
+			//ex: HitSword, HitClub, MissAxe, MissUnarmed could even get really specific HitRustyShortSword, MissLegendaryDaggerOfBlindness
+			//Make a method to figure out the type by having a lookup table in the DB that points to a weapon type string
+			Message message = new Message();
+			message.InstigatorID = player.UserID;
+			message.InstigatorType = player.Player.IsNPC == false ? Message.ObjectType.Player : Message.ObjectType.Npc;
+			message.TargetID = enemy.UserID;
+			message.TargetType = enemy.Player.IsNPC == false ? Message.ObjectType.Player : Message.ObjectType.Npc;
 
-                room.InformPlayersInRoom(roomMessage, new List<string>(new string[] { player.UserID, enemy.UserID }));
-                enemy.Player.ApplyEffectOnAttribute("Hitpoints", damage);
+			if (damage < 0) {
+                message.Self = ParseMessage(GetMessage("Combat", "Hit", MessageType.Self), player, enemy, damage, defense, attack);
+                message.Target = ParseMessage(GetMessage("Combat", "Hit", MessageType.Target), player, enemy, damage, defense, attack);
+                message.Room = ParseMessage(GetMessage("Combat", "Hit", MessageType.Room), player, enemy, damage, defense, attack);
 
-                Character.NPC npc = enemy.Player as Character.NPC;
-                if (npc != null) {
-                    npc.IncreaseXPReward(player.UserID, (damage * -1.0));
-                }
+				enemy.Player.ApplyEffectOnAttribute("Hitpoints", damage);
+
+				Character.NPC npc = enemy.Player as Character.NPC;
+				if (npc != null) {
+					npc.IncreaseXPReward(player.UserID, (damage * -1.0));
+				}
             }
             else {
-                player.MessageHandler(ParseMessage(GetMessage("Combat", "Miss", MessageType.Self), player, enemy, damage, defense, attack));
-                enemy.MessageHandler(ParseMessage(GetMessage("Combat", "Miss", MessageType.Target), player, enemy, damage, defense, attack));
-                string roomMessage = ParseMessage(GetMessage("Combat", "Miss", MessageType.Room), player, enemy, damage, defense, attack);
-                room.InformPlayersInRoom(roomMessage, new List<string>(new string[] { player.UserID, enemy.UserID }));
+				message.Self = ParseMessage(GetMessage("Combat", "Miss", MessageType.Self), player, enemy, damage, defense, attack);
+                message.Target =  ParseMessage(GetMessage("Combat", "Miss", MessageType.Target), player, enemy, damage, defense, attack);
+                message.Room = ParseMessage(GetMessage("Combat", "Miss", MessageType.Room), player, enemy, damage, defense, attack);
             }
-        }
+
+			if (player.Player.IsNPC) {
+				player.MessageHandler(message);
+			}
+			else {
+				player.MessageHandler(message.Self);
+			}
+
+			if (enemy.Player.IsNPC) {
+				enemy.MessageHandler(message);
+			}
+			else {
+				enemy.MessageHandler(message.Target);
+			}
+			
+			room.InformPlayersInRoom(message, new List<string>(new string[] { player.UserID, enemy.UserID }));
+		}
 
         private static double CalculateDamage(User.User player, User.User enemy, bool offHand, out double defense, out double attack) {
             defense = 0.0d;
@@ -483,9 +504,17 @@ namespace Commands {
         private static void SendDeadOrUnconciousMessage(User.User player, User.User enemy, bool dead = false) {
             player.Player.ClearTarget();
             string status = dead == true ? "Killed" : "KnockedUnconcious";
-            player.MessageHandler(ParseMessage(GetMessage("Combat", status, MessageType.Self), player, enemy));
-            player.MessageHandler(ParseMessage(GetMessage("Combat", status, MessageType.Target), player, enemy));
-            Room.GetRoom(player.Player.Location).InformPlayersInRoom(ParseMessage(GetMessage("Combat", status, MessageType.Room), player, enemy), new List<string>(new string[] { player.UserID, enemy.UserID }));
+			Message message = new Message();
+			message.InstigatorID = player.UserID;
+			message.InstigatorType = player.Player.IsNPC == false ? Message.ObjectType.Player : Message.ObjectType.Npc;
+			message.TargetID = enemy.UserID;
+			message.TargetType = enemy.Player.IsNPC == false ? Message.ObjectType.Player : Message.ObjectType.Npc;
+
+			message.Self = ParseMessage(GetMessage("Combat", status, MessageType.Self), player, enemy);
+            message.Target = ParseMessage(GetMessage("Combat", status, MessageType.Target), player, enemy);
+			message.Room = ParseMessage(GetMessage("Combat", status, MessageType.Room), player, enemy);
+
+			Room.GetRoom(player.Player.Location).InformPlayersInRoom(message, new List<string>() { player.UserID, enemy.UserID });
 			if (dead) {
 				SetKiller(enemy, player);
 			}
@@ -509,6 +538,10 @@ namespace Commands {
         //these will actually be skill moves
 		private static void Cleave(User.User player, List<string> commands) {//this will need a check in the future to be used with only bladed weapons
 			User.User enemy = null;
+			Message message = new Message();
+			message.InstigatorID = player.UserID;
+			message.InstigatorType = player.Player.IsNPC == false ? Message.ObjectType.Player : Message.ObjectType.Npc;
+
             if (commands.Count > 2) {
 
                 foreach (User.User foe in MySockets.Server.GetAUserByFirstName(commands[2])) {
@@ -535,36 +568,51 @@ namespace Commands {
             }
 
 			if (enemy == null) {
-                player.MessageHandler("You can't kill what you can't see!");
-				return;
-			}
-            Room room = Room.GetRoom(player.Player.Location);
-
-			if (String.Compare(enemy.Player.ActionState.ToString(),"unconcious", true) == 0) {
-				if (commands.Count > 3 && commands[3].ToLower() == "slowly") {  //a slow death for your opponent, bask in it.
-                    player.MessageHandler(String.Format("You slowly drive your blade through {0}'s chest and twist it a few times as {1} lays on the ground unconcious.", enemy.Player.FirstName, enemy.Player.Gender == "Male" ? "he" : "she"));
-                    enemy.MessageHandler(String.Format("{0} slowly drives {1} blade through your chest and twists it a few times as you lay on the ground unconcious.", player.Player.FirstName, player.Player.Gender == "Male" ? "his" : "her"));
-					string roomMessage = String.Format("{0} slowly drives {1} blade through {2}'s chest and twists it a few times as {3} lay on the ground unconcious.", player.Player.FirstName, player.Player.Gender == "Male" ? "his" : "her", enemy.Player.FirstName, enemy.Player.Gender == "Male" ? "he" : "she");
-					room.InformPlayersInRoom(roomMessage, new List<string>(new string[] {player.UserID, enemy.UserID})); 
-; 
-				}
-				else {
-                    player.MessageHandler(String.Format("You cleave {0} as {1} lays on the ground unconcious.", enemy.Player.FirstName, enemy.Player.Gender == "Male" ? "he" : "she"));
-                    enemy.MessageHandler(String.Format("{0} cleaved you as you lay on the ground unconcious.", player.Player.FirstName));
-					string roomMessage = String.Format("{0} cleaved {1} as {2} lay on the ground unconcious.", player.Player.FirstName, enemy.Player.FirstName, enemy.Player.Gender == "Male" ? "he" : "she");
-					room.InformPlayersInRoom(roomMessage, new List<string>(new string[] {player.UserID, enemy.UserID})); 
-				}
-                enemy.Player.SetAttributeValue("Hitpoints", -100);
-				//SetDead(player, enemy);
-                Character.NPC npc = enemy.Player as Character.NPC;
-                if (npc != null) {
-                    if (npc.IsDead()) {
-                        npc.Fsm.ChangeState(AI.Rot.GetState(), npc);
-                    }
-                }
+				message.Self = "You can't kill what you can't see!";
+				
 			}
 			else {
-                player.MessageHandler(String.Format("You can't cleave {0}, {1} not unconcious.", enemy.Player.FirstName, enemy.Player.Gender == "Male" ? "he's" : "she's"));
+				Room room = Room.GetRoom(player.Player.Location);
+				message.TargetID = enemy.UserID;
+				message.TargetType = enemy.Player.IsNPC == false ? Message.ObjectType.Player : Message.ObjectType.Npc;
+
+				if (String.Compare(enemy.Player.ActionState.ToString(), "unconcious", true) == 0) {
+					if (commands.Count > 3 && commands[3].ToLower() == "slowly") {  //a slow death for your opponent, bask in it.
+						message.Self = String.Format("You slowly drive your blade through {0}'s chest and twist it a few times as {1} lays on the ground unconcious.", enemy.Player.FirstName, enemy.Player.Gender == "Male" ? "he" : "she");
+						message.Target = String.Format("{0} slowly drives {1} blade through your chest and twists it a few times as you lay on the ground unconcious.", player.Player.FirstName, player.Player.Gender == "Male" ? "his" : "her");
+						message.Room = String.Format("{0} slowly drives {1} blade through {2}'s chest and twists it a few times as {3} lay on the ground unconcious.", player.Player.FirstName, player.Player.Gender == "Male" ? "his" : "her", enemy.Player.FirstName, enemy.Player.Gender == "Male" ? "he" : "she");
+					}
+					else {
+						message.Self = String.Format("You cleave {0} as {1} lays on the ground unconcious.", enemy.Player.FirstName, enemy.Player.Gender == "Male" ? "he" : "she");
+						message.Target = String.Format("{0} cleaved you as you lay on the ground unconcious.", player.Player.FirstName);
+						message.Room = String.Format("{0} cleaved {1} as {2} lay on the ground unconcious.", player.Player.FirstName, enemy.Player.FirstName, enemy.Player.Gender == "Male" ? "he" : "she");
+					}
+					enemy.Player.SetAttributeValue("Hitpoints", -100);
+					//SetDead(player, enemy);
+					Character.NPC npc = enemy.Player as Character.NPC;
+					if (npc != null) {
+						if (npc.IsDead()) {
+							npc.Fsm.ChangeState(AI.Rot.GetState(), npc);
+						}
+					}
+				}
+				else {
+					message.Self = String.Format("You can't cleave {0}, {1} not unconcious.", enemy.Player.FirstName, enemy.Player.Gender == "Male" ? "he's" : "she's");
+				}
+				if (player.Player.IsNPC) {
+					player.MessageHandler(message);
+				}
+				else {
+					player.MessageHandler(message.Self);
+				}
+				if (enemy.Player.IsNPC) {
+					enemy.MessageHandler(message);
+				}
+				else {
+					enemy.MessageHandler(message.Target);
+				}
+
+				room.InformPlayersInRoom(message, new List<string>() { player.UserID, enemy.UserID });
 			}
 		}
 		#endregion
@@ -635,22 +683,28 @@ namespace Commands {
 
 		private static bool BreakDoor(User.User player, List<string> commands){
 			Door door = FindDoor(player.Player.Location, commands);
+			Message message = new Message();
+			message.InstigatorID = player.UserID;
+			message.InstigatorType = player.Player.IsNPC == false ? Message.ObjectType.Player : Message.ObjectType.Npc;
+
 			if (door == null) {
 				return false;
 			}
 
 			if (door.Destroyed) {
-                player.MessageHandler(GetMessage("Messages", "AlreadyBroken", MessageType.Self));
-				return true;
-			}
+				message.Self = GetMessage("Messages", "AlreadyBroken", MessageType.Self);
 
-		    double attack = CalculateAttack(player, 0);
-			double defense = CalculateDefense(door);
-			double damage = attack - defense;
-			List<string> message = door.ApplyDamage(damage);
-			door.UpdateDoorStatus();
-            player.MessageHandler(message[0].FontColor(Utils.FontForeColor.RED));
-			Rooms.Room.GetRoom(player.Player.Location).InformPlayersInRoom(String.Format(message[1], player.Player.FirstName), new List<string>(new string[] {player.UserID}));
+			}
+			else {
+				double attack = CalculateAttack(player, 0);
+				double defense = CalculateDefense(door);
+				double damage = attack - defense;
+				List<string> messages = door.ApplyDamage(damage);
+				door.UpdateDoorStatus();
+				message.Self = messages[0].FontColor(Utils.FontForeColor.RED);
+				message.Room = String.Format(messages[1], player.Player.FirstName);
+                Rooms.Room.GetRoom(player.Player.Location).InformPlayersInRoom(message, new List<string>() { player.UserID });
+			}
 			return true;
 		}
 
