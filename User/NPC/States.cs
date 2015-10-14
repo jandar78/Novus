@@ -107,8 +107,7 @@ namespace AI {
 			Rooms.Room endRoom = Rooms.Room.GetRoom(endPoint);
 			TreeNode rootNode = new TreeNode(room);
 			rootNode.Parent = rootNode;
-		//	rootNode.Distance = 0;
-			TreeTraverser traverser = new TreeTraverser(rootNode, endRoom.Id, endRoom.RoomId, room.Zone == endRoom.Zone);
+			TreeTraverser traverser = new TreeTraverser(rootNode, endRoom.Id, room.Zone == endRoom.Zone);
 			
 			List<string> pathToFollow = traverser.TraverseTree();//should be the path to our endPoint.....I hope.		
 			pathToFollow.ToString();
@@ -129,8 +128,7 @@ namespace AI {
                 Rooms.Room room = Rooms.Room.GetRoom(actor.Location);
                 room.GetRoomExits();
                 List<Rooms.Exits> availableExits = room.RoomExits;
-				FindPath findPath = new FindPath(actor.Location, "A9");
-                if (DateTime.Now.ToUniversalTime() > actor.NextAiAction) {//so it's time for this AI state to execute
+				if (DateTime.Now.ToUniversalTime() > actor.NextAiAction) {//so it's time for this AI state to execute
                     Commands.CommandParser.ExecuteCommand(actor, availableExits[Extensions.RandomNumber.GetRandomNumber().NextNumber(0, availableExits.Count)].Direction);
                     actor.NextAiAction = DateTime.Now.AddSeconds(Extensions.RandomNumber.GetRandomNumber().NextNumber(60, 121)).ToUniversalTime(); //set when we want this action to execute next
                     if (!FSM.ContinueWithThisState()) {
