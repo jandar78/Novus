@@ -1,6 +1,8 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio Express 2012 for Windows Desktop
+# Visual Studio 14
+VisualStudioVersion = 14.0.23107.0
+MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SocketProgram", "SocketProgram\SocketProgram.csproj", "{AECBB66A-201A-467F-9C30-FB23DDF77CF6}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ServerConsole", "ServerConsole\ServerConsole.csproj", "{9553C65A-7FC4-401C-B03B-4DCA5C6CDB6B}"
@@ -12,8 +14,6 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Scripts", "Scripts\Scripts.csproj", "{B41E7714-20B3-43AA-9B0E-DFDB6AA41520}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Core", "User\Core.csproj", "{ECA43097-56B3-45C9-93C2-C6ADA9F0D8A4}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DynamicUtilites", "DynamicUtilities\DynamicUtilites.csproj", "{0FEF568A-0697-4DFA-A643-99060713CF00}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WorldBuilder", "WorldBuilder\WorldBuilder.csproj", "{EAEA69FE-8932-4DEC-9525-26A25D14CC9B}"
 EndProject
@@ -47,10 +47,6 @@ Global
 		{ECA43097-56B3-45C9-93C2-C6ADA9F0D8A4}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{ECA43097-56B3-45C9-93C2-C6ADA9F0D8A4}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{ECA43097-56B3-45C9-93C2-C6ADA9F0D8A4}.Release|Any CPU.Build.0 = Release|Any CPU
-		{0FEF568A-0697-4DFA-A643-99060713CF00}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{0FEF568A-0697-4DFA-A643-99060713CF00}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{0FEF568A-0697-4DFA-A643-99060713CF00}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{0FEF568A-0697-4DFA-A643-99060713CF00}.Release|Any CPU.Build.0 = Release|Any CPU
 		{EAEA69FE-8932-4DEC-9525-26A25D14CC9B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{EAEA69FE-8932-4DEC-9525-26A25D14CC9B}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{EAEA69FE-8932-4DEC-9525-26A25D14CC9B}.Release|Any CPU.ActiveCfg = Release|Any CPU

@@ -55,7 +55,7 @@ namespace Triggers {
 
             switch (typeEventCaller) {  
                 case TriggerEventArgs.IDType.Npc:
-                    caller = CharacterFactory.Factory.CreateNPCCharacter(Convert.ToInt32(callerID));
+                    caller = Character.NPCUtils.GetAnNPCByID(callerID);
                     break;
                 case TriggerEventArgs.IDType.Room:
                     caller = Rooms.Room.GetRoom(callerID);

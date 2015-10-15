@@ -112,7 +112,9 @@ namespace Triggers {
         public override void AddVariable(object variable, string variableName) {
 			//need to figure out a way to add variables to the session or it may just be something that happens from the
 			//script code by calling the scriptmethods we provide.  We might just add variables like player/item ID's
-			Session.Execute(string.Format("{0} = {1}", (string)variable, variableName));
+			if (variable.ToString().Contains("\""))	variable = variable.ToString().Replace("\"", "\\\"");
+			string addVariable = string.Format("string {0} = \"{1}\";", variableName, (string)variable);
+            Session.Execute(addVariable);
         }
 
 		public void AddNamespace(string nameSpace) {

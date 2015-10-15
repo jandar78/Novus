@@ -35,6 +35,6 @@ namespace Triggers {
 			InstigatorType = instigatorType;
         }
 
-        public enum IDType { Npc, Room, None };
+        public enum IDType { None, Npc, Room, Player };
     }
 }

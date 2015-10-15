@@ -33,6 +33,14 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="Crainiate.Diagramming, Version=5.0.5765.33424, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\References\Crainiate.Diagramming.dll</HintPath>
+    </Reference>
+    <Reference Include="Crainiate.Diagramming.Forms, Version=5.0.5765.33490, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\References\Crainiate.Diagramming.Forms.dll</HintPath>
+    </Reference>
     <Reference Include="lua51">
       <HintPath>..\User\bin\Debug\lua51.dll</HintPath>
     </Reference>

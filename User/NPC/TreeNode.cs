@@ -9,6 +9,7 @@ namespace AI.PathFinding {
 		public string ID { get; private set; }
 		public string Zone { get; private set; }
 		public int Number { get; private set; }
+		public string Title { get; private set; }
 		public bool Traversable { get; private set; }
 		public bool IgnoreLocks { get; private set; }
 		public bool IgnoreBlocked { get; private set; }
@@ -22,6 +23,7 @@ namespace AI.PathFinding {
 				Zone = room.Zone;
 				Number = room.RoomId;
 				AdjacentNodes = new Dictionary<string, TreeNode>();
+				Title = room.Title;
 				Traversable = !room.GetRoomType().HasFlag(Rooms.RoomTypes.DEADLY); //more work to be done here
 			}
 		}
@@ -53,6 +55,11 @@ namespace AI.PathFinding {
 			_unvisitedNodes = new Queue<TreeNode>();
 			_unvisitedNodes.Enqueue(_root);
 			EndPointID = endPointID;
+		}
+
+		public Stack<TreeNode> GetTraversedNodes() {
+			TraverseTree();
+			return _visitedNodes;
 		}
 
 		public List<string> TraverseTree() {
@@ -120,7 +127,7 @@ namespace AI.PathFinding {
 					//Don't add it to the Queue it's out of bounds
 				}
 				else {
-					if (_visitedNodes.Any(n => n.ID != node.ID)) {
+					if (!_visitedNodes.Any(n => n.ID == node.ID)) {
 						_unvisitedNodes.Enqueue(node);
 					}
 				}

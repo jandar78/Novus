@@ -547,16 +547,11 @@ namespace Character {
 
 				foreach (Attribute a in this.Attributes.Values) {
 					BsonDocument attributes = new BsonDocument();
-					attributes.Add("Name", "");
-					attributes.Add("Value", "");
-					attributes.Add("Max", "");
-					attributes.Add("RegenRate", "");
-
-					attributes["Name"] = a.Name;
-					attributes["Value"] = a.Value;
-					attributes["Max"] = a.Max;
-					attributes["RegenRate"] = a.RegenRate;
-
+					attributes.Add("Name", a.Name);
+					attributes.Add("Value", a.Value);
+					attributes.Add("Max", a.Max);
+					attributes.Add("RegenRate", a.RegenRate);
+					
 					attributeList.Add(attributes);
 				}
 				npcCharacter.Add("Attributes", attributeList);
@@ -565,14 +560,28 @@ namespace Character {
 
 				foreach (KeyValuePair<string, double> tracker in damageTracker) {
 					BsonDocument track = new BsonDocument();
-					track.Add("ID", "");
-					track.Add("Value", 0.0);
-
-					track["ID"] = tracker.Key;
-					track["Value"] = tracker.Value;
-
+					track.Add("ID", tracker.Key);
+					track.Add("Value", tracker.Value);
+					
 					xpTracker.Add(track);
 				}
+
+				BsonArray questIds = new BsonArray();
+				foreach (var quest in Quests) {
+					BsonDocument questDoc = new BsonDocument();
+					questDoc.Add("QuestID", quest.QuestID);
+					BsonArray playerSteps = new BsonArray();
+					foreach (var playerStep in quest.CurrentPlayerStep) {
+						BsonDocument step = new BsonDocument();
+						step.Add("PlayerID", playerStep.Key);
+						step.Add("Step", playerStep.Value);
+						playerSteps.Add(step);
+					}
+
+					questIds.Add(questDoc);
+				}
+
+				npcCharacter.Add("QuestIDs", questIds);
 
 				npcCharacter.Add("XpTracker", xpTracker);
 
@@ -640,6 +649,23 @@ namespace Character {
 
 					xpTracker.Add(track);
 				}
+
+				BsonArray questIds = new BsonArray();
+				foreach (var quest in Quests) {
+					BsonDocument questDoc = new BsonDocument();
+					questDoc.Add("QuestID", quest.QuestID);
+					BsonArray playerSteps = new BsonArray();
+					foreach (var playerStep in quest.CurrentPlayerStep) {
+						BsonDocument step = new BsonDocument();
+						step.Add("PlayerID", playerStep.Key);
+						step.Add("Step", playerStep.Value);
+						playerSteps.Add(step);
+					}
+
+					questIds.Add(questDoc);
+				}
+
+				npcCharacter["QuestIDs"] = questIds;
 
 				npcCharacter["XpTracker"] = xpTracker;
 
@@ -740,7 +766,11 @@ namespace Character {
 
 			if (questIds != null) {
 				foreach (BsonDocument questDoc in questIds) {
-					Quest quest = new Quest(questDoc["QuestID"].AsString);
+					Dictionary<string, int> playerSteps = new Dictionary<string, int>();
+					foreach (var playerStep in questDoc["PlayerIDs"].AsBsonArray) {
+						playerSteps.Add(playerStep["PlayerID"].AsString, playerStep["Step"].AsInt32);
+					}
+					Quest quest = new Quest(questDoc["QuestID"].AsString, playerSteps);
 					Quests.Add(quest);
 				}
 			}

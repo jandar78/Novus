@@ -92,7 +92,5 @@ namespace WorldBuilder {
         private void DisplayValidationErrorBox(string msg) {
             MessageBox.Show(msg, "Validation error", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
         }
-
-     
-    }
+	}
 }

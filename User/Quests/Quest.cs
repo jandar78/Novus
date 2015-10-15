@@ -56,9 +56,9 @@ namespace Quests {
 			}
 		}
         
-        private string QuestID {
+        public string QuestID {
             get;
-            set;
+            private set;
         }
 
         private int CurrentStep {
@@ -71,8 +71,9 @@ namespace Quests {
             set;
         }
 
-        public Quest(string questID) {
+        public Quest(string questID, Dictionary<string, int> playerSteps) {
             QuestID = questID;
+			CurrentPlayerStep = playerSteps;
             LoadQuestSteps();
         }
 
@@ -123,7 +124,7 @@ namespace Quests {
                 }
 				stepNumber++;
             }
-
+			
 			return stepNumber;
         }
 
@@ -142,7 +143,8 @@ namespace Quests {
 							//we will not execute the trigger since they need to start this quest from the beginning
 							break;
 						}
-						parser.TriggerToExecute.HandleEvent(null, new TriggerEventArgs(npc.ID, TriggerEventArgs.IDType.Npc, message.InstigatorID, (TriggerEventArgs.IDType)Enum.Parse(typeof(TriggerEventArgs.IDType), message.InstigatorType.ToString()), message.Room));
+						TriggerEventArgs e = new TriggerEventArgs(npc.ID, TriggerEventArgs.IDType.Npc, message.InstigatorID, (TriggerEventArgs.IDType)Enum.Parse(typeof(TriggerEventArgs.IDType), message.InstigatorType.ToString()), message.Room);
+                        parser.TriggerToExecute.HandleEvent(null, e);
 					}
 
 					CurrentStep++;
