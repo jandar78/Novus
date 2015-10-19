@@ -129,6 +129,7 @@
 			this.idValue = new System.Windows.Forms.TextBox();
 			this.id = new System.Windows.Forms.Label();
 			this.tabPage2 = new System.Windows.Forms.TabPage();
+			this.label22 = new System.Windows.Forms.Label();
 			this.mapDiagram = new Crainiate.Diagramming.Forms.Diagram();
 			this.addRoomGroup = new System.Windows.Forms.GroupBox();
 			this.addRoomDown = new System.Windows.Forms.Button();
@@ -195,7 +196,8 @@
 			this.toolTip1 = new System.Windows.Forms.ToolTip(this.components);
 			this.statusStrip1 = new System.Windows.Forms.StatusStrip();
 			this.databaseConnectionStatusValue = new System.Windows.Forms.ToolStripStatusLabel();
-			this.label22 = new System.Windows.Forms.Label();
+			this.scriptTypeValue = new System.Windows.Forms.ComboBox();
+			this.label25 = new System.Windows.Forms.Label();
 			this.tabControl1.SuspendLayout();
 			this.tabPage1.SuspendLayout();
 			this.itemTypeGroup.SuspendLayout();
@@ -1374,8 +1376,18 @@
 			this.tabPage2.Text = "Room";
 			this.tabPage2.UseVisualStyleBackColor = true;
 			// 
+			// label22
+			// 
+			this.label22.AutoSize = true;
+			this.label22.Location = new System.Drawing.Point(272, 178);
+			this.label22.Name = "label22";
+			this.label22.Size = new System.Drawing.Size(89, 13);
+			this.label22.TabIndex = 62;
+			this.label22.Text = "Map Visualization";
+			// 
 			// mapDiagram
 			// 
+			this.mapDiagram.AllowDrop = true;
 			this.mapDiagram.AutoScroll = true;
 			this.mapDiagram.AutoScrollMinSize = new System.Drawing.Size(834, 1163);
 			this.mapDiagram.BackColor = System.Drawing.SystemColors.Menu;
@@ -1832,6 +1844,8 @@
 			// 
 			// tabPage4
 			// 
+			this.tabPage4.Controls.Add(this.scriptTypeValue);
+			this.tabPage4.Controls.Add(this.label25);
 			this.tabPage4.Controls.Add(this.byPassTestValue);
 			this.tabPage4.Controls.Add(this.groupBox8);
 			this.tabPage4.Controls.Add(this.scriptValidatedValue);
@@ -1918,7 +1932,8 @@
             "Items",
             "Door",
             "NPC",
-            "Room"});
+            "Room",
+            "Quests"});
 			this.scriptFilterTypeValue.Location = new System.Drawing.Point(76, 42);
 			this.scriptFilterTypeValue.Name = "scriptFilterTypeValue";
 			this.scriptFilterTypeValue.RightToLeft = System.Windows.Forms.RightToLeft.No;
@@ -1954,7 +1969,8 @@
             "Items",
             "Door",
             "NPC",
-            "Room"});
+            "Room",
+            "Quests"});
 			this.scriptTypesValue.Location = new System.Drawing.Point(75, 45);
 			this.scriptTypesValue.Name = "scriptTypesValue";
 			this.scriptTypesValue.Size = new System.Drawing.Size(121, 21);
@@ -1990,7 +2006,7 @@
 			// 
 			// loadScript
 			// 
-			this.loadScript.Location = new System.Drawing.Point(121, 90);
+			this.loadScript.Location = new System.Drawing.Point(138, 159);
 			this.loadScript.Name = "loadScript";
 			this.loadScript.Size = new System.Drawing.Size(75, 23);
 			this.loadScript.TabIndex = 3;
@@ -2000,7 +2016,7 @@
 			// 
 			// saveScript
 			// 
-			this.saveScript.Location = new System.Drawing.Point(24, 90);
+			this.saveScript.Location = new System.Drawing.Point(41, 159);
 			this.saveScript.Name = "saveScript";
 			this.saveScript.Size = new System.Drawing.Size(75, 23);
 			this.saveScript.TabIndex = 2;
@@ -2012,7 +2028,7 @@
 			// 
 			this.scriptIdValue.Location = new System.Drawing.Point(75, 12);
 			this.scriptIdValue.Name = "scriptIdValue";
-			this.scriptIdValue.Size = new System.Drawing.Size(100, 20);
+			this.scriptIdValue.Size = new System.Drawing.Size(121, 20);
 			this.scriptIdValue.TabIndex = 1;
 			// 
 			// label29
@@ -2041,14 +2057,25 @@
 			this.databaseConnectionStatusValue.Size = new System.Drawing.Size(103, 17);
 			this.databaseConnectionStatusValue.Text = "Database OFFLINE";
 			// 
-			// label22
+			// scriptTypeValue
 			// 
-			this.label22.AutoSize = true;
-			this.label22.Location = new System.Drawing.Point(272, 178);
-			this.label22.Name = "label22";
-			this.label22.Size = new System.Drawing.Size(89, 13);
-			this.label22.TabIndex = 62;
-			this.label22.Text = "Map Visualization";
+			this.scriptTypeValue.FormattingEnabled = true;
+			this.scriptTypeValue.Items.AddRange(new object[] {
+            "Lua",
+            "Roslyn"});
+			this.scriptTypeValue.Location = new System.Drawing.Point(75, 83);
+			this.scriptTypeValue.Name = "scriptTypeValue";
+			this.scriptTypeValue.Size = new System.Drawing.Size(121, 21);
+			this.scriptTypeValue.TabIndex = 58;
+			// 
+			// label25
+			// 
+			this.label25.AutoSize = true;
+			this.label25.Location = new System.Drawing.Point(8, 86);
+			this.label25.Name = "label25";
+			this.label25.Size = new System.Drawing.Size(61, 13);
+			this.label25.TabIndex = 57;
+			this.label25.Text = "Script Type";
 			// 
 			// Form1
 			// 
@@ -2273,6 +2300,8 @@
         private System.Windows.Forms.Button addRoomNorth;
 		private Crainiate.Diagramming.Forms.Diagram mapDiagram;
 		private System.Windows.Forms.Label label22;
+		private System.Windows.Forms.ComboBox scriptTypeValue;
+		private System.Windows.Forms.Label label25;
 	}
 }
 

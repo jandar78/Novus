@@ -20,6 +20,8 @@ using System.Xml;
 using System.Collections;
 using LuaInterface;
 using Triggers;
+using Roslyn.Compilers;
+using Roslyn.Scripting.CSharp;
 
 namespace WorldBuilder {
     public partial class Form1 : Form {
@@ -38,7 +40,7 @@ namespace WorldBuilder {
                 BsonDocument doc = new BsonDocument();
                 doc.Add("_id", scriptIdValue.Text);
                 doc.Add(new BsonElement("Bytes", scriptArray.AsBsonValue));
-                    
+				doc.Add(new BsonElement("Type", scriptTypeValue.SelectedItem.ToString()));    
                 
 
                 MongoCollection collection = MongoUtils.MongoData.GetCollection("Scripts", (string)scriptTypesValue.SelectedItem);
@@ -57,9 +59,9 @@ namespace WorldBuilder {
                 BsonDocument scriptDocument = collection.FindOneAs<BsonDocument>(Query.EQ("_id", scriptIdValue.Text));
 
                 byte[] scriptBytes = (byte[])scriptDocument["Bytes"].AsBsonBinaryData;
-
-                
-                scriptValue.Text = System.Text.Encoding.ASCII.GetString(scriptBytes);
+				scriptTypeValue.Text = scriptDocument["Type"].AsString;
+				//scriptTypeValue.SelectedText = scriptDocument["Type"].AsString;
+				scriptValue.Text = System.Text.Encoding.ASCII.GetString(scriptBytes);
                 
                 scriptValidatedValue.Visible = false;
             }
@@ -97,32 +99,78 @@ namespace WorldBuilder {
             
         }
 
-        private void testScript_Click(object sender, EventArgs e) {
-            Lua lua = new Lua();
-            lua.RegisterMarkedMethodsOf(this);
-            //add some variables so we can pass tests
-            lua["item"] = Items.ItemFactory.CreateItem(ObjectId.Parse("5383dc8531b6bd11c4095993"));
+		private void testScript_Click(object sender, EventArgs e) {
+			scriptValidatedValue.Visible = false;
+			if (scriptTypeValue.Text == "Lua") {
+				Lua lua = new Lua();
+				lua.RegisterMarkedMethodsOf(this);
+				//add some variables so we can pass tests
+				lua["item"] = Items.ItemFactory.CreateItem(ObjectId.Parse("5383dc8531b6bd11c4095993"));
 
-            if (byPassTestValue.Visible) {
-                ScriptError = !byPassTestValue.Checked;
-            }
-            else {
-                try {
-                    lua.DoString(scriptValue.Text);
-                    ScriptError = false;
-                    scriptValidatedValue.Visible = true;
-                }
-                catch (LuaException lex) {
-                    MessageBox.Show(lex.Message, "Lua Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                    ScriptError = true;
-                    scriptValidatedValue.Visible = false;
-                }
-            }
-        }
+				if (byPassTestValue.Visible) {
+					ScriptError = !byPassTestValue.Checked;
+				}
+				else {
+					try {
+						lua.DoString(scriptValue.Text);
+						ScriptError = false;
+						scriptValidatedValue.Visible = true;
+					}
+					catch (LuaException lex) {
+						MessageBox.Show(lex.Message, "Lua Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+						ScriptError = true;
+					}
+				}
+			}
+			else {
+				if (byPassTestValue.Visible) {
+					ScriptError = !byPassTestValue.Checked;
+				}
+				ScriptEngine engine = new ScriptEngine();
+				ScriptMethods host = new ScriptMethods();
+				host.DataSet.Add("player", Character.NPCUtils.CreateNPC(1));
+				host.DataSet.Add("npc", Character.NPCUtils.CreateNPC(1));
+				Roslyn.Scripting.Session session = engine.CreateSession(host, host.GetType());
+				new[]
+					   {
+						 typeof (Type).Assembly,
+						 typeof (ICollection).Assembly,
+						 typeof (Console).Assembly,
+						 typeof (RoslynScript).Assembly,
+						 typeof (IEnumerable<>).Assembly,
+						 typeof (IQueryable).Assembly,
+						 typeof (ScriptMethods).Assembly,
+						 typeof(Character.Iactor).Assembly,
+						 typeof(Character.Character).Assembly,
+						 typeof(Character.NPC).Assembly,
+						 typeof(Room).Assembly,
+						 typeof(Commands.CommandParser).Assembly,
+						 typeof(ClientHandling.Message).Assembly,
+						 GetType().Assembly
+					}.ToList().ForEach(asm => session.AddReference(asm));
+
+				//Import common namespaces
+				new[]
+						{
+						 "System", "System.Linq", "System.Object", "System.Collections", "System.Collections.Generic",
+						 "System.Text", "System.Threading.Tasks", "System.IO",
+						 "Character", "Rooms", "Items", "Commands", "ClientHandling", "Triggers"
+					 }.ToList().ForEach(ns => session.ImportNamespace(ns));
+				try {
+					var result = session.CompileSubmission<object>(scriptValue.Text);
+					ScriptError = false;
+					scriptValidatedValue.Visible = true;
+				}
+				catch (Exception ex) {
+					MessageBox.Show("Errors found in script:\n " + ex.Message, "Script Errors", MessageBoxButtons.OK);
+				}
+			}
+		}
 
         #region Lua Methods
         //LUA methods need to be public or you'll get "method is nil" exception
         //these are just stub methods for th emost part solely to let th eLua interface run through the lua script and find any compiler errors
+		//this will not find logic errors in the script.  All scripts should be tested before in game before being moved to live.
         [LuaAccessible]
         public double ParseAndCalculateCheck(Character.Iactor player, string calculation) {
             return 1.0d;

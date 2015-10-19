@@ -395,7 +395,7 @@ namespace WorldBuilder {
         private void locationValue_Leave(object sender, EventArgs e) {
             if (locationValue.Text != "-1" && !string.IsNullOrEmpty(locationValue.Text)) {
                 try {
-                    BsonDocument room = MongoUtils.MongoData.GetCollection("World", "Rooms").FindOneAs<BsonDocument>(Query.EQ("_id", int.Parse(locationValue.Text)));
+                    BsonDocument room = MongoUtils.MongoData.GetCollection("World", "Rooms").FindOneAs<BsonDocument>(Query.EQ("_id", locationValue.Text));
                     if (room == null) {
                         DisplayValidationErrorBox("That is not a valid room location");
                     }

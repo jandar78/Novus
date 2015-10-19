@@ -32,7 +32,7 @@ namespace MongoUtils
 		//if the _mongoDB object is null we have not instantiated it and connected to the database
 		static public bool IsConnected() {
             if (_mongoDB != null) {
-                //there's a chance we lost th eocnnection but since no read/write occurred we ar enot aware yet so let's ping
+                //there's a chance we lost the connection but since no read/write occurred we are not aware yet so let's ping
                 try {
                     _mongoDB.Ping();
                 }
