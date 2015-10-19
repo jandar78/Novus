@@ -74,15 +74,15 @@ namespace CharacterFactory {
             BsonDocument template = collection.FindOneAs<BsonDocument>(query);
 
             
-            CharacterEnums.CharacterClass charClass = (CharacterEnums.CharacterClass)Enum.Parse(typeof(CharacterEnums.CharacterClass), template["Class"].AsString.ToUpper());
-            CharacterEnums.EyeColors EyeColor = (CharacterEnums.EyeColors)Enum.Parse(typeof(CharacterEnums.EyeColors), template["EyeColor"].AsString.ToUpper());
-            CharacterEnums.Genders Gender = (CharacterEnums.Genders)Enum.Parse(typeof(CharacterEnums.Genders), template["Gender"].AsString.ToUpper());
-            CharacterEnums.HairColors HairColor = (CharacterEnums.HairColors)Enum.Parse(typeof(CharacterEnums.HairColors), template["HairColor"].AsString.ToUpper());         
-            CharacterEnums.CharacterRace Race = (CharacterEnums.CharacterRace)Enum.Parse(typeof(CharacterEnums.CharacterRace), template["Race"].AsString.ToUpper());           
-            CharacterEnums.SkinColors SkinColor = (CharacterEnums.SkinColors)Enum.Parse(typeof(CharacterEnums.SkinColors), template["SkinColor"].AsString.ToUpper());
-            CharacterEnums.SkinType SkinType = (CharacterEnums.SkinType)Enum.Parse(typeof(CharacterEnums.SkinType), template["SkinType"].AsString.ToUpper());
-            CharacterEnums.Languages Language = (CharacterEnums.Languages)Enum.Parse(typeof(CharacterEnums.Languages), template["Language"].AsString.ToUpper());
-            CharacterEnums.BodyBuild Build = (CharacterEnums.BodyBuild)Enum.Parse(typeof(CharacterEnums.BodyBuild), template["Build"].AsString.ToUpper());
+            CharacterEnums.CharacterClass charClass = (CharacterEnums.CharacterClass)Enum.Parse(typeof(CharacterEnums.CharacterClass), template["Class"].AsString);
+            CharacterEnums.EyeColors EyeColor = (CharacterEnums.EyeColors)Enum.Parse(typeof(CharacterEnums.EyeColors), template["EyeColor"].AsString);
+            CharacterEnums.Genders Gender = (CharacterEnums.Genders)Enum.Parse(typeof(CharacterEnums.Genders), template["Gender"].AsString);
+            CharacterEnums.HairColors HairColor = (CharacterEnums.HairColors)Enum.Parse(typeof(CharacterEnums.HairColors), template["HairColor"].AsString);         
+            CharacterEnums.CharacterRace Race = (CharacterEnums.CharacterRace)Enum.Parse(typeof(CharacterEnums.CharacterRace), template["Race"].AsString);           
+            CharacterEnums.SkinColors SkinColor = (CharacterEnums.SkinColors)Enum.Parse(typeof(CharacterEnums.SkinColors), template["SkinColor"].AsString);
+            CharacterEnums.SkinType SkinType = (CharacterEnums.SkinType)Enum.Parse(typeof(CharacterEnums.SkinType), template["SkinType"].AsString);
+            CharacterEnums.Languages Language = (CharacterEnums.Languages)Enum.Parse(typeof(CharacterEnums.Languages), template["Language"].AsString);
+            CharacterEnums.BodyBuild Build = (CharacterEnums.BodyBuild)Enum.Parse(typeof(CharacterEnums.BodyBuild), template["Build"].AsString);
             
             Character.NPC npc = new Character.NPC(Race, charClass, Gender, Language, SkinColor, SkinType, HairColor, EyeColor, Build);
 
@@ -95,7 +95,7 @@ namespace CharacterFactory {
                 npc.Description = descriptions[0]["Description"].AsString;
             }
             npc.MobTypeID = template["MobTypeID"].AsInt32;
-            npc.Location = template["Location"].AsString;
+           // npc.Location = template["Location"].AsString;
             npc.Weight = template["Weight"].AsDouble;
             npc.Height = template["Height"].AsDouble;
             npc.LastCombatTime = DateTime.MinValue.ToUniversalTime();

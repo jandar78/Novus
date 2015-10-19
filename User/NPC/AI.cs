@@ -101,13 +101,15 @@ namespace AI {
             //kick off a separate thread so that then it won't hold up the players actions and
             //then we can even execute states that operate on a delay.
 
-            if (parser.TriggerToExecute != null) {
-                IState state = GetStateFromName(parser.TriggerToExecute.StateToExecute);
-                if (state != null) {
-                    ChangeState(state, npc);
-                    npc.NextAiAction = DateTime.Now.ToUniversalTime().AddSeconds(-1); //this state will execute next now
-                    state.Execute(npc, parser.TriggerToExecute);
-                }
+            if (parser.TriggersToExecute.Count > 0) {
+				foreach (Triggers.ITrigger trigger in parser.TriggersToExecute) {
+					IState state = GetStateFromName(trigger.StateToExecute);
+					if (state != null) {
+						ChangeState(state, npc);
+						npc.NextAiAction = DateTime.Now.ToUniversalTime().AddSeconds(-1); //this state will execute next now
+						state.Execute(npc, trigger);
+					}
+				}
             }
         }
     }

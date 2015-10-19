@@ -52,6 +52,41 @@ namespace AI {
         }
     }
 
+	public class Questing : IState {
+
+		private static Questing _questing;
+		private Questing() { }
+		public static Questing GetState() {
+			return _questing ?? (_questing = new Questing());
+		}
+		public void Enter(Character.NPC actor) {
+			actor.NextAiAction = DateTime.Now.AddSeconds(Extensions.RandomNumber.GetRandomNumber().NextNumber(1, 5)).ToUniversalTime();
+		}
+
+		public void Exit(Character.NPC actor) {
+		}
+
+		public override string ToString() {
+			return "Questing";
+		}
+
+		public void Execute(Character.NPC actor, ITrigger trigger = null) {
+			if (actor.StanceState != CharacterEnums.CharacterStanceState.Laying_unconcious &&
+				actor.StanceState != CharacterEnums.CharacterStanceState.Laying_dead &&
+				actor.StanceState != CharacterEnums.CharacterStanceState.Decomposing) {
+				if (DateTime.Now.ToUniversalTime() > actor.NextAiAction) {//so it's time for this AI state to execute
+																		  //get the questID and step that we want to process		
+					actor.Quests.Where(q => q.AutoProcessNextStep == true).SingleOrDefault().AutoProcessQuestStep(actor as Character.Iactor);
+					
+				}
+			}
+			//either way we are not staying in this state, it's just a blip state
+			actor.NextAiAction = DateTime.Now.AddSeconds(Extensions.RandomNumber.GetRandomNumber().NextNumber(1, 5)).ToUniversalTime(); //set when we want this action to execute next
+			actor.Fsm.RevertState();
+			actor.Save();
+		}
+	}
+
 	public class WalkTo : IState {
 
 		private static WalkTo _walkTo;

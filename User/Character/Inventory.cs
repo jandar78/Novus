@@ -40,7 +40,7 @@ namespace Character {
             return result;
         }
 
-        public void AddItemToInventory(Items.Iitem item) {
+		public void AddItemToInventory(Items.Iitem item) {
             item.Owner = playerID;
             item.Save();
             inventory.Add(item);

@@ -67,55 +67,57 @@ namespace Items {
         /// <param name="result"></param>
         /// <param name="trigger"></param>
         private static void SubscribeToCorrectEvent(Iitem result, ItemTrigger trigger) {
-			if (!string.IsNullOrEmpty(trigger.TriggerOn)) {
-				switch (trigger.TriggerOn.ToUpper()) {
-					case "OPEN":
-						result.ContainerOpened += new EventHandler<ItemEventArgs>(trigger.HandleEvent);
-						break;
-					case "CLOSE":
-						result.ContainerClosed += new EventHandler<ItemEventArgs>(trigger.HandleEvent);
-						break;
-					case "DETERIORATE":
-						result.Deteriorated += new EventHandler<ItemEventArgs>(trigger.HandleEvent);
-						break;
-					case "IMPROVE":
-						result.Improved += new EventHandler<ItemEventArgs>(trigger.HandleEvent);
-						break;
-					case "WORN":
-						result.ItemWorn += new EventHandler<ItemEventArgs>(trigger.HandleEvent);
-						break;
-					case "IGNITE":
-						result.Ignited += new EventHandler<ItemEventArgs>(trigger.HandleEvent);
-						break;
-					case "EXTINGUISH":
-						result.Extinguished += new EventHandler<ItemEventArgs>(trigger.HandleEvent);
-						break;
-					case "DRAIN":
-						result.Drained += new EventHandler<ItemEventArgs>(trigger.HandleEvent);
-						break;
-					case "RECHARGE":
-						result.Recharged += new EventHandler<ItemEventArgs>(trigger.HandleEvent);
-						break;
-					case "EXAMINE":
-						result.Examined += new EventHandler<ItemEventArgs>(trigger.HandleEvent);
-						break;
-					case "LOOKIN":
-						result.LookedIn += new EventHandler<ItemEventArgs>(trigger.HandleEvent);
-						break;
-					case "STORE":
-						result.Stored += new EventHandler<ItemEventArgs>(trigger.HandleEvent);
-						break;
-					case "RETRIEVE":
-						result.Retrieved += new EventHandler<ItemEventArgs>(trigger.HandleEvent);
-						break;
-					case "CONSUME":
-						result.Consumed += new EventHandler<ItemEventArgs>(trigger.HandleEvent);
-						break;
-					case "WIELD":
-						result.Wielded += new EventHandler<ItemEventArgs>(trigger.HandleEvent);
-						break;
-					default:
-						break;
+			if (trigger.TriggerOn.Count > 0) {
+				foreach (var on in trigger.TriggerOn) {
+					switch (on.ToUpper()) {
+						case "OPEN":
+							result.ContainerOpened += new EventHandler<ItemEventArgs>(trigger.HandleEvent);
+							break;
+						case "CLOSE":
+							result.ContainerClosed += new EventHandler<ItemEventArgs>(trigger.HandleEvent);
+							break;
+						case "DETERIORATE":
+							result.Deteriorated += new EventHandler<ItemEventArgs>(trigger.HandleEvent);
+							break;
+						case "IMPROVE":
+							result.Improved += new EventHandler<ItemEventArgs>(trigger.HandleEvent);
+							break;
+						case "WORN":
+							result.ItemWorn += new EventHandler<ItemEventArgs>(trigger.HandleEvent);
+							break;
+						case "IGNITE":
+							result.Ignited += new EventHandler<ItemEventArgs>(trigger.HandleEvent);
+							break;
+						case "EXTINGUISH":
+							result.Extinguished += new EventHandler<ItemEventArgs>(trigger.HandleEvent);
+							break;
+						case "DRAIN":
+							result.Drained += new EventHandler<ItemEventArgs>(trigger.HandleEvent);
+							break;
+						case "RECHARGE":
+							result.Recharged += new EventHandler<ItemEventArgs>(trigger.HandleEvent);
+							break;
+						case "EXAMINE":
+							result.Examined += new EventHandler<ItemEventArgs>(trigger.HandleEvent);
+							break;
+						case "LOOKIN":
+							result.LookedIn += new EventHandler<ItemEventArgs>(trigger.HandleEvent);
+							break;
+						case "STORE":
+							result.Stored += new EventHandler<ItemEventArgs>(trigger.HandleEvent);
+							break;
+						case "RETRIEVE":
+							result.Retrieved += new EventHandler<ItemEventArgs>(trigger.HandleEvent);
+							break;
+						case "CONSUME":
+							result.Consumed += new EventHandler<ItemEventArgs>(trigger.HandleEvent);
+							break;
+						case "WIELD":
+							result.Wielded += new EventHandler<ItemEventArgs>(trigger.HandleEvent);
+							break;
+						default:
+							break;
+					}
 				}
 			}
         }

@@ -66,6 +66,146 @@ namespace Commands {
 			}
 		}
 
+		private static void Give(User.User player, List<string> commands) {
+			//get the item name from the command, may have to join all the words after dropping the command
+			StringBuilder itemName = new StringBuilder();
+			Room room = Room.GetRoom(player.Player.Location);
+
+			string[] full = commands[0].Replace("give","").Split(new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+			
+			foreach (string word in full) {
+				if (word.ToLower() != "to") {
+					itemName.Append(word + " ");
+				}
+				else {
+					break; //we got to the end of the item name
+				}
+			}
+
+			int itemPosition = 1;
+			string[] position = commands[commands.Count - 1].Split('.'); //we are separating based on using the decimal operator after the name of the npc/item
+			if (position.Count() > 1) {
+				int.TryParse(position[position.Count() - 1], out itemPosition);
+				itemName = itemName.Remove(itemName.Length - 2, 2);
+			}
+
+			//get the item from the DB
+			List<Items.Iitem> items = Items.Items.GetByName(itemName.ToString().Trim(), player.UserID);
+			Items.Iitem item = items[itemPosition - 1];
+
+
+			string toPlayerName = commands[0].ToLower().Replace("give", "").Replace(itemName.ToString(), "").Replace("to", "").Trim();
+
+			bool HasDotOperator = false;
+			int playerPosition = 0;
+			position = toPlayerName.Split('.'); //we are separating based on using the decimal operator after the name of the npc/item
+			if (position.Count() > 1) {
+				int.TryParse(position[position.Count() - 1], out playerPosition);
+				HasDotOperator = true;
+			}
+
+			User.User toPlayer = null;
+			List<User.User> toPlayerList = new List<User.User>();
+			//we need some special logic here, first we'll try by first name only and see if we get a hit.  If there's more than one person named the same
+			//then we'll see if the last name was included in the commands. And try again.  If not we'll check for the dot operator and all if else fails tell them
+			//to be a bit more specific about who they are trying to directly speak to.
+			string[] nameBreakDown = toPlayerName.ToLower().Split(' ');
+			foreach (string id in room.GetObjectsInRoom(Room.RoomObjects.Players, 100)) {
+				toPlayerList.Add(MySockets.Server.GetAUser(id));
+			}
+
+			if (toPlayerList.Where(p => p.Player.FirstName.ToLower() == nameBreakDown[0]).Count() > 1) { //let's narrow it down by including a last name (if provided)
+				toPlayer = toPlayerList.Where(p => p.Player.FirstName.ToLower() == (nameBreakDown[0] ?? "")).Where(p => String.Compare(p.Player.LastName.ToLower(), nameBreakDown[1] ?? "", true) == 0).SingleOrDefault();
+
+				if (toPlayer == null) { //no match on full name, let's try with the dot operator if they provided one
+					if (HasDotOperator && (playerPosition < toPlayerList.Count && playerPosition >= 0)) {
+						toPlayer = toPlayerList[playerPosition];
+					}
+					else {
+						toPlayer = toPlayerList[0];
+					}
+				}
+			}
+			else { //we found an exact match
+				toPlayer = toPlayerList.Where(p => p.Player.FirstName.ToLower() == (nameBreakDown[0] ?? "")).SingleOrDefault();
+
+				if (toPlayer != null && toPlayer.UserID == player.UserID) {
+					toPlayer = null; //It's the player saying something!
+				}
+			}
+
+			if (toPlayer == null) { //we are looking for an npc at this point
+				toPlayerList.Clear();
+				foreach (string id in room.GetObjectsInRoom(Room.RoomObjects.Npcs, 100)) {
+					toPlayerList.Add(Character.NPCUtils.GetUserAsNPCFromList(new List<string>() { id }));
+				}
+				if (toPlayerList.Where(p => p.Player.FirstName.ToLower() == nameBreakDown[0]).Count() > 1) { //let's narrow it down by including a last name (if provided)
+					toPlayer = toPlayerList.Where(p => p.Player.FirstName.ToLower() == (nameBreakDown[0] ?? "")).Where(p => String.Compare(p.Player.LastName, nameBreakDown[1] ?? "", true) == 0).SingleOrDefault();
+
+					if (toPlayer == null) { //no match on full name, let's try with the dot operator if they provided one
+						if (HasDotOperator && (playerPosition < toPlayerList.Count && playerPosition >= 0)) {
+							toPlayer = toPlayerList[playerPosition];
+						}
+						else {
+							toPlayer = toPlayerList[0];
+						}
+					}
+				}
+				else { //we found an exact match
+					toPlayer = toPlayerList.Where(p => p.Player.FirstName.ToLower() == (nameBreakDown[0] ?? "")).SingleOrDefault();
+
+					if (commands.Count == 2 || toPlayer != null && toPlayer.UserID == player.UserID) {
+						toPlayer = null;
+						player.MessageHandler("Really? Giving to yourself?.");
+					}
+					else if (toPlayer == null) {
+						player.MessageHandler("You can't give things to someone who is not here.");
+					}
+				}
+			}
+
+			//have player give item
+			Message message = new Message();
+
+			if (item != null && toPlayer != null) {
+				message.InstigatorID = player.Player.ID;
+				message.InstigatorType = player.Player.IsNPC ? Message.ObjectType.Npc : Message.ObjectType.Player;
+				message.TargetID = toPlayer.Player.ID;
+				message.TargetType = toPlayer.Player.IsNPC ? Message.ObjectType.Npc : Message.ObjectType.Player;
+
+				player.Player.Inventory.RemoveInventoryItem(item, player.Player.Equipment);
+				player.Player.Save();
+
+				item.Location = "";
+				item.Owner = toPlayer.UserID;
+				item.Save();
+
+				toPlayer.Player.Inventory.AddItemToInventory(item);
+				toPlayer.Player.Save();
+				
+				//Inform room and player of action
+				message.Room = string.Format("{0} gives {1} to {2}", player.Player.FirstName, item.Name, toPlayer.Player.FirstName);
+				message.Self = string.Format("You give {0} to {1}", item.Name, toPlayer.Player.FirstName);
+				message.Target = string.Format("{0} gives you {1}", player.Player.FirstName, item.Name);
+
+				if (toPlayer.Player.IsNPC) {
+					toPlayer.MessageHandler(message);
+				}
+				else {
+					toPlayer.MessageHandler(message.Target);
+				}
+			}
+
+			if (player.Player.IsNPC) {
+				player.MessageHandler(message);
+			}
+			else {
+				player.MessageHandler(message.Self);
+			}
+
+			room.InformPlayersInRoom(message, new List<string>(new string[] { player.UserID }));
+		}
+
         private static void Loot(User.User player, List<string> commands) {
             Character.Iactor npc = null;
             string[] position = commands[0].Split('.'); //we are separating based on using the decimal operator after the name of the npc/item
@@ -145,7 +285,7 @@ namespace Commands {
                 foreach (string word in commands) {
                     itemName.Append(word + " ");
                 }
-
+				
                 List<Items.Iitem> items = Items.Items.GetByName(itemName.ToString().Trim(), player.UserID);
                 Items.Iitem item = items[itemPosition - 1];
 
@@ -493,7 +633,9 @@ namespace Commands {
             string containerName = "";
 
             List<string> commandAltered = ParseItemPositions(commands, "from", out itemPosition, out itemName);
-            ParseContainerPosition(commandAltered, commands[3], out containerPosition, out containerName);
+			if (commands.Count >= 3) {
+				ParseContainerPosition(commandAltered, commands[3], out containerPosition, out containerName);
+			}
           
             string location = player.Player.Location;
            

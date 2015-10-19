@@ -33,20 +33,7 @@ namespace Commands {
                 Dictionary<string, int> npcGroups = new Dictionary<string, int>();
 
                 foreach (string id in room.GetObjectsInRoom(Room.RoomObjects.Npcs)) {
-                    //MongoCollection npcs = MongoUtils.MongoData.GetCollection("Characters", "NPCCharacters"); //wtf is this here for? doesn't the for loop get all the NPC's?
-                   // IMongoQuery query = Query.EQ("_id", ObjectId.Parse(id));
-                   // BsonDocument npc = npcs.FindOneAs<BsonDocument>(query);
-
                     var npc = Character.NPCUtils.GetAnNPCByID(id);
-
-
-                    //let's create groups for easy display
-                    //if (!npcGroups.ContainsKey(npc.["FirstName"].AsString + "$" + npc["LastName"].AsString + "$" + npc["StanceState"])) {
-                    //    npcGroups.Add(npc["FirstName"].AsString + "$" + npc["LastName"].AsString + "$" + npc["StanceState"], 1);
-                    //}
-                    //else {
-                    //    npcGroups[npc["FirstName"].AsString + "$" + npc["LastName"].AsString + "$" + npc["StanceState"]] += 1;
-                    //}
 
                     if (!npcGroups.ContainsKey(npc.FirstName + "$" + npc.LastName + "$" + npc.StanceState)) {
                         npcGroups.Add(npc.FirstName + "$" + npc.LastName + "$" + npc.StanceState, 1);

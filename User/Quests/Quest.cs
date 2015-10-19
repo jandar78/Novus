@@ -71,10 +71,18 @@ namespace Quests {
             set;
         }
 
+		public bool AutoProcessNextStep {
+			get {
+				return AutoProcessPlayer.Count > 0;
+			}
+		}
+
         public Quest(string questID, Dictionary<string, int> playerSteps) {
-            QuestID = questID;
+			AutoProcessPlayer = new Queue<string>();
+			QuestID = questID;
 			CurrentPlayerStep = playerSteps;
             LoadQuestSteps();
+			
         }
 
 		/// <summary>
@@ -83,6 +91,8 @@ namespace Quests {
 		private bool AllowOutOfOrder {
 			get; set;
 		}
+
+		public Queue<string> AutoProcessPlayer { get; set; }
 
 		/// <summary>
 		/// Only one player at a time can ever be doing this quest.
@@ -98,56 +108,78 @@ namespace Quests {
 			if (doc != null) {
 				AllowOutOfOrder = doc["AllowOutOfOrder"].AsBoolean;
 				IsUnique = doc["IsUnique"].AsBoolean;
-
+				int stepNumber = 0;
 				foreach (BsonDocument stepDoc in doc["Steps"].AsBsonArray) {
 					QuestStep temp = new QuestStep();
 					temp = new QuestStep();
 					temp.QuestID = QuestID;
+					temp.AppliesToNPC = stepDoc["AppliesToNPC"].AsBoolean;
+					temp.IfPreviousCompleted = stepDoc["OnlyIfPreviousCompleted"].AsBoolean;
 					temp.Trigger = new Triggers.QuestTrigger((stepDoc["Trigger"].AsBsonDocument));
-
+					temp.Step = stepNumber;
+					temp.AutoProcess = stepDoc["AutoProcess"].AsBoolean;
 					QuestSteps.Add(temp);
+
+					stepNumber++;
 				}
 			}
         }
 
-        public int AddPlayerToQuest(string playerID) {
-			int stepNumber = 0;
-            foreach (QuestStep step in QuestSteps) {
+        public int AddPlayerToQuest(string playerID, int stepNumber) {
+			foreach (QuestStep step in QuestSteps.Where(s => s.Step > stepNumber)) {
                 if (step.AddPlayerToQuest(playerID)) {
 					if (CurrentPlayerStep.ContainsKey(playerID)) {
-						CurrentPlayerStep[playerID] = stepNumber;
+						CurrentPlayerStep[playerID] = step.Step;
 					}
 					else {
-						CurrentPlayerStep.Add(playerID, stepNumber);
+						CurrentPlayerStep.Add(playerID, step.Step);
 					}
                     break;
                 }
 				stepNumber++;
             }
-			
-			return stepNumber;
+
+			return CurrentPlayerStep[playerID];
         }
+
+		public void AutoProcessQuestStep(Character.Iactor npc) {
+			int stepToProcess = CurrentPlayerStep[AutoProcessPlayer.Dequeue()] + 1;
+			TriggerEventArgs e = new TriggerEventArgs(npc.ID, TriggerEventArgs.IDType.Npc, "", TriggerEventArgs.IDType.None, "");
+			QuestSteps[stepToProcess].ProcessStep(null, e);
+		}
 
 		public void ProcessQuestStep(Message message, Character.Iactor npc) {
 			AI.MessageParser parser = null;
-			CurrentStep = 0;
-			if (message.InstigatorType == Message.ObjectType.Player) {
-				//find the step that contains the trigger
-				foreach (QuestStep step in QuestSteps) {
+			int currentStep = -1;
+			if (CurrentPlayerStep.ContainsKey(message.InstigatorID)) {
+				currentStep = CurrentPlayerStep[message.InstigatorID];
+			}
+			//find the step that contains the trigger
+			foreach (QuestStep step in QuestSteps) {
+				if (message.InstigatorType == Message.ObjectType.Player || (step.AppliesToNPC && message.InstigatorType == Message.ObjectType.Npc)) { //only do it for players or if we specifically say it can trigger for NPC's
 					parser = new AI.MessageParser(message, npc, new List<ITrigger> { step.Trigger });
 					parser.FindTrigger();
 
-					if (parser.TriggerToExecute != null) {
-						CurrentStep = AddPlayerToQuest(message.InstigatorID);
-						if (!AllowOutOfOrder && CurrentStep != CurrentPlayerStep[message.InstigatorID]) {
+					foreach (ITrigger trigger in parser.TriggersToExecute) {
+						if (trigger.AutoProcess) {
+							AutoProcessPlayer.Enqueue(message.InstigatorID);
+							((Character.NPC)npc).Fsm.ChangeState(AI.Questing.GetState(), npc as Character.NPC);
+							break;
+						}
+
+						if (!AllowOutOfOrder && currentStep != CurrentPlayerStep[message.InstigatorID] || currentStep > step.Step) {
 							//we will not execute the trigger since they need to start this quest from the beginning
 							break;
 						}
-						TriggerEventArgs e = new TriggerEventArgs(npc.ID, TriggerEventArgs.IDType.Npc, message.InstigatorID, (TriggerEventArgs.IDType)Enum.Parse(typeof(TriggerEventArgs.IDType), message.InstigatorType.ToString()), message.Room);
-                        parser.TriggerToExecute.HandleEvent(null, e);
-					}
+						
+						if (step.IfPreviousCompleted && CurrentStep < (step.Step - 1)) { //this step won't process if the previous step was not completed
+							break;
+						} 
 
-					CurrentStep++;
+						currentStep = AddPlayerToQuest(message.InstigatorID, currentStep);
+						TriggerEventArgs e = new TriggerEventArgs(npc.ID, TriggerEventArgs.IDType.Npc, message.InstigatorID, (TriggerEventArgs.IDType)Enum.Parse(typeof(TriggerEventArgs.IDType), message.InstigatorType.ToString()), message.Room);
+						trigger.HandleEvent(null, e);
+					}
 				}
 			}
 		}
@@ -198,12 +230,21 @@ namespace Quests {
             set;
         }
 
+		public bool AppliesToNPC {
+			get;
+			set;
+		}
+
+		public bool AutoProcess { get; set; }
+
+		public bool IfPreviousCompleted { get; set; }
+
         //mainly for when we want to process a step that is not dependent on a trigger.
         //we may have some NPC dialogue along with emotes that in between check to see if the player they are talking
         //to is still around or saying something in which case a single script that did all that would not be very feasible.
         //but how do we get this to execute from the previous step?
-        public void ProcessStep() {
-            Trigger.HandleEvent();
+        public void ProcessStep(object sender, EventArgs e) {
+            Trigger.HandleEvent(sender, e);
         }
 
         public bool AddPlayerToQuest(string playerID) {

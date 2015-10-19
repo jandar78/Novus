@@ -17,7 +17,9 @@ namespace Commands {
 		public static void Move(User.User player, List<string> commands) {
 			Message message = new Message();
 			message.InstigatorID = player.UserID;
-			message.InstigatorType = Message.ObjectType.Player;
+     		message.InstigatorType = player.Player.IsNPC ? Message.ObjectType.Npc : Message.ObjectType.Player;
+			
+
 
 			if (!player.Player.InCombat) {
 
@@ -122,11 +124,11 @@ namespace Commands {
 							ApplyRoomModifier(player);
 
 							if (player.Player.ActionState != CharacterEnums.CharacterActionState.Sneaking) {
-								if (directionToGo != RoomExits.Up || directionToGo != RoomExits.Down) {
-									message.Room = String.Format(arrive["ShowOthers"].AsString.Replace("the {1}","{1}"), who, direction);
+								if (directionToGo == RoomExits.Up || directionToGo == RoomExits.Down) {
+									message.Room = String.Format(arrive["ShowOthers"].AsString.Replace("the {1}","{1}"), who, directionToGo.ToString());
 								}
 								else {
-									message.Room = String.Format(arrive["ShowOthers"].AsString, who, direction);
+									message.Room = String.Format(arrive["ShowOthers"].AsString, who, directionToGo.ToString());
 								}
 							}
 

@@ -49,13 +49,14 @@ namespace Commands {
             ItemCommands.Add("DEACTIVATE", new CommandDelegate(DeActivate));
             ItemCommands.Add("SWITCHOFF", new CommandDelegate(DeActivate));
 			ItemCommands.Add("LOOT", new CommandDelegate(Loot));
-            //these two may be the same as equip and unequip we'll see
-            //ItemCommands.Add("WEAR", new CommandDelegate(Wear));
-            //ItemCommands.Add("REMOVE", new CommandDelegate(Remove));
+			ItemCommands.Add("GIVE", new CommandDelegate(Give));
+			//these two may be the same as equip and unequip we'll see
+			//ItemCommands.Add("WEAR", new CommandDelegate(Wear));
+			//ItemCommands.Add("REMOVE", new CommandDelegate(Remove));
 
 
-            //General commands (biggest of the list)
-            GeneralCommands.Add("BUG", new CommandDelegate(ReportBug));
+			//General commands (biggest of the list)
+			GeneralCommands.Add("BUG", new CommandDelegate(ReportBug));
             GeneralCommands.Add("HIDE", new CommandDelegate(PerformSkill));
             GeneralCommands.Add("UNCONCEAL", new CommandDelegate(PerformSkill));
             GeneralCommands.Add("SPOT", new CommandDelegate(PerformSkill));
@@ -94,6 +95,7 @@ namespace Commands {
 			//Player information commands
 			PlayerCommands.Add("STATS", new CommandDelegate(DisplayStats));
 			PlayerCommands.Add("SAY", new CommandDelegate(Say));
+			PlayerCommands.Add("SAYTO", new CommandDelegate(SayTo));
 			PlayerCommands.Add("WHISPER", new CommandDelegate(Whisper));
 			PlayerCommands.Add("TELL", new CommandDelegate(Tell));
 			PlayerCommands.Add("EMOTE", new CommandDelegate(Emote));

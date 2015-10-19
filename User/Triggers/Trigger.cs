@@ -6,132 +6,193 @@ using System.Threading.Tasks;
 using System.Threading;
 using MongoDB.Bson;
 using LuaInterface;
+using ClientHandling;
 
 //Trigger can be used to kick off scripts for pretty much anything, ranging from Quests to a special action an item can perform
 //based on what the trigger is
 
 namespace Triggers {
-    public class GeneralTrigger : ITrigger {
-        public GeneralTrigger(BsonDocument doc, TriggerType triggerType) {
-            MessageOverrideAsString = new List<string>();
+	public class GeneralTrigger : ITrigger {
+		public GeneralTrigger(BsonDocument doc, TriggerType triggerType) {
+			TriggerOn = new List<string>();
+			AndOn = new List<string>();
+			NotOn = new List<string>();
+			MessageOverrideAsString = new List<string>();
 			if (doc != null && doc.ElementCount > 0 && doc.Contains("TriggerOn")) {
-				TriggerOn = doc["TriggerOn"].AsString;
+				foreach (var on in doc["TriggerOn"].AsBsonArray) {
+					TriggerOn.Add(on.AsString);
+				}
+				foreach (var and in doc["And"].AsBsonArray) {
+					AndOn.Add(and.AsString);
+				}
+				foreach (var not in doc["NoTriggerOn"].AsBsonArray) {
+					NotOn.Add(not.AsString);
+				}
+				AutoProcess = doc.Contains("AutoProcess") ? doc["AutoProcess"].AsBoolean : false;
 				ChanceToTrigger = doc["ChanceToTrigger"].AsInt32;
 				script = ScriptFactory.GetScript(doc["ScriptID"].AsString, triggerType.ToString());
 				foreach (var overrides in doc["Overrides"].AsBsonArray) {
 					MessageOverrideAsString.Add(overrides.AsString);
 				}
+				Type = doc["Type"].AsString;
 			}
-        }
+		}
 
-        public GeneralTrigger(){}
-        public string TriggerOn { get; set; }
-        public double ChanceToTrigger { get; set; }
-        public BsonArray MessageOverrides { get; set; }
-        public List<string> MessageOverrideAsString { get; set; }
-        public string StateToExecute { get; set; }
-        public IScript script; 
+		public GeneralTrigger() {
+			TriggerOn = new List<string>();
+			AndOn = new List<string>();
+			NotOn = new List<string>();
+			MessageOverrideAsString = new List<string>();
+		}
 
-        public virtual void HandleEvent(object o, EventArgs e) {
-			Task.Run(() => script.RunScript());
+		public List<string> TriggerOn { get; set; }
+		public List<string> AndOn { get; set; }
+		public List<string> NotOn { get; set; }
+		public double ChanceToTrigger { get; set; }
+		public BsonArray MessageOverrides { get; set; }
+		public List<string> MessageOverrideAsString { get; set; }
+		public string StateToExecute { get; set; }
+		public string Type { get; set; }
+		public bool AutoProcess { get; set; }
+		public IScript script;
+
+		public async virtual void HandleEvent(object o, EventArgs e) {
+			Message message = new Message();
+			var typeEventCaller = ((TriggerEventArgs)e).IdType;
+			var callerID = ((TriggerEventArgs)e).Id;
+			object caller = null;
+
+			switch (typeEventCaller) {
+				case TriggerEventArgs.IDType.Npc:
+					caller = Character.NPCUtils.GetUserAsNPCFromList(new List<string>() { callerID });
+					break;
+				case TriggerEventArgs.IDType.Room:
+					caller = Rooms.Room.GetRoom(callerID);
+					break;
+				default:
+					break;
+			}
+
+			if (MessageOverrideAsString.Count > 0) {
+				script.AddVariable(MessageOverrideAsString, "messageOverrides");
+			}
+
+			script.AddVariable(message, "Message");
+
+			if (caller is Rooms.IRoom) {
+				script.AddVariable((Rooms.IRoom)caller, "room");
+				script.AddVariable("room", "callerType");
+			}
+			else if (caller is User.User) {
+				script.AddVariable((User.User)caller, "npc");
+				script.AddVariable("npc", "callerType");
+			}
+
+			if (((TriggerEventArgs)e).InstigatorType == TriggerEventArgs.IDType.Player) {
+				script.AddVariable(MySockets.Server.GetAUser(((TriggerEventArgs)e).InstigatorID), "player");
+			}
+			else if (((TriggerEventArgs)e).InstigatorType == TriggerEventArgs.IDType.Npc) {
+				script.AddVariable(Character.NPCUtils.GetUserAsNPCFromList(new List<string>() { ((TriggerEventArgs)e).InstigatorID }), "player");
+			}
+
+			await Task.Run(() => script.RunScript());
 			// ThreadPool.QueueUserWorkItem(delegate { script.RunScript(); });           
 		}
 
-        public virtual void HandleEvent() {
-            HandleEvent(null, null);
-        }
-    }
+		public virtual void HandleEvent() {
+			HandleEvent(null, null);
+		}
+	}
 
 
-    public class QuestTrigger : GeneralTrigger {
-        public QuestTrigger(BsonDocument doc):base(doc, TriggerType.Quests) {
-        }
+	public class QuestTrigger : GeneralTrigger {
+		public QuestTrigger(BsonDocument doc) : base(doc, TriggerType.Quests) {
+		}
 
-        public override void HandleEvent(object o, EventArgs e) {
-            //for items we want to add the item and the owner into the script as variables
-            var typeEventCaller = ((TriggerEventArgs)e).IdType;
-            var callerID = ((TriggerEventArgs)e).Id;
+		public async override void HandleEvent(object o, EventArgs e) {
+			//for items we want to add the item and the owner into the script as variables
+			Message message = new Message();
+			var typeEventCaller = ((TriggerEventArgs)e).IdType;
+			var callerID = ((TriggerEventArgs)e).Id;
 			object caller = null;
 
-            switch (typeEventCaller) {  
-                case TriggerEventArgs.IDType.Npc:
-                    caller = Character.NPCUtils.GetAnNPCByID(callerID);
-                    break;
-                case TriggerEventArgs.IDType.Room:
-                    caller = Rooms.Room.GetRoom(callerID);
-                    break;
-                default:
-                    break;
-            }
+			switch (typeEventCaller) {
+				case TriggerEventArgs.IDType.Npc:
+					caller = Character.NPCUtils.GetAnNPCByID(callerID);
+					break;
+				case TriggerEventArgs.IDType.Room:
+					caller = Rooms.Room.GetRoom(callerID);
+					break;
+				default:
+					break;
+			}
 
-            if (caller is Rooms.IRoom) {
-                if (script.ScriptType == ScriptFactory.ScriptTypes.Lua) {
-                    script.AddVariable((Rooms.IRoom)caller, "room");
-                }
-                else {
-                    script.AddVariable(((Rooms.IRoom)caller).Id.ToString(), "roomID");
-                }
-            }
-            else if (caller is Character.Iactor) {
-                if (script.ScriptType == ScriptFactory.ScriptTypes.Lua) {
-                    script.AddVariable((Character.Iactor)caller, "npc");
-                }
-                else {
-                    script.AddVariable(((Character.Iactor)caller).ID.ToString(), "npcID");
-                }
-            }
+			if (MessageOverrideAsString.Count > 0) {
+				script.AddVariable(MessageOverrideAsString, "messageOverrides");
+			}
+
+			script.AddVariable(message, "Message");
+
+			if (caller is Rooms.IRoom) {
+				script.AddVariable((Rooms.IRoom)caller, "room");
+			}
+			else if (caller is Character.Iactor) {
+				script.AddVariable(Character.NPCUtils.GetUserAsNPCFromList(new List<string>() { ((Character.Iactor)caller).ID }), "npc");
+			}
 
 			//add the player (instigator) to the script
-			if (script.ScriptType == ScriptFactory.ScriptTypes.Lua) {
+			if (((TriggerEventArgs)e).InstigatorType == TriggerEventArgs.IDType.Player) {
 				script.AddVariable(MySockets.Server.GetAUser(((TriggerEventArgs)e).InstigatorID), "player");
 			}
-			else {
-				script.AddVariable(((TriggerEventArgs)e).InstigatorID, "playerID");
+			else if (((TriggerEventArgs)e).InstigatorType == TriggerEventArgs.IDType.Npc) {
+				script.AddVariable(Character.NPCUtils.GetUserAsNPCFromList(new List<string>() { ((TriggerEventArgs)e).InstigatorID }), "player");
 			}
 
 			//add a message if there is one
 			if (!string.IsNullOrEmpty(((TriggerEventArgs)e).Message)) {
-				script.AddVariable(((TriggerEventArgs)e).Message, "message");
+				script.AddVariable(((TriggerEventArgs)e).Message, "messages");
 			}
 
 			//trying this instead of the ThreadPool
-			Task.Run(() => script.RunScript());
+			await Task.Run(() => script.RunScript());
 
-            //ThreadPool.QueueUserWorkItem(delegate {
-            //    script.RunScript();
-            //});
-        }
-    }
+			//ThreadPool.QueueUserWorkItem(delegate {
+			//    script.RunScript();
+			//});
+		}
+	}
 
-    public class ItemTrigger : GeneralTrigger {
-        public ItemTrigger(BsonDocument doc):base(doc, TriggerType.Items) {}
+	public class ItemTrigger : GeneralTrigger {
+		public ItemTrigger(BsonDocument doc) : base(doc, TriggerType.Items) { }
 
-        public override void HandleEvent(object o, EventArgs e) {
-            //for items we want to add the item and the owner into the script as variables
-            var item = Items.Items.GetByID(((Items.ItemEventArgs)e).ItemID.ToString());
+		public async override void HandleEvent(object o, EventArgs e) {
+			//for items we want to add the item and the owner into the script as variables
+			var item = Items.Items.GetByID(((Items.ItemEventArgs)e).ItemID.ToString());
 			if (item != null) {
-				if (script.ScriptType == ScriptFactory.ScriptTypes.Lua) {
-					script.AddVariable(item, "item");
+				script.AddVariable(item, "item");
+
+				if (MessageOverrideAsString.Count > 0) {
+					script.AddVariable(MessageOverrideAsString, "messageOverrides");
 				}
-				else {
-					script.AddVariable(item.Id.ToString(), "itemID");
+
+				User.User player = MySockets.Server.GetAUser(item.Owner);
+				if (player != null) {//the owner could be another item and not a player
+					if (script.ScriptType == ScriptFactory.ScriptTypes.Lua) {
+						script.AddVariable(player.Player, "player");
+					}
+					else {
+						script.AddVariable(player.Player.ID, "playerID");
+					}
 				}
+
+				await Task.Run(() => script.RunScript());
+				//ThreadPool.QueueUserWorkItem(delegate { script.RunScript(); });
 			}
+		}
+	}
 
-            User.User player = MySockets.Server.GetAUser(item.Owner);
-            if (player != null) {//the owner could be another item and not a player
-				if (script.ScriptType == ScriptFactory.ScriptTypes.Lua) {
-					script.AddVariable(player.Player, "player");
-				}
-				else {
-					script.AddVariable(player.Player.ID, "playerID");
-				}
-            }
 
-			Task.Run(() => script.RunScript());
-			//ThreadPool.QueueUserWorkItem(delegate { script.RunScript(); });
-        }
-    }
-
-    public enum TriggerType { Items, Quests, Door, NPC, Room};
+	public enum TriggerType {
+		Items, Quests, Door, NPC, Room
+	};
 }

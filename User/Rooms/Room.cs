@@ -305,10 +305,35 @@ namespace Rooms {
         private void CheckRoomTriggers(string message) {
             if (_triggers != null) {
                 foreach (Triggers.ITrigger trigger in _triggers) {
-                    if (message.Contains(trigger.TriggerOn)) {
-                        if (Extensions.RandomNumber.GetRandomNumber().NextNumber(0,100) <= trigger.ChanceToTrigger) {
-                            trigger.HandleEvent(null, null);
-                        }
+					bool hasOn = false;
+					bool hasAnd = false;
+					foreach (string on in trigger.TriggerOn) {
+							if (message.Contains(on)) {
+								hasOn = true;
+								break;
+							}
+						}
+						if (trigger.AndOn.Count > 0) {
+							foreach (string and in trigger.AndOn) {
+								if (message.Contains(and)) {
+									hasAnd = true;
+									break;
+								}
+							}
+						}
+						else {
+							hasAnd = true;
+						}
+						foreach (string not in trigger.NotOn) {
+							if (message.Contains(not)) {
+								hasOn = false;
+								break;
+							}
+						}
+						if (hasOn && hasAnd) {
+						if (Extensions.RandomNumber.GetRandomNumber().NextNumber(0, 100) <= trigger.ChanceToTrigger) {
+							trigger.HandleEvent(null, null);
+						}
                     }
                 }
             }
@@ -375,7 +400,9 @@ namespace Rooms {
             }
 
             foreach (BsonDocument doc in npcsInRoom) {
-                npcs.Add(doc["_id"].AsObjectId.ToString());
+				if (!npcs.Contains(doc["_id"].AsObjectId.ToString())) {
+					npcs.Add(doc["_id"].AsObjectId.ToString());
+				}
             }
         }
 
@@ -451,7 +478,7 @@ namespace Rooms {
 										message.Room = String.Format(affect["DescriptionOthers"].AsString, user.Player.FirstName,
 															user.Player.Gender.ToString() == "Male" ? "his" : "her");
 										message.InstigatorID = user.Player.ID;
-										message.InstigatorType = Message.ObjectType.Player;
+										message.InstigatorType = user.Player.IsNPC ? Message.ObjectType.Npc : Message.ObjectType.Player;
 										room.InformPlayersInRoom(message, new List<string>() { user.UserID });
 									}
 								}

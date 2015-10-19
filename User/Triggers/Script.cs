@@ -16,8 +16,10 @@ using Roslyn.Scripting.CSharp;
 namespace Triggers {
 
     public class RoslynScript : Script {
+
 		private Roslyn.Scripting.Session _session;
 		private ScriptEngine _engine;
+		private ScriptMethods _scriptMethods;
 		
 		public ScriptEngine Engine {
 			get {
@@ -28,11 +30,22 @@ namespace Triggers {
 			}
 		}
 
+		public ScriptMethods ScriptMethod {
+			get {
+				if (_scriptMethods == null) {
+					_scriptMethods = new ScriptMethods();
+				}
+				return _scriptMethods;
+			}
+			set {
+				_scriptMethods = value;
+			}
+		}
+
 		public Roslyn.Scripting.Session Session {
 			get {
-				if (_session == null) {
-					
-					_session = Engine.CreateSession(new ScriptMethods(), new ScriptMethods().GetType());
+				if (_session == null) {					
+					_session = Engine.CreateSession(ScriptMethod, ScriptMethod.GetType());
 				}
 				return _session;
 			}
@@ -78,6 +91,10 @@ namespace Triggers {
 						 typeof (IEnumerable<>).Assembly,
 						 typeof (IQueryable).Assembly,
 						 typeof (ScriptMethods).Assembly,
+						 typeof(Character.Iactor).Assembly,
+						 typeof(Character.Character).Assembly,
+						 typeof(Character.NPC).Assembly,
+						 typeof(ClientHandling.Message).Assembly,
 						 GetType().Assembly
 					}.ToList().ForEach(asm => Engine.AddReference(asm));
 
@@ -86,7 +103,9 @@ namespace Triggers {
 					{
 						 "System", "System.Linq",
 						 "System.Collections",
-						 "System.Collections.Generic"
+						 "System.Collections.Generic",
+						 "System.Text","System.Threading.Tasks","System.IO",
+                         "Character", "Rooms", "Items", "ClientHandling"
 					 }.ToList().ForEach(ns => Engine.ImportNamespace(ns));
 		}
 
@@ -104,25 +123,33 @@ namespace Triggers {
         
         public override void RunScript() {
             MemStream = new MemoryStream(ScriptByteArray);
-            if (_memStream != null) {
-			   Session.Execute(MemStreamAsString);
-            }
+			if (_memStream != null) {
+				string code = MemStreamAsString;
+				try {
+				//	var result = Session.CompileSubmission<object>(MemStreamAsString);
+					Session.Execute(MemStreamAsString);
+				}
+				catch { }
+			}
         }
 
         public override void AddVariable(object variable, string variableName) {
 			//need to figure out a way to add variables to the session or it may just be something that happens from the
 			//script code by calling the scriptmethods we provide.  We might just add variables like player/item ID's
-			if (variable.ToString().Contains("\""))	variable = variable.ToString().Replace("\"", "\\\"");
-			string addVariable = string.Format("string {0} = \"{1}\";", variableName, (string)variable);
-            Session.Execute(addVariable);
+			if (variable != null) {
+				if (variable.ToString().Contains("\"")) {
+					variable = variable.ToString().Replace("\"", "\\\"");
+				}
+				ScriptMethod.SetVariable(variableName, variable);
+			}
         }
 
 		public void AddNamespace(string nameSpace) {
-			_session.ImportNamespace(nameSpace);
+			Session.ImportNamespace(nameSpace);
 		}
 
 		public void AddReference(Assembly assembly) {
-			_session.AddReference(assembly);
+			Session.AddReference(assembly);
 		}
 	}
 

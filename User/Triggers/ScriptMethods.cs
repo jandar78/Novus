@@ -16,11 +16,11 @@ using NCalc;
 
 namespace Triggers {
 	public class ScriptMethods {
-		private Dictionary<string, object> DataSet {
+		public Dictionary<string, object> DataSet {
 			get;
 			set;
 		}
-		private Stack<object> DataStack {
+		public Stack<object> DataStack {
 			get;
 			set;
 		}
@@ -38,6 +38,10 @@ namespace Triggers {
 			object o = null;
 			o = MySockets.Server.GetAUser(playerID).Player;
 			return o;
+		}
+
+		public User.User GetUser(string playerID) {
+			return MySockets.Server.GetAUser(playerID);
 		}
 
 		[LuaAccessible]
@@ -100,6 +104,15 @@ namespace Triggers {
 			}
 
 
+			object result = m.Invoke(null, parameters);
+
+			return result;
+		}
+
+		//rosyln version
+		public object GetMethodResult(string className, string methodName, object[] parameters) {
+			Type t = GetClassType(className);
+			MethodInfo m = t.GetMethod(methodName, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static);	
 			object result = m.Invoke(null, parameters);
 
 			return result;
@@ -180,6 +193,20 @@ namespace Triggers {
 				m.Invoke(o, new object[] { table });
 			}
 		}
+
+		//roslyn method
+		public void InvokeMethod(object o, string methodName, object[] parameters) {
+			Type t = o.GetType();
+			MethodInfo m = t.GetMethod(methodName, BindingFlags.Public | BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic);
+
+			if (m.IsStatic) {
+				o = null;
+			}
+
+			m.Invoke(o, parameters);
+		}
+		
+
 
 		[LuaAccessible]
 		public static object GetDictionaryElement(object o, string name) {

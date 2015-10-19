@@ -577,11 +577,17 @@ namespace Character {
 						step.Add("Step", playerStep.Value);
 						playerSteps.Add(step);
 					}
+					BsonArray autoProcess = new BsonArray();
+					foreach (string playerStep in quest.AutoProcessPlayer) {
+						autoProcess.Add(BsonValue.Create(playerStep));
+					}
 
+					questDoc.Add("AutoPlayers", autoProcess);
+					questDoc.Add("PlayersIDs", playerSteps);
 					questIds.Add(questDoc);
 				}
 
-				npcCharacter.Add("QuestIDs", questIds);
+				npcCharacter.Add("QuestIds", questIds);
 
 				npcCharacter.Add("XpTracker", xpTracker);
 
@@ -603,7 +609,7 @@ namespace Character {
 				npcCharacter["Location"] = this.Location;
 				npcCharacter["ActionState"] = this.ActionState.ToString().CamelCaseWord();
 				npcCharacter["StanceState"] = this.StanceState.ToString().CamelCaseWord();
-				npcCharacter["AiState"] = Fsm.state.ToString();
+				npcCharacter["AiState"] = Fsm.state != null ? Fsm.state.ToString() : "None";
 				npcCharacter["previousAiState"] = Fsm.previousState == null ? "" : Fsm.previousState.ToString();
 				npcCharacter["AiGlobalState"] = Fsm.globalState == null ? "" : Fsm.globalState.ToString();
 				npcCharacter["NextAiAction"] = this.NextAiAction.ToUniversalTime();
@@ -655,6 +661,7 @@ namespace Character {
 					BsonDocument questDoc = new BsonDocument();
 					questDoc.Add("QuestID", quest.QuestID);
 					BsonArray playerSteps = new BsonArray();
+
 					foreach (var playerStep in quest.CurrentPlayerStep) {
 						BsonDocument step = new BsonDocument();
 						step.Add("PlayerID", playerStep.Key);
@@ -662,10 +669,17 @@ namespace Character {
 						playerSteps.Add(step);
 					}
 
+					BsonArray autoProcess = new BsonArray();
+					foreach (string playerStep in quest.AutoProcessPlayer) {
+						autoProcess.Add(BsonValue.Create(playerStep));
+					}
+
+					questDoc.Add("AutoPlayers", autoProcess);
+					questDoc.Add("PlayerIDs", playerSteps);
 					questIds.Add(questDoc);
 				}
 
-				npcCharacter["QuestIDs"] = questIds;
+				npcCharacter["QuestIds"] = questIds;
 
 				npcCharacter["XpTracker"] = xpTracker;
 
@@ -767,10 +781,21 @@ namespace Character {
 			if (questIds != null) {
 				foreach (BsonDocument questDoc in questIds) {
 					Dictionary<string, int> playerSteps = new Dictionary<string, int>();
-					foreach (var playerStep in questDoc["PlayerIDs"].AsBsonArray) {
-						playerSteps.Add(playerStep["PlayerID"].AsString, playerStep["Step"].AsInt32);
+
+					if (questDoc.Contains("PlayerIDs")) {
+						foreach (var playerStep in questDoc["PlayerIDs"].AsBsonArray) {
+							playerSteps.Add(playerStep["PlayerID"].AsString, playerStep["Step"].AsInt32);
+						}
 					}
+
 					Quest quest = new Quest(questDoc["QuestID"].AsString, playerSteps);
+
+					if (questDoc.Contains("AutoPlayers")) {
+						foreach (var autoID in questDoc["AutoPlayers"].AsBsonArray) {
+							quest.AutoProcessPlayer.Enqueue(autoID.AsString);
+						}
+					}
+					
 					Quests.Add(quest);
 				}
 			}
@@ -843,12 +868,27 @@ namespace Character {
 		}
 
 		public void ParseMessage(Message message) {
-            //send the message to the AI logic 
-			Fsm.InterpretMessage(message, this);
-            //send the message to the Quest logic
-            foreach (IQuest quest in Quests) {
-				quest.ProcessQuestStep(message, this);
-            }
+			//send the message to the AI logic 
+			if (message.InstigatorID != this.ID) {
+				//does the AI need to do something based on this
+				Fsm.InterpretMessage(message, this);
+
+				//let's see if we have a general trigger hit
+				var parser = new AI.MessageParser(message, this, Triggers);
+				parser.FindTrigger();
+
+				if (parser.TriggersToExecute.Count > 0) {
+					foreach (ITrigger trigger in parser.TriggersToExecute) {
+						trigger.HandleEvent(null, new TriggerEventArgs(this.ID, TriggerEventArgs.IDType.Npc, message.InstigatorID, (TriggerEventArgs.IDType)Enum.Parse(typeof(TriggerEventArgs.IDType), message.InstigatorType.ToString())));
+					}
+				}
+
+				//now let's see if there's a quest that will trigger
+				foreach (IQuest quest in Quests) {
+					quest.ProcessQuestStep(message, this);
+				}
+				Save();
+			}
 		}
 
 		public void SetActionState(CharacterActionState state) {

@@ -58,7 +58,7 @@ namespace ClientHandling {
 
 
 		public Message() {
-			_messages = new string[3];
+			_messages = new string[] { string.Empty, string.Empty, string.Empty };
 		}
 
 		/// <summary>
@@ -68,9 +68,9 @@ namespace ClientHandling {
 		/// <param name="messages"></param>
 		public Message(List<string> messages, string instigatorID = null, ObjectType instigatorType = ObjectType.None, string targetid = null, ObjectType targetType = ObjectType.None) {
 			_messages = new string[3];
-			Self = string.IsNullOrEmpty(messages[0]) ? null : messages[0];
-			Target = string.IsNullOrEmpty(messages[1]) ? null : messages[1];
-			Room = string.IsNullOrEmpty(messages[2]) ? null : messages[2];
+			Self = string.IsNullOrEmpty(messages[0]) ? string.Empty : messages[0];
+			Target = string.IsNullOrEmpty(messages[1]) ? string.Empty : messages[1];
+			Room = string.IsNullOrEmpty(messages[2]) ? string.Empty : messages[2];
 
 			InstigatorID = instigatorID;
 			InstigatorType = instigatorType;
