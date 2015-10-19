@@ -143,46 +143,59 @@ namespace Quests {
         }
 
 		public void AutoProcessQuestStep(Character.Iactor npc) {
-			int stepToProcess = CurrentPlayerStep[AutoProcessPlayer.Dequeue()] + 1;
-			TriggerEventArgs e = new TriggerEventArgs(npc.ID, TriggerEventArgs.IDType.Npc, "", TriggerEventArgs.IDType.None, "");
-			QuestSteps[stepToProcess].ProcessStep(null, e);
+			string id = AutoProcessPlayer.Dequeue();
+
+			User.User player = MySockets.Server.GetAUser(id);
+
+			if (player == null) {
+				player = Character.NPCUtils.GetUserAsNPCFromList(new List<string> { id });
+			}
+
+			int stepToProcess = CurrentPlayerStep[player.UserID];
+			TriggerEventArgs e = new TriggerEventArgs(npc.ID, TriggerEventArgs.IDType.Npc, player.UserID, player.Player.IsNPC ? TriggerEventArgs.IDType.Npc : TriggerEventArgs.IDType.Player);
+			QuestSteps[stepToProcess - 1].ProcessStep(null, e);
 		}
 
 		public void ProcessQuestStep(Message message, Character.Iactor npc) {
 			AI.MessageParser parser = null;
-			int currentStep = -1;
+			int currentStep = 0;
 			if (CurrentPlayerStep.ContainsKey(message.InstigatorID)) {
 				currentStep = CurrentPlayerStep[message.InstigatorID];
+				if (currentStep >= QuestSteps.Count) {
+					currentStep = QuestSteps.Count - 1;
+					CurrentPlayerStep[message.InstigatorID] = currentStep;
+				}
 			}
 			//find the step that contains the trigger
-			foreach (QuestStep step in QuestSteps) {
-				if (message.InstigatorType == Message.ObjectType.Player || (step.AppliesToNPC && message.InstigatorType == Message.ObjectType.Npc)) { //only do it for players or if we specifically say it can trigger for NPC's
-					parser = new AI.MessageParser(message, npc, new List<ITrigger> { step.Trigger });
-					parser.FindTrigger();
+			QuestStep step = QuestSteps[currentStep];
+			if (message.InstigatorType == Message.ObjectType.Player || (step.AppliesToNPC && message.InstigatorType == Message.ObjectType.Npc)) { //only do it for players or if we specifically say it can trigger for NPC's
+				parser = new AI.MessageParser(message, npc, new List<ITrigger> { step.Trigger });
+				parser.FindTrigger();
 
-					foreach (ITrigger trigger in parser.TriggersToExecute) {
-						if (trigger.AutoProcess) {
-							AutoProcessPlayer.Enqueue(message.InstigatorID);
-							((Character.NPC)npc).Fsm.ChangeState(AI.Questing.GetState(), npc as Character.NPC);
-							break;
-						}
-
-						if (!AllowOutOfOrder && currentStep != CurrentPlayerStep[message.InstigatorID] || currentStep > step.Step) {
-							//we will not execute the trigger since they need to start this quest from the beginning
-							break;
-						}
-						
-						if (step.IfPreviousCompleted && CurrentStep < (step.Step - 1)) { //this step won't process if the previous step was not completed
-							break;
-						} 
-
+				foreach (ITrigger trigger in parser.TriggersToExecute) {
+					if (trigger.AutoProcess && currentStep == step.Step) {
+						AutoProcessPlayer.Enqueue(message.InstigatorID);
+						((Character.NPC)npc).Fsm.ChangeState(AI.Questing.GetState(), npc as Character.NPC);
 						currentStep = AddPlayerToQuest(message.InstigatorID, currentStep);
-						TriggerEventArgs e = new TriggerEventArgs(npc.ID, TriggerEventArgs.IDType.Npc, message.InstigatorID, (TriggerEventArgs.IDType)Enum.Parse(typeof(TriggerEventArgs.IDType), message.InstigatorType.ToString()), message.Room);
-						trigger.HandleEvent(null, e);
+						break;
 					}
+
+					if (!AllowOutOfOrder && currentStep != CurrentPlayerStep[message.InstigatorID] || currentStep > step.Step) {
+						//we will not execute the trigger since they need to start this quest from the beginning
+						break;
+					}
+
+					if (step.IfPreviousCompleted && CurrentStep < (step.Step - 1)) { //this step won't process if the previous step was not completed
+						break;
+					}
+
+					currentStep = AddPlayerToQuest(message.InstigatorID, currentStep);
+					TriggerEventArgs e = new TriggerEventArgs(npc.ID, TriggerEventArgs.IDType.Npc, message.InstigatorID, (TriggerEventArgs.IDType)Enum.Parse(typeof(TriggerEventArgs.IDType), message.InstigatorType.ToString()), message.Room);
+					trigger.HandleEvent(null, e);
 				}
 			}
 		}
+		
 
 		public void StartQuest(string playerID) {
             //maybe some quests put some other events in motion

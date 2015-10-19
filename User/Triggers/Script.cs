@@ -110,10 +110,7 @@ namespace Triggers {
 		}
 
         ~RoslynScript(){
-            if (_memStream != null) {
-                _memStream.Dispose();
-            }
-			if (_engine != null) {
+            if (_engine != null) {
 				_engine = null;
 			}
 			if (_session != null) {
@@ -122,14 +119,15 @@ namespace Triggers {
         }
         
         public override void RunScript() {
-            MemStream = new MemoryStream(ScriptByteArray);
-			if (_memStream != null) {
-				string code = MemStreamAsString;
-				try {
-				//	var result = Session.CompileSubmission<object>(MemStreamAsString);
-					Session.Execute(MemStreamAsString);
+			using (MemStream = new MemoryStream(ScriptByteArray)) {
+				if (_memStream != null) {
+					string code = MemStreamAsString;
+					try {
+						//	var result = Session.CompileSubmission<object>(MemStreamAsString);
+						Session.Execute(MemStreamAsString);
+					}
+					catch { }
 				}
-				catch { }
 			}
         }
 
@@ -212,10 +210,11 @@ namespace Triggers {
         }
         
         public override void RunScript() {
-            MemStream = new MemoryStream(ScriptByteArray);
-            if (_memStream != null) {
-				Engine.DoString(MemStreamAsString);
-            }
+			using (MemStream = new MemoryStream(ScriptByteArray)) {
+				if (_memStream != null) {
+					Engine.DoString(MemStreamAsString);
+				}
+			}
         }
 
         public override void AddVariable(object variable, string variableName) {
@@ -307,6 +306,12 @@ namespace Triggers {
 
 		public virtual void RunScript() {
 			throw new NotImplementedException();
+		}
+
+		~Script() {
+			if (_memStream != null) {
+				_memStream.Dispose();
+			}
 		}
 	}
 

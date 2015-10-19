@@ -333,11 +333,11 @@ namespace Calendar {
 		//this gives us 13 hours of daylight and 11 of night time.
 	   //the numbers are based on a 24 hour clock
 	internal enum DayNight {
-			Dawn = 7,
-			Morning = 9,
+			Dawn = 6,
+			Morning = 8,
 			Afternoon = 12,
 			Evening = 17,
 			Dusk = 19,
-			Night = 20
+			Night = 21
 		}
 }

@@ -91,6 +91,10 @@ namespace Commands {
 
 			//get the item from the DB
 			List<Items.Iitem> items = Items.Items.GetByName(itemName.ToString().Trim(), player.UserID);
+			if (items.Count == 0) {
+				player.MessageHandler("You can't seem to find an item by that name.");
+				return;
+			}
 			Items.Iitem item = items[itemPosition - 1];
 
 
