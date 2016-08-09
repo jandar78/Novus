@@ -9,6 +9,7 @@ using MongoDB.Driver;
 using MongoDB.Driver.Builders;
 using Extensions;
 using CharacterEnums;
+using Interfaces;
 
 namespace Character {
 	public class NPCUtils {
@@ -39,9 +40,9 @@ namespace Character {
 				LoadNPCs();
 				//loop through each NPC and call the Update() method
 				foreach (string id in _npcList) {
-					Iactor actor = CharacterFactory.Factory.CreateCharacter(CharacterType.NPC);
+					IActor actor = CharacterFactory.Factory.CreateCharacter(CharacterType.NPC);
 					actor.Load(id);
-					Inpc npc = actor as Inpc;
+					INpc npc = actor as INpc;
 					if (DateTime.Now.ToUniversalTime() > npc.NextAiAction) {
 						npc.Update();
 						//in case the Rot Ai state cleaned this guy out of the DB.
@@ -55,18 +56,18 @@ namespace Character {
 		}
 
 		//this creates a new type of NPC as long as it hasn't hit the max world amount permissible
-		public static Iactor CreateNPC(int MobTypeID, string state = null) {
+		public static IActor CreateNPC(int MobTypeID, string state = null) {
 			MongoUtils.MongoData.ConnectToDatabase();
 			MongoDatabase character = MongoUtils.MongoData.GetDatabase("World");
 			MongoCollection npcCollection = character.GetCollection("NPCs");
 			IMongoQuery query = Query.EQ("_id", MobTypeID);
 			BsonDocument doc = npcCollection.FindOneAs<BsonDocument>(query);
 
-			Iactor actor = null;
+			IActor actor = null;
 
 			if (doc["Current"].AsInt32 < doc["Max"].AsInt32) {
 				actor = CharacterFactory.Factory.CreateNPCCharacter(MobTypeID);
-				Inpc npc = actor as Inpc;
+				INpc npc = actor as INpc;
 				if (state != null) {//give it a starting state, so it can be something other than Wander
 					npc.Fsm.state = npc.Fsm.GetStateFromName(state.CamelCaseWord());
 				}
@@ -80,9 +81,9 @@ namespace Character {
 		public void RegenerateAttributes() {
 			if (_npcList != null) {
 				foreach (string id in _npcList) {
-					Iactor actor = CharacterFactory.Factory.CreateCharacter(CharacterType.NPC);
+					IActor actor = CharacterFactory.Factory.CreateCharacter(CharacterType.NPC);
 					actor.Load(id);
-					foreach (KeyValuePair<string, Attribute> attrib in actor.GetAttributes()) {
+					foreach (KeyValuePair<string, IAttributes> attrib in actor.GetAttributes()) {
 						actor.ApplyRegen(attrib.Key);
 					}
 					actor.Save();
@@ -93,7 +94,7 @@ namespace Character {
 		public void CleanupBonuses() {
 			if (_npcList != null) {
 				foreach (string id in _npcList) {
-					Iactor actor = CharacterFactory.Factory.CreateCharacter(CharacterType.NPC);
+					IActor actor = CharacterFactory.Factory.CreateCharacter(CharacterType.NPC);
 					actor.Load(id);
 					actor.CleanupBonuses();
 					actor.Save();
@@ -117,8 +118,8 @@ namespace Character {
 			}
 		}
 
-		public static List<Iactor> GetAnNPCByName(string name, string location = null) {
-			List<Iactor> npcList = null;
+		public static List<IActor> GetAnNPCByName(string name, string location = null) {
+			List<IActor> npcList = null;
 			MongoUtils.MongoData.ConnectToDatabase();
 			MongoDatabase character = MongoUtils.MongoData.GetDatabase("Characters");
 			MongoCollection npcCollection = character.GetCollection("NPCCharacters");
@@ -133,9 +134,9 @@ namespace Character {
 			var results = npcCollection.FindAs<BsonDocument>(query);
 
 			if (results != null) {
-				npcList = new List<Iactor>();
+				npcList = new List<IActor>();
 				foreach (BsonDocument found in results) {
-					Iactor npc = CharacterFactory.Factory.CreateCharacter(CharacterType.NPC);
+					IActor npc = CharacterFactory.Factory.CreateCharacter(CharacterType.NPC);
 					npc.Load(found["_id"].AsObjectId.ToString());
 					npcList.Add(npc);
 				}
@@ -155,7 +156,7 @@ namespace Character {
 			return null;
 		}
 
-		public static Iactor GetAnNPCByID(string id) {
+		public static IActor GetAnNPCByID(string id) {
 			if (string.IsNullOrEmpty(id)) {
 				return null;
 			}

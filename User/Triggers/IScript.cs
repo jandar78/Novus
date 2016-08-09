@@ -6,9 +6,9 @@ using System.Threading.Tasks;
 using System.IO;
 
 namespace Triggers {
-	public interface IScript {
-		 void RunScript();
-		 void AddVariable(object variable, string variableName);
-		 ScriptFactory.ScriptTypes ScriptType { get; }
-	}
+	//public interface IScript {
+	//	 void RunScript();
+	//	 void AddVariable(object variable, string variableName);
+	//	 ScriptFactory.ScriptTypes ScriptType { get; }
+	//}
 }

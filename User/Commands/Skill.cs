@@ -18,6 +18,7 @@ using System.Xml;
 using System.Collections;
 using LuaInterface;
 using Triggers;
+using Interfaces;
 
 namespace Commands {   
 
@@ -29,24 +30,24 @@ namespace Commands {
          
         public List<string> UserCommand { get; set; }
 
-        public User.User Target { get; set; }
-        public User.User Player { get; set; }
+        public IUser Target { get; set; }
+        public IUser Player { get; set; }
 
         //this may end up being a dictionary if player can have more than one action state applied
         //there could be states if skill outcome is succesful or not that affects the player and others around him
         //ex. if player cartwheels and fails stance would be lying down and not standing. (what if different stances based on how close to success it was?)
         //may make these a dictionary in the future we'll see
-        public CharacterEnums.CharacterActionState StateIfSuccessSelf { get; set; }
-        public CharacterEnums.CharacterStanceState StanceIfSuccessSelf { get; set; }
+        public CharacterActionState StateIfSuccessSelf { get; set; }
+        public CharacterStanceState StanceIfSuccessSelf { get; set; }
 
-        public CharacterEnums.CharacterActionState StateIfSuccessOthers { get; set; }
-        public CharacterEnums.CharacterStanceState StanceIfSuccessOthers { get; set; }
+        public CharacterActionState StateIfSuccessOthers { get; set; }
+        public CharacterStanceState StanceIfSuccessOthers { get; set; }
         
         public IScript script;
 
         public Skill() {}
 
-        public void FillSkill(User.User user, List<string> commands) {
+        public void FillSkill(IUser user, List<string> commands) {
             UserCommand = commands;
             
 			script = ScriptFactory.GetScript(commands[1].CamelCaseWord(), "Action");
@@ -54,7 +55,7 @@ namespace Commands {
             UserCommand.RemoveAt(0);
 			Player = user;
 			
-			if (script.ScriptType == ScriptFactory.ScriptTypes.Lua) {
+			if (script.ScriptType == ScriptTypes.Lua) {
 				script.AddVariable(UserCommand, "UserCommand");
 				script.AddVariable(Player.Player, "player");
 			}
@@ -73,7 +74,7 @@ namespace Commands {
                 }
 
                 if (Target != null) {
-					if (script.ScriptType == ScriptFactory.ScriptTypes.Lua) {
+					if (script.ScriptType == ScriptTypes.Lua) {
 						script.AddVariable(Target.Player, "target");
 					}
 					else {

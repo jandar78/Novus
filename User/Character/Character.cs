@@ -10,15 +10,16 @@ using MongoDB.Driver;
 using MongoDB.Bson;
 using MongoDB.Driver.Builders;
 using Extensions;
+using Interfaces;
 
 namespace Character{
 
-  	public class Character : Iactor {
-        private Inventory _inventory;
-        private Equipment _equipment;
+  	public class Character : IActor {
+        private IInventory _inventory;
+        private IEquipment _equipment;
        
         #region Public Members
-        public Inventory Inventory {
+        public IInventory Inventory {
             get {
                 return _inventory;
             }
@@ -26,7 +27,7 @@ namespace Character{
                 _inventory = value;
             }
         }
-        public Equipment Equipment {
+        public IEquipment Equipment {
             get {
                 return _equipment;
             }
@@ -37,9 +38,9 @@ namespace Character{
         #endregion Public Members
 
         #region Protected Members
-        protected Dictionary<string, Attribute> Attributes;
+        protected Dictionary<string, IAttributes> Attributes;
         protected Dictionary<string, double> SubAttributes;
-        protected HashSet<CharacterEnums.Languages> KnownLanguages; //this will hold all the languages the player can understand
+        protected HashSet<Languages> KnownLanguages; //this will hold all the languages the player can understand
         protected double _levelModifier;
         protected StatBonuses Bonuses;
         
@@ -106,20 +107,20 @@ namespace Character{
 		#region Constructors
 
         public Character() {
-            _class = CharacterEnums.CharacterClass.Explorer;
-            _race = CharacterEnums.CharacterRace.Human;
-            _gender = CharacterEnums.Genders.Female;
-            _skinColor = CharacterEnums.SkinColors.Fair;
-            _skinType = CharacterEnums.SkinType.Flesh;
-            _hairColor = CharacterEnums.HairColors.Black;
-            _eyeColor = CharacterEnums.EyeColors.Brown;
-            _build = CharacterEnums.BodyBuild.Medium;
+            _class = CharacterClass.Explorer;
+            _race = CharacterRace.Human;
+            _gender = Genders.Female;
+            _skinColor = SkinColors.Fair;
+            _skinType = Interfaces.SkinType.Flesh;
+            _hairColor = HairColors.Black;
+            _eyeColor = EyeColors.Brown;
+            _build = BodyBuild.Medium;
 
             _koCount = new Tuple<int, DateTime>(0, DateTime.Now);
             _actionState = CharacterActionState.None;
             _stanceState = CharacterStanceState.Standing;
 
-            _primaryLanguage = CharacterEnums.Languages.Common;
+            _primaryLanguage = Languages.Common;
             KnownLanguages = new HashSet<Languages>();
             KnownLanguages.Add(_primaryLanguage);
 
@@ -144,7 +145,7 @@ namespace Character{
             Equipment = new Equipment();
             Bonuses = new StatBonuses();
             
-            Attributes = new Dictionary<string, Attribute>();
+            Attributes = new Dictionary<string, IAttributes>();
 
             Attributes.Add("Hitpoints", new Attribute(150, "Hitpoints", 150, 0.1, 1));
             Attributes.Add("Dexterity", new Attribute(10, "Dexterity", 5, 0, 1));
@@ -181,7 +182,7 @@ namespace Character{
 
             _primaryLanguage = copy._primaryLanguage;
             KnownLanguages = new HashSet<Languages>();
-            foreach (CharacterEnums.Languages lang in copy.KnownLanguages) {
+            foreach (Languages lang in copy.KnownLanguages) {
                 KnownLanguages.Add(lang);
             }
 
@@ -203,9 +204,9 @@ namespace Character{
             MainHand = "WIELD_RIGHT";
 
 
-            Attributes = new Dictionary<string, Attribute>();
+            Attributes = new Dictionary<string, IAttributes>();
 
-            foreach (KeyValuePair<string, Attribute> attrib in copy.Attributes){
+            foreach (KeyValuePair<string, IAttributes> attrib in copy.Attributes){
                 Attributes.Add(attrib.Key, attrib.Value);
             }
             
@@ -263,7 +264,7 @@ namespace Character{
 			Inventory.playerID = ID;
 			Equipment.playerID = ID;
 
-			Attributes = new Dictionary<string, Attribute>();
+			Attributes = new Dictionary<string, IAttributes>();
 
 			Attributes.Add("Hitpoints", new Attribute(150, "Hitpoints", 150, 0.1, 1));
 			Attributes.Add("Dexterity", new Attribute(10, "Dexterity", 5, 0, 1));
@@ -282,17 +283,17 @@ namespace Character{
 		}
 		#endregion Constructors
 
-		public void Save() {
+		public async void Save() {
 			MongoUtils.MongoData.ConnectToDatabase();
-			MongoDatabase characterDB = MongoUtils.MongoData.GetDatabase("Characters");
+			IMongoDatabase characterDB = MongoUtils.MongoData.GetDatabase("Characters");
             if (this.ID == null) {
                 this.ID = new MongoDB.Bson.ObjectId().ToString();
             }; //new character
-			MongoCollection characterCollection = characterDB.GetCollection<BsonDocument>("PlayerCharacter");
-			IMongoQuery search = Query.EQ("_id", ObjectId.Parse(this.ID));
-			BsonDocument playerCharacter = characterCollection.FindOneAs<BsonDocument>(search);
-
-			if (playerCharacter == null) {
+			var characterCollection = characterDB.GetCollection<Character>("PlayerCharacter");
+			//IMongoQuery search = Query.EQ("_id", ObjectId.Parse(this.ID));
+            var playerCharacter = await characterCollection.Find(c => c.ID == this.ID).FirstAsync();
+            
+            if (playerCharacter == null) {
 				//this is the players first save, create everything from scratch
 				playerCharacter = new BsonDocument {
 					//no _id let MongoDB assign it one so we don't have to deal with duplicate values logic
@@ -414,14 +415,14 @@ namespace Character{
 
                 //Inventory and equipment
                 
-                foreach (Items.Iitem item in Inventory.inventory) {
+                foreach (IItem item in Inventory.inventory) {
                     items["_id"] = item.Id;
                     inventoryList.Add(items);
                 }
 
                 playerCharacter["Inventory"] = inventoryList;
 
-                foreach (KeyValuePair<Items.Wearable, Items.Iitem> item in Equipment.equipped) {
+                foreach (KeyValuePair<Wearable, IItem> item in Equipment.equipped) {
                     items["_id"] = item.Value.Id;
 
                     equipmentList.Add(items);
@@ -442,12 +443,12 @@ namespace Character{
             
 		}
 	
-		public void Load(string id) {
+		public async void Load(string id) {
 			MongoUtils.MongoData.ConnectToDatabase();
-			MongoDatabase characterDB = MongoUtils.MongoData.GetDatabase("Characters");
-			MongoCollection characterCollection = characterDB.GetCollection<BsonDocument>("PlayerCharacter");
+			var characterDB = MongoUtils.MongoData.GetDatabase("Characters");
+			var characterCollection = characterDB.GetCollection<Character>("PlayerCharacter");
 			IMongoQuery query = Query.EQ("_id", ObjectId.Parse(id));
-			BsonDocument found = characterCollection.FindOneAs<BsonDocument>(query);
+			var found = await characterCollection.Find<Character>(c => c.ID == this.ID).FirstAsync();
 
 			ID = found["_id"].AsObjectId.ToString();
 			FirstName = found["FirstName"].AsString.CamelCaseWord();
@@ -506,7 +507,7 @@ namespace Character{
 
             if (inventoryList.Count > 0) {
                 foreach (BsonDocument item in inventoryList) {
-                    Items.Iitem fullItem = Items.Items.GetByID(item["_id"].AsObjectId.ToString());
+                    IItem fullItem = Items.Items.GetByID(item["_id"].AsObjectId.ToString());
                     if (!Inventory.inventory.Contains(fullItem)) {
                         Inventory.AddItemToInventory(fullItem);
                     }
@@ -515,7 +516,7 @@ namespace Character{
 
             if (equipmentList.Count > 0) {
                 foreach (BsonDocument item in equipmentList) {
-                    Items.Iitem fullItem = Items.Items.GetByID(item["_id"].AsObjectId.ToString());
+                    IItem fullItem = Items.Items.GetByID(item["_id"].AsObjectId.ToString());
                     if (!Equipment.equipped.ContainsKey(fullItem.WornOn)) {
                         Equipment.EquipItem(fullItem, this.Inventory);
                     }
@@ -546,12 +547,12 @@ namespace Character{
             return sb.ToString();
         }
 
-        public void RewardXP(string id, long xpGained) {
+        public async void RewardXP(string id, long xpGained) {
             MongoUtils.MongoData.ConnectToDatabase();
-            MongoDatabase db = MongoUtils.MongoData.GetDatabase("Characters");
-            MongoCollection npcs = db.GetCollection("NPCCharacters");
-            BsonDocument npc = npcs.FindOneAs<BsonDocument>(Query.EQ("_id", ObjectId.Parse(id)));
-            User.User temp = MySockets.Server.GetAUser(ID);
+            var db = MongoUtils.MongoData.GetDatabase("Characters");
+            var npcs = db.GetCollection<NPC>("NPCCharacters");
+            var npc = await npcs.Find<NPC>(n => n.ID == ObjectId.Parse(id).ToString()).FirstAsync(); // Query.EQ("_id", ObjectId.Parse(id)));
+            IUser temp = MySockets.Server.GetAUser(ID);
 			if (string.IsNullOrEmpty(temp.GroupName)) {
 				temp.MessageHandler(string.Format("You gain {0:0.##} XP from {1}", xpGained, npc["FirstName"].AsString.CamelCaseWord()));
 				Experience += xpGained;
@@ -567,7 +568,7 @@ namespace Character{
                 tempChar.NextLevelExperience += (long)(tempChar.NextLevelExperience * 1.25);
                 IncreasePoints();
                 //increase all the attributes to max, small perk of leveling up.  Maybe a global setting?
-                foreach (KeyValuePair<string, Attribute> attrib in temp.Player.GetAttributes()) {
+                foreach (KeyValuePair<string, IAttributes> attrib in temp.Player.GetAttributes()) {
                     attrib.Value.Value = attrib.Value.Max;
                 }
             }
@@ -883,7 +884,7 @@ namespace Character{
         public bool IsUnconcious() {
             bool result = false;
             if (CheckUnconscious) {
-                SetActionState(CharacterEnums.CharacterActionState.Unconcious);
+                SetActionState(CharacterActionState.Unconcious);
                 SetStanceState(CharacterStanceState.Laying_unconcious);
                 ClearTarget();
                 result = true;
@@ -983,7 +984,7 @@ namespace Character{
             }
         }
 
-        public Dictionary<string, Attribute> GetAttributes() {
+        public Dictionary<string, IAttributes> GetAttributes() {
             return this.Attributes;
         }
 
@@ -1020,17 +1021,17 @@ namespace Character{
             return false;
         }
 
-        public Items.Wearable GetMainHandWeapon() {
+        public Wearable GetMainHandWeapon() {
             if (MainHand != null) {
-                return (Items.Wearable)Enum.Parse(typeof(Items.Wearable), MainHand);
+                return (Wearable)Enum.Parse(typeof(Wearable), MainHand);
             }
-            return Items.Wearable.NONE;
+            return Wearable.NONE;
         }
 
-        public bool Loot(User.User looter, List<string> commands, bool bypassCheck = false) {
+        public bool Loot(IUser looter, List<string> commands, bool bypassCheck = false) {
 			bool looted = false;
             if (IsDead()) {
-                List<Items.Iitem> result = new List<Items.Iitem>();
+                List<IItem> result = new List<IItem>();
                 StringBuilder sb = new StringBuilder();
 
 				if (!bypassCheck) {
@@ -1131,7 +1132,7 @@ namespace Character{
 		const double HighHealth = 0.75;
 		const double LowHealth = 0.25;
 
-		public static string GetAttributeColorized(this Iactor character, string name) {
+		public static string GetAttributeColorized(this IActor character, string name) {
 			
 			string result = "";
 			name = name.CamelCaseWord();

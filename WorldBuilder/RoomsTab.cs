@@ -16,11 +16,12 @@ using Extensions;
 using System.Text.RegularExpressions;
 using Crainiate.Diagramming;
 using Crainiate.Diagramming.Forms;
+using Interfaces;
 
 namespace WorldBuilder {
     public partial class Form1 : Form {
-        private List<Rooms.Exits> exitsInRoom;
-        private List<Rooms.RoomModifier> modifiersInRoom;
+        private List<IExit> exitsInRoom;
+        private List<IRoomModifier> modifiersInRoom;
 
         private void roomRefresh_Click(object sender, EventArgs e) {
             this.roomsListValue.Items.Clear();
@@ -53,14 +54,15 @@ namespace WorldBuilder {
         private void roomLoad_Click(object sender, EventArgs e) {
             if (!IsEmpty(roomIdValue.Text)) {
                 if (ConnectedToDB) {
-                    Rooms.Room room = Rooms.Room.GetRoom(roomIdValue.Text);
+                    IRoom room = Rooms.Room.GetRoom(roomIdValue.Text);
                     FillRoomControls(room);
                 }
             }
         }
 
-        private void FillRoomControls(Rooms.Room room) {
-			if (room != null) {
+        private void FillRoomControls(IRoom inRoom) {
+			if (inRoom != null) {
+                Rooms.Room room = inRoom as Rooms.Room;
 				roomIdValue.Text = room.Id.ToString();
 				roomTitleValue.Text = room.Title;
 				roomDescriptionValue.Text = room.Description;
@@ -110,7 +112,7 @@ namespace WorldBuilder {
 				arrow.Inset = 0;
 
 				foreach (var adjNode in treeNode.AdjacentNodes) {
-					Rooms.RoomExits direction = (Rooms.RoomExits)Enum.Parse(typeof(Rooms.RoomExits), adjNode.Key);
+					RoomExits direction = (RoomExits)Enum.Parse(typeof(RoomExits), adjNode.Key);
 
 					Table adjShape = new Table();
 					adjShape.Heading = adjNode.Value.ID;
@@ -118,22 +120,22 @@ namespace WorldBuilder {
 					adjShape.BackColor = Color.LightBlue;
 
 					switch (direction) {
-						case Rooms.RoomExits.North:
+						case RoomExits.North:
 							adjShape.Location = new PointF(position.X, position.Y - 100);
 							break;
-						case Rooms.RoomExits.South:
+						case RoomExits.South:
 							adjShape.Location = new PointF(position.X, position.Y + 100);
 							break;
-						case Rooms.RoomExits.East:
+						case RoomExits.East:
 							adjShape.Location = new PointF(position.X + 150, position.Y);
 							break;
-						case Rooms.RoomExits.West:
+						case RoomExits.West:
 							adjShape.Location = new PointF(position.X - 150, position.Y);
 							break;
-						case Rooms.RoomExits.Up:
+						case RoomExits.Up:
 							adjShape.Location = new PointF(position.X - 150, position.Y - 100);
 							break;
-						case Rooms.RoomExits.Down:
+						case RoomExits.Down:
 							adjShape.Location = new PointF(position.X + 150, position.Y + 100);
 							break;
 					}
@@ -158,57 +160,57 @@ namespace WorldBuilder {
 		}
 
 
-        private void FillModifiers(List<Rooms.RoomModifier> list) {
-            modifiersInRoom = new List<Rooms.RoomModifier>();
+        private void FillModifiers(List<IRoomModifier> list) {
+            modifiersInRoom = new List<IRoomModifier>();
             foreach (var modifier in list) {
                 roomModifierValue.Items.Add(modifier.Name);
             }
         }
 
-        private void FillExits(List<Rooms.Exits> exits) {
+        private void FillExits(List<IExit> exits) {
             roomExitsValue.Items.Clear();
-            exitsInRoom = new List<Rooms.Exits>();
-            foreach (Rooms.Exits exit in exits) {
+            exitsInRoom = new List<IExit>();
+            foreach (IExit exit in exits) {
                 roomExitsValue.Items.Add(exit.Direction);
                 exitsInRoom.Add(exit);
             }
         }
 
         private void roomsListValue_DoubleClick(object sender, EventArgs e) {
-            Rooms.Room room = LoadRoomInformation();
+            IRoom room = LoadRoomInformation();
             displayInGameValue.Text = ClientHandling.MessageBuffer.Format(DisplayAsSeenInGame(room));
         }
 
-        private string DisplayAsSeenInGame(Rooms.Room room) {
+        private string DisplayAsSeenInGame(IRoom room) {
             return Look(room);
         }
 
         private void roomModifierValue_DoubleClick(object sender, EventArgs e) {
-            Rooms.RoomModifier modifier = modifiersInRoom.Where(mod => mod.Name == roomModifierValue.SelectedValue.ToString()).SingleOrDefault();
+            IRoomModifier modifier = modifiersInRoom.Where(mod => mod.Name == roomModifierValue.SelectedValue.ToString()).SingleOrDefault();
 
         }
 
-        private Rooms.Room LoadRoomInformation() {
+        private IRoom LoadRoomInformation() {
             var roomIdToParse = roomsListValue.SelectedItem.ToString();
             roomIdToParse = roomIdToParse.Substring(roomIdToParse.IndexOf('(') + 1).Replace(")", "");
-            Rooms.Room room = Rooms.Room.GetRoom(roomIdToParse);
+            IRoom room = Rooms.Room.GetRoom(roomIdToParse);
             FillRoomControls(room);
             return room;
         }
 
-        private string Look(Rooms.Room room) {
+        private string Look(IRoom room) {
             StringBuilder sb = new StringBuilder();
 
                 //let's build the description the player will see
                 room.GetRoomExits();
-                List<Rooms.Exits> exitList = room.RoomExits;
+                List<IExit> exitList = room.RoomExits;
 
                 sb.AppendLine(("- " + room.Title + " -\t\t\t").ToUpper());
                 //TODO: add a "Descriptive" flag, that we will use to determine if we need to display the room description.
                 sb.AppendLine(room.Description);
                 sb.Append(HintCheck(room.Id));
 
-                foreach (Rooms.Exits exit in exitList) {
+                foreach (IExit exit in exitList) {
                     sb.AppendLine(GetExitDescription(exit, room));
                 }
                         
@@ -216,10 +218,10 @@ namespace WorldBuilder {
 
         }
 
-        private string GetExitDescription(Rooms.Exits exit, Rooms.Room room) {
+        private string GetExitDescription(IExit exit, IRoom room) {
             //there's a lot of sentence  
             string[] vowel = new string[] { "a", "e", "i", "o", "u" };
-			Rooms.RoomExits direction = (Rooms.RoomExits)Enum.Parse(typeof(Rooms.RoomExits), exit.Direction.CamelCaseWord());
+			RoomExits direction = (RoomExits)Enum.Parse(typeof(RoomExits), exit.Direction.CamelCaseWord());
             if (room.IsDark) {
                 exit.Description = "something";
             }
@@ -274,10 +276,10 @@ namespace WorldBuilder {
         }
 
         private void addRoomNorth_Click(object sender, EventArgs e) {
-            AddAdjacentRoom(Rooms.RoomExits.North);
+            AddAdjacentRoom(RoomExits.North);
         }
 
-        private void AddAdjacentRoom(Rooms.RoomExits direction) {
+        private void AddAdjacentRoom(RoomExits direction) {
 			//todo:we should see if they haven't saved and prompt them too if they are going to be adding a new room
 			//let's be smart and detect changes before we prompt them to save. use events wisely.
             string roomID = GetNewRoomId();
@@ -289,7 +291,7 @@ namespace WorldBuilder {
 
         private string GetNewRoomId() {
             int id = 0;
-            MongoCollection roomCollection = MongoUtils.MongoData.GetCollection("Rooms", GetZoneCode(roomIdValue.Text));
+            var roomCollection = MongoUtils.MongoData.GetCollection("Rooms", GetZoneCode(roomIdValue.Text));
             var maxRoomNumber = roomCollection.AsQueryable<BsonDocument>().Max(r => ParseRoomID(r.AsBsonDocument["_id"].AsString));
             id = maxRoomNumber++;
 

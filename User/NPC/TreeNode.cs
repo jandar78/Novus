@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Interfaces;
 
 namespace AI.PathFinding {
 	public class TreeNode {
@@ -17,14 +18,14 @@ namespace AI.PathFinding {
 		public TreeNode Parent { get; set; }
 		public Dictionary<string, TreeNode> AdjacentNodes;
 
-		public TreeNode(Rooms.Room room) {
+		public TreeNode(IRoom room) {
 			if (room != null) {
 				ID = room.Id;
 				Zone = room.Zone;
 				Number = room.RoomId;
 				AdjacentNodes = new Dictionary<string, TreeNode>();
 				Title = room.Title;
-				Traversable = !room.GetRoomType().HasFlag(Rooms.RoomTypes.DEADLY); //more work to be done here
+				Traversable = !room.GetRoomType().HasFlag(RoomTypes.DEADLY); //more work to be done here
 			}
 		}
 	}
@@ -92,7 +93,7 @@ namespace AI.PathFinding {
 			return _foundPath;
 		}
 
-		private void AddAdjacentRoomInDirection(TreeNode currentNode, Rooms.Room room, Rooms.RoomExits direction) {
+		private void AddAdjacentRoomInDirection(TreeNode currentNode, IRoom room, RoomExits direction) {
 			if (room.GetRoomExit(direction) != null) {
 				if (currentNode.Parent != null && room.GetRoomExit(direction).availableExits[direction].Id != currentNode.Parent.ID) {
 					var newNode = new TreeNode(room.GetRoomExit(direction).availableExits[direction]);
@@ -109,11 +110,11 @@ namespace AI.PathFinding {
 		}
 
 		private void EnqueueAdjacentNodes(TreeNode currentNode) {
-			Rooms.Room room = Rooms.Room.GetRoom(currentNode.ID);
+			IRoom room = Rooms.Room.GetRoom(currentNode.ID);
 
-			foreach (string direction in Enum.GetNames(typeof(Rooms.RoomExits))) {
+			foreach (string direction in Enum.GetNames(typeof(RoomExits))) {
 				if (direction != "None") {
-					AddAdjacentRoomInDirection(currentNode, room, (Rooms.RoomExits)Enum.Parse(typeof(Rooms.RoomExits), direction));
+					AddAdjacentRoomInDirection(currentNode, room, (RoomExits)Enum.Parse(typeof(RoomExits), direction));
 				}
 			}
 		}
@@ -121,7 +122,7 @@ namespace AI.PathFinding {
 
 		private void AddNode(TreeNode node) {
 			if (node != null) {
-				Rooms.Room room = Rooms.Room.GetRoom(node.ID);
+				IRoom room = Rooms.Room.GetRoom(node.ID);
 
 				if (StayInZone && node.Zone != Root.Zone) {
 					//Don't add it to the Queue it's out of bounds

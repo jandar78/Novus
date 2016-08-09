@@ -8,6 +8,7 @@ using MongoDB.Bson;
 using MongoDB.Bson.Serialization;
 using MongoDB.Driver.Builders;
 using ClientHandling;
+using Interfaces;
 
 namespace Quests {
 
@@ -28,13 +29,13 @@ namespace Quests {
 	//if the NPC wants to give that information or is even still there or alive.
 
     public class Quest : IQuest {
-        private List<QuestStep> _questSteps;
+        private List<IQuestStep> _questSteps;
         private Dictionary<string, int> _currentPlayerStep;
 
-        private List<QuestStep> QuestSteps {
+        public List<IQuestStep> QuestSteps {
             get {
                 if (_questSteps == null) {
-                    _questSteps = new List<QuestStep>();
+                    _questSteps = new List<IQuestStep>();
                 }
 
                 return _questSteps;
@@ -58,15 +59,15 @@ namespace Quests {
         
         public string QuestID {
             get;
-            private set;
+            set;
         }
 
-        private int CurrentStep {
+        public int CurrentStep {
 			get;
 			set;
         }
 
-        private short TotalSteps {
+        public short TotalSteps {
             get;
             set;
         }
@@ -88,7 +89,7 @@ namespace Quests {
 		/// <summary>
 		/// Allows players to complete the quest out of order.  If they return the item without starting the quest it still completes.
 		/// </summary>
-		private bool AllowOutOfOrder {
+		public bool AllowOutOfOrder {
 			get; set;
 		}
 
@@ -142,10 +143,10 @@ namespace Quests {
 			return CurrentPlayerStep[playerID];
         }
 
-		public void AutoProcessQuestStep(Character.Iactor npc) {
+		public void AutoProcessQuestStep(IActor npc) {
 			string id = AutoProcessPlayer.Dequeue();
 
-			User.User player = MySockets.Server.GetAUser(id);
+			IUser player = MySockets.Server.GetAUser(id);
 
 			if (player == null) {
 				player = Character.NPCUtils.GetUserAsNPCFromList(new List<string> { id });
@@ -156,7 +157,7 @@ namespace Quests {
 			QuestSteps[stepToProcess - 1].ProcessStep(null, e);
 		}
 
-		public void ProcessQuestStep(Message message, Character.Iactor npc) {
+		public void ProcessQuestStep(IMessage message, IActor npc) {
 			AI.MessageParser parser = null;
 			int currentStep = 0;
 			if (CurrentPlayerStep.ContainsKey(message.InstigatorID)) {
@@ -167,8 +168,8 @@ namespace Quests {
 				}
 			}
 			//find the step that contains the trigger
-			QuestStep step = QuestSteps[currentStep];
-			if (message.InstigatorType == Message.ObjectType.Player || (step.AppliesToNPC && message.InstigatorType == Message.ObjectType.Npc)) { //only do it for players or if we specifically say it can trigger for NPC's
+			IQuestStep step = QuestSteps[currentStep];
+			if (message.InstigatorType == ObjectType.Player || (step.AppliesToNPC && message.InstigatorType == ObjectType.Npc)) { //only do it for players or if we specifically say it can trigger for NPC's
 				parser = new AI.MessageParser(message, npc, new List<ITrigger> { step.Trigger });
 				parser.FindTrigger();
 
@@ -211,7 +212,7 @@ namespace Quests {
 		}
 	}
 
-    internal class QuestStep {
+    internal class QuestStep : IQuestStep {
         private HashSet<string> _playerIDList;
 
         public QuestStep() { }  

@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using System.Net.Sockets;
 using User;
 using Character;
+using Interfaces;
 
 namespace MySockets
 {
@@ -58,7 +59,7 @@ namespace MySockets
 		#region Private members
 		public Logger.Logger serverLogger;
 		private System.Net.IPAddress _ipAddress;
-		private static ConcurrentDictionary<Socket, User.User> clientSocketList;
+		private static ConcurrentDictionary<Socket, IUser> clientSocketList;
 		private Socket _serverSocket;
 		private byte[] _receiveBuffer, _sendBuffer;
 	   private static Server _server = null;
@@ -71,7 +72,7 @@ namespace MySockets
 			this.IPAddress = address;
 			this.Port = port;
 			ReceiveBuffer = new byte[1024];
-			clientSocketList = new ConcurrentDictionary<Socket, User.User>();
+			clientSocketList = new ConcurrentDictionary<Socket, IUser>();
 			_serverSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);	
 		}
 		#endregion Constructors
@@ -81,10 +82,10 @@ namespace MySockets
 			return _server ?? (_server = new Server("192.168.1.1", 8814));
 		}
 
-		public static List<User.User> GetCurrentUserList() {
-			List<User.User> userList = new List<User.User>();
-			Dictionary<Socket, User.User> tempList = new Dictionary<Socket,User.User>(clientSocketList); //this should prevent "Collection was modified" exception
-			foreach (KeyValuePair<Socket, User.User> user in tempList) {
+		public static List<IUser> GetCurrentUserList() {
+			List<IUser> userList = new List<IUser>();
+			Dictionary<Socket, IUser> tempList = new Dictionary<Socket, IUser>(clientSocketList); //this should prevent "Collection was modified" exception
+			foreach (KeyValuePair<Socket, IUser> user in tempList) {
 				userList.Add(user.Value); 
 			}
 
@@ -95,34 +96,34 @@ namespace MySockets
 			//this is messy but basically we are grabbing all the socket that have a value whos user ID is equal to the one passed in
 			//then we are going to update the value of the socket who's user is currently logging in with the user that is sitting in limbo
 			//and then we are going to get rid of the socket/user pair that are still in limbo
-			List<KeyValuePair<Socket, User.User>> check = clientSocketList.Where(u => u.Value.UserID == userID).ToList();
-			KeyValuePair<Socket, User.User> newClient = check.Where(c => c.Value.CurrentState == User.User.UserState.LOGGING_IN).FirstOrDefault();
-			KeyValuePair<Socket, User.User> oldClient = check.Where(c => c.Value.CurrentState == User.User.UserState.LIMBO).FirstOrDefault();
+			List<KeyValuePair<Socket, IUser>> check = clientSocketList.Where(u => u.Value.UserID == userID).ToList();
+			KeyValuePair<Socket, IUser> newClient = check.Where(c => c.Value.CurrentState == UserState.LOGGING_IN).FirstOrDefault();
+			KeyValuePair<Socket, IUser> oldClient = check.Where(c => c.Value.CurrentState == UserState.LIMBO).FirstOrDefault();
 			if (!clientSocketList.TryUpdate(newClient.Key, oldClient.Value, newClient.Value)){
 				return false;
 			}
 
 			GetServer().CloseThisConnection(oldClient);
-			clientSocketList[newClient.Key].CurrentState = User.User.UserState.LOGGING_IN;
+			clientSocketList[newClient.Key].CurrentState = UserState.LOGGING_IN;
 	
 			return true;
 		}
 
-		public static User.User GetAUserPlusState(string id, User.User.UserState state = User.User.UserState.TALKING) {
-			Dictionary<Socket, User.User> tempList = new Dictionary<Socket, User.User>(clientSocketList);
+		public static IUser GetAUserPlusState(string id, UserState state = UserState.TALKING) {
+			Dictionary<Socket, IUser> tempList = new Dictionary<Socket, IUser>(clientSocketList);
 			return tempList.Where(c => c.Value.UserID == id && c.Value.CurrentState == state).FirstOrDefault().Value;
 		}
 
-		public static User.User GetAUser(string id) {
+		public static IUser GetAUser(string id) {
             if (clientSocketList != null) {
-                Dictionary<Socket, User.User> tempList = new Dictionary<Socket, User.User>(clientSocketList);
+                Dictionary<Socket, IUser> tempList = new Dictionary<Socket, IUser>(clientSocketList);
                 return tempList.Where(c => c.Value.UserID == id).FirstOrDefault().Value;
             }
 
             return null;
 		}
 
-        public static User.User GetAUserFromList(List<string> id) {
+        public static IUser GetAUserFromList(List<string> id) {
             if (id.Count > 0) {
                 return GetAUser(id[0]);
             }
@@ -134,7 +135,7 @@ namespace MySockets
             if (string.IsNullOrEmpty(name)) {
                 return null;
             }
-            Dictionary<Socket, User.User> tempList = new Dictionary<Socket, User.User>(clientSocketList);
+            Dictionary<Socket, User.User> tempList = new Dictionary<Socket, IUser>(clientSocketList);
             User.User userFound = tempList.Where(c => c.Value.Player.FullName.ToLower() == name.ToLower()).FirstOrDefault().Value;
                         
             return userFound;
@@ -144,7 +145,7 @@ namespace MySockets
 			if (string.IsNullOrEmpty(name)) {
 				return null;
 			}
-			Dictionary<Socket, User.User> tempList = new Dictionary<Socket, User.User>(clientSocketList);
+			Dictionary<Socket, User.User> tempList = new Dictionary<Socket, IUser>(clientSocketList);
 			List<KeyValuePair<Socket, User.User>> temp = tempList.Where(c => c.Value.Player.FirstName.ToLower() == name.ToLower()).ToList();
 			List<User.User> result = new List<User.User>();
 
@@ -184,7 +185,7 @@ namespace MySockets
 			}
 		}
 
-		public void SendToClients(User.User.UserState state, string message) {
+		public void SendToClients(UserState state, string message) {
 			SendToClients(state, System.Text.Encoding.ASCII.GetBytes(message));
 		}
 
@@ -196,7 +197,7 @@ namespace MySockets
 
 		#region Private methods
 		//this method is not responsible for checking a characters state, that is up to the method that calls this
-		private void SendToClients(User.User.UserState state, byte[] message) {
+		private void SendToClients(UserState state, byte[] message) {
 			List<Socket> matchesState = clientSocketList.Where(s => s.Value.CurrentState == state).Select(s => s.Key).ToList();
 			foreach (Socket client in matchesState) {
 				client.Send(message);
@@ -207,23 +208,23 @@ namespace MySockets
 
 		private void SendToAllClients(byte[] message = null) {
 			if (clientSocketList.Count > 0) {
-				Dictionary<Socket, User.User> temp = new Dictionary<Socket, User.User>(clientSocketList);
-				foreach (KeyValuePair<Socket, User.User> client in temp) {
+				Dictionary<Socket, IUser> temp = new Dictionary<Socket, IUser>(clientSocketList);
+				foreach (KeyValuePair<Socket, IUser> client in temp) {
 					Socket currentSocket = client.Key;
 					//let's get rid of any pending sockets that did not get removed from the clientSocketList
-					if (client.Value.CurrentState == User.User.UserState.DISCONNECT) {
+					if (client.Value.CurrentState == UserState.DISCONNECT) {
 						CloseThisConnection(client);
 						continue;
 					}
 
 					//poll the socket to see if the user is still connected 
 
-					if ((currentSocket.Poll(1000, SelectMode.SelectRead) && currentSocket.Available == 0) || !currentSocket.Connected || client.Value.CurrentState == User.User.UserState.LIMBO) {
+					if ((currentSocket.Poll(1000, SelectMode.SelectRead) && currentSocket.Available == 0) || !currentSocket.Connected || client.Value.CurrentState == UserState.LIMBO) {
 						//ok this guy disconnected we'll apply a time stamp and if it's been XX minutes since he was last disconnected
 						//then we'll save his character and drop this socket from the clientSocketList
 						if (client.Value.LastDisconnected == DateTime.MinValue) {
 							client.Value.LastDisconnected = DateTime.Now;
-							client.Value.CurrentState = User.User.UserState.LIMBO;
+							client.Value.CurrentState = UserState.LIMBO;
 						}
 						else {
 							TimeSpan idle = client.Value.LastDisconnected - DateTime.Now;
@@ -241,7 +242,7 @@ namespace MySockets
 						string text = client.Value.OutBuffer;
 						if (!String.IsNullOrEmpty(text)) {
 							string prompt = "";
-							if (client.Value.CurrentState == User.User.UserState.TALKING) {
+							if (client.Value.CurrentState == UserState.TALKING) {
 								prompt = "HP:" + client.Value.Player.GetAttributeColorized("Hitpoints") + "\\EN:" + client.Value.Player.GetAttributeColorized("Endurance") + ">" + client.Value.telnetBufferPeek;
 							}
 							currentSocket.Poll(1, SelectMode.SelectRead); 
@@ -251,7 +252,7 @@ namespace MySockets
 								}
 								catch (SocketException) {
 									//so somehow the previous polls didn't let us know the socket was closed but now we know for sure
-									client.Value.CurrentState = User.User.UserState.LIMBO;
+									client.Value.CurrentState = UserState.LIMBO;
 								}
 							}
 						}
@@ -326,19 +327,19 @@ namespace MySockets
 			serverLogger.Log("*** Client " + socket.RemoteEndPoint.ToString() + " disconnected. ***");
 			if (clientSocketList.Count > 0) {
 				if (clientSocketList.ContainsKey(socket)) {//we want to prevent silly exceptions
-					clientSocketList[socket].CurrentState = User.User.UserState.NONE; //set it to none when exiting  
-					CloseThisConnection(new KeyValuePair<Socket, User.User>(clientSocketList.Keys.Where(k => k == socket).Single(), clientSocketList[socket]));
+					clientSocketList[socket].CurrentState = UserState.NONE; //set it to none when exiting  
+					CloseThisConnection(new KeyValuePair<Socket, IUser>(clientSocketList.Keys.Where(k => k == socket).Single(), clientSocketList[socket]));
 				}
 			}
 		}
 
-		private void CloseThisConnection(KeyValuePair<Socket, User.User> socket) {
+		private void CloseThisConnection(KeyValuePair<Socket, IUser> socket) {
 			try {
-				User.User user;
+				IUser user;
 				serverLogger.Log("*** Client " + socket.Value + " disconnected. ***");
 				
 				if (!clientSocketList.TryRemove(socket.Key, out user)) {
-					user.CurrentState = User.User.UserState.DISCONNECT;
+					user.CurrentState = UserState.DISCONNECT;
 					return;
 				}
 				socket.Key.Close();
@@ -350,7 +351,7 @@ namespace MySockets
 		}
 
 		private void CloseAllConnections() {
-			foreach (KeyValuePair<Socket, User.User> socket in clientSocketList) {
+			foreach (KeyValuePair<Socket, IUser> socket in clientSocketList) {
 				CloseThisConnection(socket);
 			}
 

@@ -13,38 +13,33 @@ namespace MongoUtils
 	public class MongoData {
 
 		
-		private static MongoServer _mongoDB;
+		private static MongoClient _mongoClient;
 
 		//Initializes the mongoDB object and connects to it
 		static public void ConnectToDatabase() {
-			if (_mongoDB == null) {
+			if (_mongoClient == null) {
 				MongoClient client = new MongoClient(); //connect to localhost
-
-				_mongoDB = client.GetServer();
+                _mongoClient = client;
 			}
-            try {
-                _mongoDB.Connect();
-            }
-            catch (Exception se) {//no reason to throw here really 
-            }
 		}
 
 		//if the _mongoDB object is null we have not instantiated it and connected to the database
 		static public bool IsConnected() {
-            if (_mongoDB != null) {
+            IAsyncCursor<BsonDocument> cursor = null;
+            if (_mongoClient != null) {
                 //there's a chance we lost the connection but since no read/write occurred we are not aware yet so let's ping
                 try {
-                    _mongoDB.Ping();
+                  cursor =  _mongoClient.ListDatabases();
                 }
                 catch {
                     return false;
                 }
             }
-            return (_mongoDB != null && _mongoDB.State == MongoServerState.Connected);
+            return (_mongoClient != null && cursor.Any());
 		}
 
-		static public MongoDatabase GetDatabase(string dbName) {
-			MongoDatabase result = _mongoDB.GetDatabase(dbName);
+		static public IMongoDatabase GetDatabase(string dbName) {
+			IMongoDatabase result = _mongoClient.GetDatabase(dbName);
 			return result;
 		}
 
@@ -55,23 +50,29 @@ namespace MongoUtils
         /// <param name="dbName"></param>
         /// <param name="collection"></param>
         /// <returns></returns>
-        static public MongoCollection GetCollection(string dbName, string collection) {
+        static public IMongoCollection<BsonDocument> GetCollection(string dbName, string collection) {
             ConnectToDatabase();
             if (IsConnected()) {
-                return GetDatabase(dbName).GetCollection(collection);
+                return GetDatabase(dbName).GetCollection<BsonDocument>(collection);
             }
 
             return null;
         }
 
-		public static List<MongoCollection> GetCollections(string dbName) {
-			List<MongoCollection> collections = new List<MongoCollection>();
-			MongoDatabase db = GetDatabase(dbName);
-			foreach (var collectionName in db.GetCollectionNames()) {
-				collections.Add(db.GetCollection(collectionName));
+		static public List<IMongoCollection<BsonDocument>> GetCollections(string dbName) {
+			List<IMongoCollection<BsonDocument>> collections = new List<IMongoCollection<BsonDocument>>();
+			IMongoDatabase db = GetDatabase(dbName);
+            IAsyncCursor<BsonDocument> collectionNames = db.ListCollections();
+			foreach (var collectionName in collectionNames.ToList()) {
+				collections.Add(db.GetCollection<BsonDocument>(collectionName.Names.First().ToString()));
 			}
 
 			return collections;
 		}
+
+        static public void RegisterMappings()
+        {
+            ClassMapper.RegisterMappings();
+        }
 	}
 }

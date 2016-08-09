@@ -8,12 +8,13 @@ using Character;
 using MongoDB.Bson;
 using MongoDB.Driver;
 using MongoDB.Driver.Builders;
+using Interfaces;
 
 namespace CharacterFactory {
 
 	public abstract class Factory {
-		public static Character.Iactor CreateCharacter(CharacterEnums.CharacterType characterType, int MobTypeID = 0) {
-			Character.Iactor character = null;
+		public static IActor CreateCharacter(CharacterType characterType, int MobTypeID = 0) {
+			IActor character = null;
 
 			switch (characterType) {
 				case CharacterType.NPC:
@@ -34,26 +35,26 @@ namespace CharacterFactory {
 			return character;
 		}
 
-        internal static Character.Iactor CreateNPCCharacterHusk() {
+        internal static IActor CreateNPCCharacterHusk() {
 
-            CharacterEnums.CharacterClass charClass = CharacterEnums.CharacterClass.Fighter;
-            CharacterEnums.EyeColors EyeColor = CharacterEnums.EyeColors.Black;
-            CharacterEnums.Genders Gender = CharacterEnums.Genders.Male;
-            CharacterEnums.HairColors HairColor = CharacterEnums.HairColors.Black;
-            CharacterEnums.CharacterRace Race = CharacterEnums.CharacterRace.Dwarf;
-            CharacterEnums.SkinColors SkinColor = CharacterEnums.SkinColors.Black;
-            CharacterEnums.SkinType SkinType = CharacterEnums.SkinType.Feathers;
-            CharacterEnums.Languages Language = CharacterEnums.Languages.Common;
-            CharacterEnums.BodyBuild Build = CharacterEnums.BodyBuild.Athletic;
+            CharacterClass charClass = CharacterClass.Fighter;
+            EyeColors EyeColor = EyeColors.Black;
+            Genders Gender = Genders.Male;
+            HairColors HairColor = HairColors.Black;
+            CharacterRace Race = CharacterRace.Dwarf;
+            SkinColors SkinColor = SkinColors.Black;
+            SkinType SkinType = SkinType.Feathers;
+            Languages Language = Languages.Common;
+            BodyBuild Build = BodyBuild.Athletic;
 
-            Character.Iactor actor = new Character.NPC(Race, charClass, Gender, Language, SkinColor, SkinType, HairColor, EyeColor, Build);
-            Character.Inpc npc = actor as Character.Inpc;
+            IActor actor = new Character.NPC(Race, charClass, Gender, Language, SkinColor, SkinType, HairColor, EyeColor, Build);
+            INpc npc = actor as INpc;
             npc.Fsm.state = AI.Wander.GetState();
 
             return actor;
         }
 
-        internal static Character.Iactor CreateNPCCharacter(int id) {
+        internal static IActor CreateNPCCharacter(int id) {
 			
             MongoUtils.MongoData.ConnectToDatabase();
             MongoDatabase db = MongoUtils.MongoData.GetDatabase("World");
@@ -74,15 +75,15 @@ namespace CharacterFactory {
             BsonDocument template = collection.FindOneAs<BsonDocument>(query);
 
             
-            CharacterEnums.CharacterClass charClass = (CharacterEnums.CharacterClass)Enum.Parse(typeof(CharacterEnums.CharacterClass), template["Class"].AsString);
-            CharacterEnums.EyeColors EyeColor = (CharacterEnums.EyeColors)Enum.Parse(typeof(CharacterEnums.EyeColors), template["EyeColor"].AsString);
-            CharacterEnums.Genders Gender = (CharacterEnums.Genders)Enum.Parse(typeof(CharacterEnums.Genders), template["Gender"].AsString);
-            CharacterEnums.HairColors HairColor = (CharacterEnums.HairColors)Enum.Parse(typeof(CharacterEnums.HairColors), template["HairColor"].AsString);         
-            CharacterEnums.CharacterRace Race = (CharacterEnums.CharacterRace)Enum.Parse(typeof(CharacterEnums.CharacterRace), template["Race"].AsString);           
-            CharacterEnums.SkinColors SkinColor = (CharacterEnums.SkinColors)Enum.Parse(typeof(CharacterEnums.SkinColors), template["SkinColor"].AsString);
-            CharacterEnums.SkinType SkinType = (CharacterEnums.SkinType)Enum.Parse(typeof(CharacterEnums.SkinType), template["SkinType"].AsString);
-            CharacterEnums.Languages Language = (CharacterEnums.Languages)Enum.Parse(typeof(CharacterEnums.Languages), template["Language"].AsString);
-            CharacterEnums.BodyBuild Build = (CharacterEnums.BodyBuild)Enum.Parse(typeof(CharacterEnums.BodyBuild), template["Build"].AsString);
+            CharacterClass charClass = (CharacterClass)Enum.Parse(typeof(CharacterClass), template["Class"].AsString);
+            EyeColors EyeColor = (EyeColors)Enum.Parse(typeof(EyeColors), template["EyeColor"].AsString);
+            Genders Gender = (Genders)Enum.Parse(typeof(Genders), template["Gender"].AsString);
+            HairColors HairColor = (HairColors)Enum.Parse(typeof(HairColors), template["HairColor"].AsString);         
+            CharacterRace Race = (CharacterRace)Enum.Parse(typeof(CharacterRace), template["Race"].AsString);           
+            SkinColors SkinColor = (SkinColors)Enum.Parse(typeof(SkinColors), template["SkinColor"].AsString);
+            SkinType SkinType = (SkinType)Enum.Parse(typeof(SkinType), template["SkinType"].AsString);
+            Languages Language = (Languages)Enum.Parse(typeof(Languages), template["Language"].AsString);
+            BodyBuild Build = (BodyBuild)Enum.Parse(typeof(BodyBuild), template["Build"].AsString);
             
             Character.NPC npc = new Character.NPC(Race, charClass, Gender, Language, SkinColor, SkinType, HairColor, EyeColor, Build);
 

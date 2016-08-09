@@ -8,9 +8,10 @@ using MongoDB.Driver.Builders;
 using MongoDB.Bson;
 using MongoDB.Bson.Serialization.Attributes;
 using MongoDB.Bson.Serialization.Options;
+using Interfaces;
 
 namespace Items {
-    public sealed partial class Items : Iitem, Iweapon, Iedible, Icontainer, Iiluminate, Iclothing, Ikey {
+    public sealed partial class Items : IItem, IWeapon, IEdible, IContainer, IIluminate, IClothing, IKey {
 
         public double MinDamage { get; set; }
         public double MaxDamage { get; set; }
@@ -36,6 +37,4 @@ namespace Items {
             return result;
         }
     }
-
-    public enum WeaponType { BLADE, BLUNT, POLE } //a few type of weapons
 }

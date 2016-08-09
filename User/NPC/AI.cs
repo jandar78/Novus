@@ -6,10 +6,11 @@ using System.Threading.Tasks;
 using Extensions;
 using MongoDB.Bson;
 using ClientHandling;
+using Interfaces;
 
 namespace AI {
-    public class FSM {
-        private Dictionary<string, IState> cachedStates;
+    public class FSM : IFsm {
+        public Dictionary<string, IState> cachedStates { get; set; }
         private static FSM _fsm = null;
 
         public IState state {
@@ -32,11 +33,11 @@ namespace AI {
             CacheStates();
         }
 
-        public static FSM GetInstance() {
+        public static IFsm GetInstance() {
             return _fsm ?? (_fsm = new FSM());
         }
 
-        private void CacheStates() {
+        public void CacheStates() {
             var totalerTypes = System.Reflection.Assembly.GetExecutingAssembly().GetTypes().Where(t => typeof(IState).IsAssignableFrom(t) && t.IsClass == true);
             foreach (Type totalerType in totalerTypes) {
                 cachedStates.Add(totalerType.Name, (IState)totalerType.GetMethod("GetState").Invoke(totalerType, null)); 
@@ -59,7 +60,7 @@ namespace AI {
             return null;
         }
 
-        public void ChangeState(IState newState, Character.NPC Actor) {
+        public void ChangeState(IState newState, INpc Actor) {
             if (state != null && newState != null) {
                 state.Exit(Actor);
                 previousState = state;
@@ -82,7 +83,7 @@ namespace AI {
             temp = null;
         }
 
-        public void Update(Character.NPC Actor) {
+        public void Update(INpc Actor) {
             if (state != null) {
                 state.Execute(Actor);
             }
@@ -91,7 +92,7 @@ namespace AI {
             }
         }
 
-        public void InterpretMessage(Message message, Character.Iactor actor) {
+        public void InterpretMessage(IMessage message, IActor actor) {
             Character.NPC npc = actor as Character.NPC;
             MessageParser parser = new MessageParser(message, actor, npc.Triggers);
             
@@ -102,7 +103,7 @@ namespace AI {
             //then we can even execute states that operate on a delay.
 
             if (parser.TriggersToExecute.Count > 0) {
-				foreach (Triggers.ITrigger trigger in parser.TriggersToExecute) {
+				foreach (ITrigger trigger in parser.TriggersToExecute) {
 					IState state = GetStateFromName(trigger.StateToExecute);
 					if (state != null) {
 						ChangeState(state, npc);

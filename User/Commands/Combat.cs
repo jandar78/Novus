@@ -10,6 +10,7 @@ using MongoDB.Bson;
 using MongoDB.Driver.Builders;
 using Extensions;
 using ClientHandling;
+using Interfaces;
 
 namespace Commands {
 	public partial class CommandParser {
@@ -44,13 +45,13 @@ namespace Commands {
         }
 
 
-        private static double GetBonus(User.User player, CharacterEnums.BonusTypes type) {
+        private static double GetBonus(IUser player, BonusTypes type) {
             return player.Player.GetBonus(type);
         }      
 
         //this is where attacks dones from scripts will call into
         //this can just set the round timer and apply the damages       
-        private static void SpecialAttack(User.User player) {
+        private static void SpecialAttack(IUser player) {
             if (!CheckIfCanAttack(player.Player.LastCombatTime)) {
                 return;
             }
@@ -68,7 +69,7 @@ namespace Commands {
         }
 
         //Will probably have to be modified a little bit when we introduce spells, but maybe not
-        private static void Kill(User.User player, List<string> commands) {
+        private static void Kill(IUser player, List<string> commands) {
 
             //Has the round interval time elapsed?
             if (!CheckIfCanAttack(player.Player.LastCombatTime)) {
@@ -76,7 +77,7 @@ namespace Commands {
             }
 
             //no target, no fight
-            User.User enemy = GetTarget(player, commands);
+            IUser enemy = GetTarget(player, commands);
             if (enemy == null) {
                 return;
             }
@@ -95,7 +96,7 @@ namespace Commands {
             //double chanceToBlock = GetAndEvaluateExpression("BlockChance", enemy.Player);
 
             //Get their main hand
-            Items.Wearable mainHand = player.Player.Equipment.GetMainHandWeapon(player.Player);
+            Wearable mainHand = player.Player.Equipment.GetMainHandWeapon(player.Player);
 
             //Attack with the main hand
             WeaponHandAttack(player, enemy);
@@ -112,7 +113,7 @@ namespace Commands {
             player.Player.Save();
         }
 
-        private static double PercentHit(User.User player, User.User enemy) {
+        private static double PercentHit(IUser player, IUser enemy) {
             //TODO:
             //Calculate the attackers chance to succesfully perform a hit.
             //The defender then needs to calculate block. 
@@ -126,7 +127,7 @@ namespace Commands {
           
         }
 
-        private static double GetAndEvaluateExpression(string calculationName, Character.Iactor player) {
+        private static double GetAndEvaluateExpression(string calculationName, IActor player) {
             MongoCollection col = MongoUtils.MongoData.GetCollection("Calculations", "Combat");
             IMongoQuery query = Query.EQ("_id", calculationName);
             BsonDocument doc = col.FindOneAs<BsonDocument>(query).AsBsonDocument;
@@ -140,7 +141,7 @@ namespace Commands {
 
         //TODO:
         //This method exists in the Skill class, should probably combine them into a math library or something
-        private static string ReplaceStringWithNumber(Character.Iactor player, string expression) {
+        private static string ReplaceStringWithNumber(IActor player, string expression) {
             //would like to make this a bit more generic so if new attributes are inserted we don't have to change this method
             //I think easiest way is to have the expression be separated by spaces, but just so it works with anything let's get rid of
             //any mathematical signs and then we should just have the name of the attributes we want.
@@ -169,7 +170,7 @@ namespace Commands {
                     }
                     else if (attributeName.Contains("Bonus")){ //this part does not exist in the Skill class method
                         string bonusName = attributeName.Replace("Bonus", "");
-                        double replacementValue = player.GetBonus((CharacterEnums.BonusTypes)Enum.Parse(typeof(CharacterEnums.BonusTypes), bonusName));
+                        double replacementValue = player.GetBonus((BonusTypes)Enum.Parse(typeof(BonusTypes), bonusName));
                         temp = temp.Replace(attributeName, replacementValue.ToString());
                     }
                 }
@@ -179,12 +180,12 @@ namespace Commands {
         }
 
 
-        private static void WeaponHandAttack(User.User player, User.User enemy, bool offHand = false) {            
+        private static void WeaponHandAttack(IUser player, IUser enemy, bool offHand = false) {            
             //Calculate the total damage           
             double defense = 0.0d;
             double attack = 0.0d;
             double damage = CalculateDamage(player, enemy, offHand, out defense, out attack); 
-            Room room = Room.GetRoom(player.Player.Location);
+            IRoom room = Rooms.Room.GetRoom(player.Player.Location);
             
             SendRoundOutcomeMessage(player, enemy, room, damage, defense, attack);
 
@@ -197,16 +198,16 @@ namespace Commands {
         /// </summary>
         /// <param name="player"></param>
         /// <param name="enemy"></param>
-        private static void UpdatePlayerState(User.User player, User.User enemy) {
+        private static void UpdatePlayerState(IUser player, IUser enemy) {
             if (enemy.Player.IsUnconcious()) SendDeadOrUnconciousMessage(player, enemy);
             if (enemy.Player.IsDead()) {
                 SendDeadOrUnconciousMessage(player, enemy, true);
 
-                Character.NPC npc = enemy.Player as Character.NPC;
+                INpc npc = enemy.Player as INpc;
                 if (npc != null) {
                     npc.CalculateXP();
                     npc.Fsm.ChangeState(AI.Rot.GetState(), npc);
-                    enemy.Player = npc;
+                    enemy.Player = npc as IActor;
                     enemy.Player.Save();
                 }
             }
@@ -222,16 +223,16 @@ namespace Commands {
         /// <param name="damage"></param>
         /// <param name="defense"></param>
         /// <param name="attack"></param>
-        private static void SendRoundOutcomeMessage(User.User player, User.User enemy, Room room, double damage, double defense, double attack) {
+        private static void SendRoundOutcomeMessage(IUser player, IUser enemy, IRoom room, double damage, double defense, double attack) {
 			//TODO: Get the message based weapon type/special weapon (blunt, blade, axe, pole, etc.)
 			//Get the weapon type and append it to the "Hit" or "Miss" type when getting the message 
 			//ex: HitSword, HitClub, MissAxe, MissUnarmed could even get really specific HitRustyShortSword, MissLegendaryDaggerOfBlindness
 			//Make a method to figure out the type by having a lookup table in the DB that points to a weapon type string
-			Message message = new Message();
+			IMessage message = new ClientHandling.Message();
 			message.InstigatorID = player.UserID;
-			message.InstigatorType = player.Player.IsNPC == false ? Message.ObjectType.Player : Message.ObjectType.Npc;
+			message.InstigatorType = player.Player.IsNPC == false ? ObjectType.Player : ObjectType.Npc;
 			message.TargetID = enemy.UserID;
-			message.TargetType = enemy.Player.IsNPC == false ? Message.ObjectType.Player : Message.ObjectType.Npc;
+			message.TargetType = enemy.Player.IsNPC == false ? ObjectType.Player : ObjectType.Npc;
 
 			if (damage < 0) {
                 message.Self = ParseMessage(GetMessage("Combat", "Hit", MessageType.Self), player, enemy, damage, defense, attack);
@@ -240,7 +241,7 @@ namespace Commands {
 
 				enemy.Player.ApplyEffectOnAttribute("Hitpoints", damage);
 
-				Character.NPC npc = enemy.Player as Character.NPC;
+				INpc npc = enemy.Player as INpc;
 				if (npc != null) {
 					npc.IncreaseXPReward(player.UserID, (damage * -1.0));
 				}
@@ -268,7 +269,7 @@ namespace Commands {
 			room.InformPlayersInRoom(message, new List<string>(new string[] { player.UserID, enemy.UserID }));
 		}
 
-        private static double CalculateDamage(User.User player, User.User enemy, bool offHand, out double defense, out double attack) {
+        private static double CalculateDamage(IUser player, IUser enemy, bool offHand, out double defense, out double attack) {
             defense = 0.0d;
             attack = 0.0d;
             attack = Math.Round(CalculateAttack(player, enemy.Player.Level, offHand), 2, MidpointRounding.AwayFromZero);
@@ -277,8 +278,8 @@ namespace Commands {
             return Math.Round((attack + defense), 2, MidpointRounding.AwayFromZero);
         }
 
-        private static User.User GetTarget(User.User player, List<string> commands) {
-            User.User enemy = FindTarget(player, commands);
+        private static IUser GetTarget(IUser player, List<string> commands) {
+            IUser enemy = FindTarget(player, commands);
 
             if (!SendMessageIfTargetUnavailable(player, enemy)) {
                 return null;
@@ -287,9 +288,9 @@ namespace Commands {
             return enemy;
         }
 
-        public static User.User FindTargetByName(string name, string location) {
-            User.User enemy = null;
-            foreach (User.User foe in MySockets.Server.GetAUserByFirstName(name)) {
+        public static IUser FindTargetByName(string name, string location) {
+            IUser enemy = null;
+            foreach (IUser foe in MySockets.Server.GetAUserByFirstName(name)) {
                 if (foe.Player.Location == location) {
                     enemy = foe;
                     break;
@@ -298,10 +299,10 @@ namespace Commands {
 
             if (enemy == null) {
                 //ok it's not a player lets look through the NPC list
-                foreach (Character.NPC npc in Character.NPCUtils.GetAnNPCByName(name, location)) {
-                    User.User foe = new User.User(true);
-                    foe.UserID = npc.ID;
-                    foe.Player = npc;
+                foreach (INpc npc in Character.NPCUtils.GetAnNPCByName(name, location)) {
+                    IUser foe = new User.User(true);
+                    foe.UserID = ((NPC)npc).ID;
+                    foe.Player = npc as IActor;
                     enemy = foe;
                     break;
                 }
@@ -316,8 +317,8 @@ namespace Commands {
         /// <param name="player"></param>
         /// <param name="commands"></param>
         /// <returns></returns>
-        private static User.User FindTarget(User.User player, List<string> commands) {
-            User.User enemy = null;
+        private static IUser FindTarget(IUser player, List<string> commands) {
+            IUser enemy = null;
 
             if (commands.Count > 2 && !string.Equals(commands[2], "target", StringComparison.InvariantCultureIgnoreCase)) {
                 enemy = FindTargetByName(commands[2], player.Player.Location);
@@ -329,7 +330,7 @@ namespace Commands {
 
             //didn't find a player character so let's look for an npc
             if (enemy == null) {
-                Character.Iactor npc = null;
+                IActor npc = null;
                 string[] position = commands[0].Split('.'); //we are separating based on using the decimal operator after the name of the npc/item
                 if (position.Count() > 1) {
                     //ok so the player specified a specific NPC in the room list to examine and not just the first to match
@@ -344,7 +345,7 @@ namespace Commands {
                 }
 
                 if (npc != null) {
-                    User.User temp = new User.User(true);
+                    IUser temp = new User.User(true);
                     temp.UserID = npc.ID;
                     temp.Player = npc;
                     enemy = temp;
@@ -360,7 +361,7 @@ namespace Commands {
         /// <param name="player"></param>
         /// <param name="enemy"></param>
         /// <returns></returns>
-        private static bool SendMessageIfTargetUnavailable(User.User player, User.User enemy) {
+        private static bool SendMessageIfTargetUnavailable(IUser player, IUser enemy) {
             bool targetFound = true;
 
                if (enemy == null) { //target not found so no longer in combat
@@ -401,7 +402,7 @@ namespace Commands {
         /// </summary>
         /// <param name="player"></param>
         /// <param name="enemy"></param>
-        private static void TargetEachOther(User.User player, User.User enemy) {
+        private static void TargetEachOther(IUser player, IUser enemy) {
             if (player.Player.InCombat == false || enemy.Player.InCombat == false) {
                 player.Player.InCombat = true;
                 enemy.Player.InCombat = true;
@@ -421,7 +422,7 @@ namespace Commands {
 
 		#region Combat calculations
         
-		private static double CalculateAttack(User.User player, int targetLevel, bool offHand = false){
+		private static double CalculateAttack(IUser player, int targetLevel, bool offHand = false){
             double result = 0.0;
             result = 100 - ((targetLevel - player.Player.Level + player.Player.GetAttributeRank("Strength") - 1) * 10);
             result *= 0.10;
@@ -434,16 +435,16 @@ namespace Commands {
 			return result * -1;
 		}
 
-        private static double WeaponDamage(User.User player, bool offhand = false) {
+        private static double WeaponDamage(IUser player, bool offhand = false) {
             double result = 0.0d;
-            List<Items.Iitem> weapons = player.Player.Equipment.GetWieldedWeapons();
+            List<IItem> weapons = player.Player.Equipment.GetWieldedWeapons();
             if (weapons.Count > 0) {
-                Items.Iweapon weapon;
+                IWeapon weapon;
                 if (!offhand) {
-                    weapon = (Items.Iweapon)weapons.Where(w => w.WornOn.ToString().CamelCaseWord() == player.Player.MainHand.CamelCaseWord()).SingleOrDefault();
+                    weapon = (IWeapon)weapons.Where(w => w.WornOn.ToString().CamelCaseWord() == player.Player.MainHand.CamelCaseWord()).SingleOrDefault();
                 }
                 else {
-                    weapon = (Items.Iweapon)weapons.Where(w => w.WornOn.ToString().CamelCaseWord() != player.Player.MainHand.CamelCaseWord()).SingleOrDefault();
+                    weapon = (IWeapon)weapons.Where(w => w.WornOn.ToString().CamelCaseWord() != player.Player.MainHand.CamelCaseWord()).SingleOrDefault();
                 }
 
                 result = RandomNumber.GetRandomNumber().NextNumber((int)weapon.CurrentMinDamage, (int)weapon.CurrentMaxDamage + 1);
@@ -464,14 +465,14 @@ namespace Commands {
             return result;
         }
 
-        private static double WeaponSkill(User.User player) {
+        private static double WeaponSkill(IUser player) {
             //TODO: This is the logic for the weapon skill portion just need to get the weapon skill tree set up
             //if (Math.Pow(WeaponSkill, 2)) > 0.5) return 0.5d;
             //else return Math.Pow(WeaponSkill, 2);
             return 0.25d;
         }
 
-		private static double CalculateDefense(User.User enemy) {
+		private static double CalculateDefense(IUser enemy) {
 			double result = 0.0;
             if (!enemy.Player.CheckUnconscious) {
                 double gearResult = 0.0d; //should be GetGearHit + BonusHit;
@@ -487,7 +488,7 @@ namespace Commands {
 			return result;
 		}
 
-		private static double CalculateDefense(Door door) {
+		private static double CalculateDefense(IDoor door) {
             //TODO:some doors may have some resistance to damage add that here
 			double result = 0.0;
 			return result;
@@ -501,33 +502,33 @@ namespace Commands {
 		/// <param name="player"></param>
 		/// <param name="enemy"></param>
         /// 
-        private static void SendDeadOrUnconciousMessage(User.User player, User.User enemy, bool dead = false) {
+        private static void SendDeadOrUnconciousMessage(IUser player, IUser enemy, bool dead = false) {
             player.Player.ClearTarget();
             string status = dead == true ? "Killed" : "KnockedUnconcious";
-			Message message = new Message();
+			IMessage message = new ClientHandling.Message();
 			message.InstigatorID = player.UserID;
-			message.InstigatorType = player.Player.IsNPC == false ? Message.ObjectType.Player : Message.ObjectType.Npc;
+			message.InstigatorType = player.Player.IsNPC == false ? ObjectType.Player : ObjectType.Npc;
 			message.TargetID = enemy.UserID;
-			message.TargetType = enemy.Player.IsNPC == false ? Message.ObjectType.Player : Message.ObjectType.Npc;
+			message.TargetType = enemy.Player.IsNPC == false ? ObjectType.Player : ObjectType.Npc;
 
 			message.Self = ParseMessage(GetMessage("Combat", status, MessageType.Self), player, enemy);
             message.Target = ParseMessage(GetMessage("Combat", status, MessageType.Target), player, enemy);
 			message.Room = ParseMessage(GetMessage("Combat", status, MessageType.Room), player, enemy);
 
-			Room.GetRoom(player.Player.Location).InformPlayersInRoom(message, new List<string>() { player.UserID, enemy.UserID });
+			Rooms.Room.GetRoom(player.Player.Location).InformPlayersInRoom(message, new List<string>() { player.UserID, enemy.UserID });
 			if (dead) {
 				SetKiller(enemy, player);
 			}
 			SetCombatTimer(player, enemy);
         }
 
-		private static void SetKiller(User.User enemy, User.User player) {
+		private static void SetKiller(IUser enemy, IUser player) {
 			enemy.Player.KillerID = player.UserID;
 			enemy.Player.TimeOfDeath = DateTime.UtcNow;
 		}
         		
 		//set player timer to minvalue
-		private static void SetCombatTimer(User.User player, User.User enemy) {
+		private static void SetCombatTimer(IUser player, IUser enemy) {
 			player.Player.LastCombatTime = DateTime.MinValue.ToUniversalTime();
 			enemy.Player.LastCombatTime = DateTime.MinValue.ToUniversalTime();
 		}
@@ -536,15 +537,15 @@ namespace Commands {
 		#region Finishing moves
 		//finisher moves
         //these will actually be skill moves
-		private static void Cleave(User.User player, List<string> commands) {//this will need a check in the future to be used with only bladed weapons
-			User.User enemy = null;
-			Message message = new Message();
+		private static void Cleave(IUser player, List<string> commands) {//this will need a check in the future to be used with only bladed weapons
+			IUser enemy = null;
+			IMessage message = new ClientHandling.Message();
 			message.InstigatorID = player.UserID;
-			message.InstigatorType = player.Player.IsNPC == false ? Message.ObjectType.Player : Message.ObjectType.Npc;
+			message.InstigatorType = player.Player.IsNPC == false ? ObjectType.Player : ObjectType.Npc;
 
             if (commands.Count > 2) {
 
-                foreach (User.User foe in MySockets.Server.GetAUserByFirstName(commands[2])) {
+                foreach (IUser foe in MySockets.Server.GetAUserByFirstName(commands[2])) {
                     if (foe.Player.Location == player.Player.Location) {
                         enemy = foe;
                     }
@@ -556,9 +557,9 @@ namespace Commands {
 
             if (enemy == null) {
                 //ok it's not a player lets look through the NPC list
-                foreach (Character.NPC npc in Character.NPCUtils.GetAnNPCByName(commands[2], player.Player.Location)) {
-                    if (npc.ActionState == CharacterEnums.CharacterActionState.Unconcious) {
-                        User.User foe = new User.User(true);
+                foreach (IActor npc in Character.NPCUtils.GetAnNPCByName(commands[2], player.Player.Location)) {
+                    if (npc.ActionState == CharacterActionState.Unconcious) {
+                        IUser foe = new User.User(true);
                         foe.UserID = npc.ID;
                         foe.Player = npc;
                         enemy = foe;
@@ -572,9 +573,9 @@ namespace Commands {
 				
 			}
 			else {
-				Room room = Room.GetRoom(player.Player.Location);
+				IRoom room = Rooms.Room.GetRoom(player.Player.Location);
 				message.TargetID = enemy.UserID;
-				message.TargetType = enemy.Player.IsNPC == false ? Message.ObjectType.Player : Message.ObjectType.Npc;
+				message.TargetType = enemy.Player.IsNPC == false ? ObjectType.Player : ObjectType.Npc;
 
 				if (String.Compare(enemy.Player.ActionState.ToString(), "unconcious", true) == 0) {
 					if (commands.Count > 3 && commands[3].ToLower() == "slowly") {  //a slow death for your opponent, bask in it.
@@ -619,7 +620,7 @@ namespace Commands {
 
         #region Combat Messages
         //replaces the placeholder with the actual value, so edits can all be made on the DB, if you add anymore place holders this is where you would do the replace
-        public static string ParseMessage(string message, User.User attacker, User.User target, double damage = 0, double defense = 0, double attack = 0) {
+        public static string ParseMessage(string message, IUser attacker, IUser target, double damage = 0, double defense = 0, double attack = 0) {
 
             message = message.Replace("{attacker}", attacker.Player.FirstName)
                              .Replace("{damage}", (damage * -1).ToString().FontColor(Utils.FontForeColor.RED))
@@ -660,7 +661,7 @@ namespace Commands {
 
         #region Break things
 
-		private static void Break(User.User player, List<string> commands) {
+		private static void Break(IUser player, List<string> commands) {
 			string objectName = "";
 
 			for (int i = commands.Count -1; i > 0; i--){ //this should keep the words in the order we want
@@ -681,11 +682,11 @@ namespace Commands {
             }
 		}
 
-		private static bool BreakDoor(User.User player, List<string> commands){
-			Door door = FindDoor(player.Player.Location, commands);
-			Message message = new Message();
+		private static bool BreakDoor(IUser player, List<string> commands){
+			IDoor door = FindDoor(player.Player.Location, commands);
+			IMessage message = new ClientHandling.Message();
 			message.InstigatorID = player.UserID;
-			message.InstigatorType = player.Player.IsNPC == false ? Message.ObjectType.Player : Message.ObjectType.Npc;
+			message.InstigatorType = player.Player.IsNPC == false ? ObjectType.Player : ObjectType.Npc;
 
 			if (door == null) {
 				return false;
@@ -708,7 +709,7 @@ namespace Commands {
 			return true;
 		}
 
-		private static bool BreakObject(User.User player, string objectName) {
+		private static bool BreakObject(IUser player, string objectName) {
             //TODO: finish this method now that we have objects in the game that can be destroyed
             //find item in the DB, check if destructible.
             //Calculate player attack and determine damage to item

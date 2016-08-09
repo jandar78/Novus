@@ -45,7 +45,7 @@ namespace Calendar {
 		}
 
         public static void UpdateClock() {
-            MongoCollection calendar = MongoUtils.MongoData.GetCollection("World", "Globals");
+            MongoCollection calendar = MongoUtils.MongoData.GetCollection("World", "Calendar");
             BsonDocument time = calendar.FindOneAs<BsonDocument>(Query.EQ("_id", "Time"));
             time["Second"] = time["Second"].AsInt32 + 28;
 
@@ -137,7 +137,7 @@ namespace Calendar {
 		}
 
 		private static BsonDocument GetCalendarData() {
-              MongoCollection calendarCollection = MongoUtils.MongoData.GetCollection("World","Globals");
+              MongoCollection calendarCollection = MongoUtils.MongoData.GetCollection("World", "Globals");
 	   	    IMongoQuery query = Query.EQ("_id", "Calendar");
 		    BsonDocument result = calendarCollection.FindOneAs<BsonDocument>(query);
 		    return result;
@@ -156,7 +156,7 @@ namespace Calendar {
 			    //is still going through the auto script process
 			    weather["StartTime"] = DateTime.Now.ToString();
 			    weather["Duration"] = Extensions.RandomNumber.GetRandomNumber().NextNumber(0,5);
-                   MongoUtils.MongoData.GetCollection("World", "Globals").Save(weather);
+                MongoUtils.MongoData.GetCollection("World", "Globals").Save(weather);
 			    		
 			    //choose a new type of weather pattern
                    Weather weatherEnum = Weather.Clear;

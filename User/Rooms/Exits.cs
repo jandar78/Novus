@@ -12,12 +12,13 @@ using Commands;
 using System.Threading;
 using LuaInterface;
 using Triggers;
+using Interfaces;
 
 namespace Rooms {
-	public class Exits {
+    public class Exits : IExit {
 
-		public Dictionary<RoomExits, Room> availableExits;
-		public Dictionary<RoomExits, Door> doors;
+        public Dictionary<RoomExits, IRoom> availableExits { get; set; }
+		public Dictionary<RoomExits, IDoor> doors { get; set; }
 
 		public bool HasDoor {
 			get {
@@ -30,12 +31,12 @@ namespace Rooms {
 		public string Direction { get; set; }
 
 		public Exits() {
-			availableExits = new Dictionary<RoomExits, Room>();
-			doors = new Dictionary<RoomExits, Door>();
+			availableExits = new Dictionary<RoomExits, IRoom>();
+			doors = new Dictionary<RoomExits, IDoor>();
 		}
 	}
 
-	public class Door {
+	public class Door : IDoor {
 		#region Public Properties
 		public string Id { get; set; }
 
@@ -91,7 +92,7 @@ namespace Rooms {
 
 		public bool Listener {
 			get;
-			protected set;
+			set;
 		}
 
 		public BsonArray Phrases { get; set; }
@@ -99,13 +100,13 @@ namespace Rooms {
 
 		public string Description { get; set; }
 		public string DescriptionDestroyed { get; set; }
-		#endregion Public Properties
+        #endregion Public Properties
 
-		private List<Triggers.ITrigger> _exitTriggers = new List<Triggers.ITrigger>();
+        private List<ITrigger> _exitTriggers = new List<ITrigger>();
 
 		public Door() { }
 
-		public static Door GetDoor(string doorID, string doorID2 = "") {
+		public static IDoor GetDoor(string doorID, string doorID2 = "") {
 			Door door = null;
 
 			MongoCollection roomCollection = MongoUtils.MongoData.GetCollection("World", "Doors");
@@ -121,11 +122,16 @@ namespace Rooms {
 			return door;
 		}
 
-		private void LoadTriggers() {
+		public void LoadTriggers() {
+            if (_exitTriggers == null)
+            {
+                _exitTriggers = new List<ITrigger>();
+            }
+
 			foreach (BsonDocument doc in Triggers) {
 				Triggers.GeneralTrigger trigger = new Triggers.GeneralTrigger(doc, TriggerType.Door);
 				trigger.script.AddVariable(this, "door");
-				if (trigger.script.ScriptType == ScriptFactory.ScriptTypes.Lua) {
+				if (trigger.script.ScriptType == ScriptTypes.Lua) {
 					LuaScript luaScript = trigger.script as LuaScript;
 					luaScript.RegisterMarkedMethodsOf(new DoorHelpers());
 
@@ -151,7 +157,7 @@ namespace Rooms {
 			return message;
 		}
 
-		private BsonDocument GetDoorFromDB() {
+		public BsonDocument GetDoorFromDB() {
 			MongoCollection doorCollection = GetDoorCollection();
 
 			IMongoQuery query = Query.EQ("_id", this.Id);
@@ -159,7 +165,7 @@ namespace Rooms {
 			return doorCollection.FindOneAs<BsonDocument>(query);
 		}
 
-		private MongoCollection GetDoorCollection() {
+		public MongoCollection GetDoorCollection() {
 			return MongoUtils.MongoData.GetCollection("World", "Doors");
 		}
 
@@ -251,15 +257,15 @@ namespace Rooms {
 
 			[LuaAccessible]
 			public static void CreateNPC(int mobTypeID, string location, int amount) {
-				amount = amount * Rooms.Room.GetRoom(location).GetObjectsInRoom(Room.RoomObjects.Players).Count;
+				amount = amount * Rooms.Room.GetRoom(location).GetObjectsInRoom(RoomObjects.Players, 100).Count;
 
 				for (int i = 0; i < amount; i++) {
-					Character.Iactor actor = Character.NPCUtils.CreateNPC(mobTypeID);
+					IActor actor = Character.NPCUtils.CreateNPC(mobTypeID);
 					if (actor != null) {
 						actor.Location = location;
 						//meh this whole AI stuff may need to be changed depending on how AI will handle triggers
 						actor.LastCombatTime = DateTime.MinValue.ToUniversalTime();
-						Character.Inpc npc = actor as Character.Inpc;
+						INpc npc = actor as INpc;
 						npc.Fsm.state = AI.FindTarget.GetState();
 						actor.Save();
 					}

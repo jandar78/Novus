@@ -4,12 +4,11 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Interfaces;
 
 namespace User
 {
-	public class User {
-
-		public enum UserState {NONE, JUST_CONNECTED, LOGGING_IN, CREATING_CHARACTER, LEVEL_UP, TALKING, LIMBO, DISCONNECT,  };
+	public class User : IUser{
 
 		#region Properties
         public bool HourFormat24 {
@@ -32,7 +31,7 @@ namespace User
 			set;
 		}
 
-        public Character.Iactor Player {
+        public IActor Player {
             get {
                 return _character;
             }
@@ -107,8 +106,8 @@ namespace User
 		#endregion Properties
 
 		#region members
-		private ClientHandling.MessageBuffer _userBuffer;
-		private Character.Iactor _character;
+		private ClientHandling.MessageBuffer _userBuffer { get; set; }
+		private IActor _character;
         private bool _TimeFormat;
 		#endregion members
 
@@ -116,7 +115,7 @@ namespace User
 		public User(bool npc = false) {
             if (!npc) {
                 CurrentState = UserState.JUST_CONNECTED;
-                _character = CharacterFactory.Factory.CreateCharacter(CharacterEnums.CharacterType.PLAYER);
+                _character = CharacterFactory.Factory.CreateCharacter(CharacterType.PLAYER);
                 _userBuffer = new ClientHandling.MessageBuffer(UserID);
                 LastDisconnected = DateTime.MinValue;
                 LoginCompleted = false;
@@ -127,7 +126,7 @@ namespace User
 
         public User() {
             CurrentState = UserState.JUST_CONNECTED;
-            _character = CharacterFactory.Factory.CreateCharacter(CharacterEnums.CharacterType.PLAYER);
+            _character = CharacterFactory.Factory.CreateCharacter(CharacterType.PLAYER);
             _userBuffer = new ClientHandling.MessageBuffer(UserID);
             LastDisconnected = DateTime.MinValue;
             LoginCompleted = false;
@@ -139,12 +138,12 @@ namespace User
 		/// Use this call for players to receive the Message.Room message and for NPCS to parse all messages for triggers
 		/// </summary>
 		/// <param name="message"></param>
-        public void MessageHandler(Message message) {
+        public void MessageHandler(IMessage message) {
             if (!this.Player.IsNPC) {
                 OutBuffer = message.Room;
             }
             else {
-                Character.Inpc npc = _character as Character.Inpc;
+                INpc npc = _character as INpc;
                 if (npc != null) {
                     npc.ParseMessage(message);
                 }

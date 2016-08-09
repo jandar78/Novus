@@ -9,15 +9,26 @@ using MongoDB.Driver;
 using MongoDB.Driver.Builders;
 using MongoDB;
 using CharacterEnums;
+using Interfaces;
 
 namespace Character {
     /// <summary>
     /// This class can hold Bonus/Penalty for each type.  This way we can just offset bonuses and penalties at the core.
     /// We can display to the user for example that their DEX is -5% or Dodge is +10% instead of doing Bonus Dodge = 15% Penalty Dodge = -5%
     /// </summary>
-   public class StatBonuses {
+   public class StatBonuses : IStatBonuses {
         
-        private Dictionary<string, Tuple<double, DateTime>> _bonus = new Dictionary<string,Tuple<double,DateTime>>();
+        public Dictionary<string, Tuple<double, DateTime>> _bonus {
+            get {
+                if (_bonus == null) {
+                    return new Dictionary<string, Tuple<double, DateTime>>();
+                }
+                return _bonus;
+            }
+            set {
+                _bonus = value;
+            }
+        }
         
         /// <summary>
         /// Adds an amount (positive or negative) to the type specified. Passing in zero or null for the time will make this bonus never expire.
@@ -82,13 +93,13 @@ namespace Character {
         /// Calling this will remove any bonuses or penalties whose time has expired.
         /// </summary>
         /// <returns></returns>
-        public ClientHandling.Message Cleanup() {
+        public IMessage Cleanup() {
             List<string> messages = new List<string>();
-            MongoCollection bonusCollection = MongoUtils.MongoData.GetCollection("Messages", "Bonuses");
+            MongoCollection<BsonDocument> bonusCollection = MongoUtils.MongoData.GetCollection("Messages", "Bonuses");
             BsonDocument found = null;
             BsonArray array = null;
             IMongoQuery query = null;
-            ClientHandling.Message message = new ClientHandling.Message();
+            IMessage message = new Message();
             foreach (KeyValuePair<string, Tuple<double, DateTime>> item in _bonus) {
                 if (item.Value.Item2 != DateTime.MaxValue && DateTime.Now >= item.Value.Item2) {
                     query = Query.EQ("_id", item.Key);

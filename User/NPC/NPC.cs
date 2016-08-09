@@ -12,18 +12,19 @@ using System.Collections.Concurrent;
 using Triggers;
 using Quests;
 using ClientHandling;
+using Interfaces;
 
 namespace Character {
-	public class NPC : Iactor, Inpc {
+	public class NPC : IActor, INpc {
 		#region private things
 		private Dictionary<string, double> damageTracker;
-		private Inventory _inventory;
-		private Equipment _equipment;
-        private List<Quest> _quests;
+		private IInventory _inventory;
+		private IEquipment _equipment;
+        private List<IQuest> _quests;
 		#endregion private things
 
 		#region Public Members
-		public Inventory Inventory {
+		public IInventory Inventory {
 			get {
 				return _inventory;
 			}
@@ -31,7 +32,7 @@ namespace Character {
 				_inventory = value;
 			}
 		}
-		public Equipment Equipment {
+		public IEquipment Equipment {
 			get {
 				return _equipment;
 			}
@@ -40,10 +41,10 @@ namespace Character {
 			}
 		}
 
-        public List<Quest> Quests {
+        public List<IQuest> Quests {
             get {
                 if (_quests == null) {
-                    _quests = new List<Quest>();
+                    _quests = new List<IQuest>();
                 }
                 return _quests;
             }
@@ -56,11 +57,11 @@ namespace Character {
 		#endregion Public Members
 
 		#region Protected Members
-		protected Dictionary<string, Attribute> Attributes;
+		protected Dictionary<string, IAttributes> Attributes;
 		protected Dictionary<string, double> SubAttributes;
-		protected HashSet<CharacterEnums.Languages> KnownLanguages; //this will hold all the languages the player can understand
+		protected HashSet<Languages> KnownLanguages; //this will hold all the languages the player can understand
 		protected double _levelModifier;
-		private StatBonuses Bonuses;
+		private IStatBonuses Bonuses;
 
 		#region Stances
 		protected CharacterStanceState _stanceState;
@@ -146,7 +147,7 @@ namespace Character {
 			set;
 		}
 
-		public AI.FSM Fsm {
+		public IFsm Fsm {
 			get;
 			set;
 
@@ -332,8 +333,8 @@ namespace Character {
 			}
 			set {
 				MongoUtils.MongoData.ConnectToDatabase();
-				MongoDatabase db = MongoUtils.MongoData.GetDatabase("Character");
-				MongoCollection charCollection = db.GetCollection("General");
+				var db = MongoUtils.MongoData.GetDatabase("Character");
+				var charCollection = db.GetCollection("General");
 				BsonDocument result = charCollection.FindOneAs<BsonDocument>(Query.EQ("_id", "LevelModifier"));
 				if (result != null) {
 					_levelModifier = result[Level.ToString()].AsDouble;
@@ -456,7 +457,7 @@ namespace Character {
 			damageTracker = new Dictionary<string, double>();
 			Triggers = new List<ITrigger>();
 			Bonuses = new StatBonuses();
-			Quests = new List<Quest>();
+			Quests = new List<IQuest>();
 
 			FirstName = "";
 			LastName = "";
@@ -482,7 +483,7 @@ namespace Character {
 			Inventory.playerID = this.ID;
 			Equipment.playerID = this.ID;
 
-			Attributes = new Dictionary<string, Attribute>();
+			Attributes = new Dictionary<string, IAttributes>();
 
 			Attributes.Add("Hitpoints", new Attribute(200.0d, "Hitpoints", 200.0d, 0.2d, 1));
 			Attributes.Add("Dexterity", new Attribute(10.0d, "Dexterity", 10.0d, 0.0d, 1));
@@ -500,15 +501,15 @@ namespace Character {
 			SubAttributes.Add("Leadership", 10.0d);
 		}
 
-		public void Save() {
+		public async void Save() {
 			MongoUtils.MongoData.ConnectToDatabase();
-			MongoDatabase characterDB = MongoUtils.MongoData.GetDatabase("Characters");
+			var characterDB = MongoUtils.MongoData.GetDatabase("Characters");
 			if (this.ID == null) {
 				this.ID = new MongoDB.Bson.ObjectId().ToString();
 			}; //new character
-			MongoCollection characterCollection = characterDB.GetCollection<BsonDocument>("NPCCharacters");
+			var characterCollection = characterDB.GetCollection<NPC>("NPCCharacters");
 			IMongoQuery search = Query.EQ("_id", ObjectId.Parse(this.ID));
-			BsonDocument npcCharacter = characterCollection.FindOneAs<BsonDocument>(search);
+            var npcCharacter = await characterCollection.Find<NPC>(n => n.ID == this.ID).FirstAsync(); //FindOneAs<BsonDocument>(search);
 
 			if (npcCharacter == null) {
 				//this is the NPC's first save, create everything from scratch
@@ -627,7 +628,7 @@ namespace Character {
 				BsonArray playerAttributes = new BsonArray();
 				BsonArray xpTracker = new BsonArray();
 
-				foreach (KeyValuePair<string, Attribute> attribute in Attributes) {
+				foreach (KeyValuePair<string, IAttributes> attribute in Attributes) {
 					BsonDocument attrib = new BsonDocument();
 					attrib.Add("Name", "");
 					attrib.Add("Value", "");
@@ -694,12 +695,12 @@ namespace Character {
 
 		}
 
-		public void Load(string id) {
+		public async void Load(string id) {
 			MongoUtils.MongoData.ConnectToDatabase();
-			MongoDatabase characterDB = MongoUtils.MongoData.GetDatabase("Characters");
-			MongoCollection characterCollection = characterDB.GetCollection<BsonDocument>("NPCCharacters");
+			var characterDB = MongoUtils.MongoData.GetDatabase("Characters");
+			var characterCollection = characterDB.GetCollection<NPC>("NPCCharacters");
 			IMongoQuery query = Query.EQ("_id", ObjectId.Parse(id));
-			BsonDocument found = characterCollection.FindOneAs<BsonDocument>(query);
+			var found = await characterCollection.Find<NPC>(n => n.ID == id).FirstAsync();
 
 			ID = found["_id"].AsObjectId.ToString();
 			FirstName = found["FirstName"].AsString.CamelCaseWord();
@@ -788,7 +789,7 @@ namespace Character {
 						}
 					}
 
-					Quest quest = new Quest(questDoc["QuestID"].AsString, playerSteps);
+					var quest = new Quests.Quest(questDoc["QuestID"].AsString, playerSteps);
 
 					if (questDoc.Contains("AutoPlayers")) {
 						foreach (var autoID in questDoc["AutoPlayers"].AsBsonArray) {
@@ -811,7 +812,7 @@ namespace Character {
 		public void CalculateXP() {
 			if (this.IsDead()) {
 				foreach (KeyValuePair<string, double> pair in damageTracker) {
-					User.User player = MySockets.Server.GetAUser(pair.Key);
+					IUser player = MySockets.Server.GetAUser(pair.Key);
 					if (player != null) {
 						double rewardPercentage = ((pair.Value * -1) / GetAttributeMax("Hitpoints"));
 						if (rewardPercentage > 1.0)
@@ -867,7 +868,7 @@ namespace Character {
 			Save();
 		}
 
-		public void ParseMessage(Message message) {
+		public void ParseMessage(IMessage message) {
 			//send the message to the AI logic 
 			if (message.InstigatorID != this.ID) {
 				//does the AI need to do something based on this
@@ -922,7 +923,7 @@ namespace Character {
 		public bool IsUnconcious() {
 			bool result = false;
 			if (CheckUnconscious) {
-				SetActionState(CharacterEnums.CharacterActionState.Unconcious);
+				SetActionState(CharacterActionState.Unconcious);
 				SetStanceState(CharacterStanceState.Laying_unconcious);
 				ClearTarget();
 				result = true;
@@ -1024,7 +1025,7 @@ namespace Character {
 			}
 		}
 
-		public Dictionary<string, Attribute> GetAttributes() {
+		public Dictionary<string, IAttributes> GetAttributes() {
 			return this.Attributes;
 		}
 
@@ -1062,22 +1063,22 @@ namespace Character {
 			return false;
 		}
 
-		public bool Loot(User.User looter, List<string> commands, bool byPassCheck = false) {
-			Message message = new Message();
+		public bool Loot(IUser looter, List<string> commands, bool byPassCheck = false) {
+			var message = new ClientHandling.Message();
 			message.InstigatorID = looter.UserID;
-			message.InstigatorType = looter.Player.IsNPC == false ? Message.ObjectType.Player : Message.ObjectType.Npc;
+			message.InstigatorType = looter.Player.IsNPC == false ? ObjectType.Player : ObjectType.Npc;
 			message.TargetID = this.ID;
-			message.TargetType = this.IsNPC == false ? Message.ObjectType.Player : Message.ObjectType.Npc;
+			message.TargetType = this.IsNPC == false ? ObjectType.Player : ObjectType.Npc;
 
 			bool looted = false;
 			if (IsDead()) {
-				List<Items.Iitem> result = new List<Items.Iitem>();
+				List<IItem> result = new List<IItem>();
 				StringBuilder sb = new StringBuilder();
 				bool hasLoot = false;
 				if (!byPassCheck) {
 					//Let's see if who's looting was the killer otherwise we check the time of death
 					//also check if looter is part of a group if so then the group will provide the loot logic.
-					if (!string.Equals(looter.UserID, ((Iactor)this).KillerID, StringComparison.InvariantCultureIgnoreCase)) {
+					if (!string.Equals(looter.UserID, ((IActor)this).KillerID, StringComparison.InvariantCultureIgnoreCase)) {
 						if (!CanLoot(looter.UserID)) {
 							//looter not the killer not in group and time to loot has not expired
 							looter.MessageHandler("You did not deal the killing blow and can not loot this corpse at this time.");
@@ -1154,7 +1155,7 @@ namespace Character {
 
 		public bool CanLoot(string looterID) {
 			bool youCanLootMe = true;
-			if (DateTime.UtcNow < ((Iactor)this).TimeOfDeath.AddSeconds(30)) {
+			if (DateTime.UtcNow < ((IActor)this).TimeOfDeath.AddSeconds(30)) {
 				youCanLootMe = false;
 			}
 

@@ -6,11 +6,12 @@ using System.Text;
 using System.Threading.Tasks;
 
 namespace Quests {
-    public interface IQuest {
+    //public interface IQuest
+    //{
 
-        void StartQuest(string playerID);
-        void ProcessQuestStep(Message message, Character.Iactor npc);
-        void EndQuest(string playerID);
+    //    void StartQuest(string playerID);
+    //    void ProcessQuestStep(Message message, Character.Iactor npc);
+    //    void EndQuest(string playerID);
 
-    }
+    //}
 }

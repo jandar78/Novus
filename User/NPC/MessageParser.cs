@@ -6,12 +6,13 @@ using System.Threading.Tasks;
 using MongoDB.Bson;
 using Triggers;
 using ClientHandling;
+using Interfaces;
 
 namespace AI {
 	public class MessageParser {
 
-		private Message MessageFull { get; set; }
-		private Character.Iactor Actor { get; set; }
+		private IMessage MessageFull { get; set; }
+		private IActor Actor { get; set; }
 
 		private List<ITrigger> Triggers { get; set; }
 		public List<ITrigger> TriggersToExecute { get; set; }
@@ -20,7 +21,7 @@ namespace AI {
 			TriggersToExecute = new List<ITrigger>();
 		}
 
-		public MessageParser(Message message, Character.Iactor actor, List<ITrigger> triggers) {
+		public MessageParser(IMessage message, IActor actor, List<ITrigger> triggers) {
 			MessageFull = message;
 			Actor = actor;
 			Triggers = triggers;

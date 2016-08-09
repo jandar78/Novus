@@ -3,10 +3,11 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Interfaces;
 
 namespace ClientHandling {
-	public class Message {
-		private string[] _messages;
+	public class Message : IMessage {
+		public string[] _messages { get; set; }
 
 		public string Self {
 			get {
@@ -77,10 +78,6 @@ namespace ClientHandling {
 
 			TargetID = targetid;
 			TargetType = targetType;
-		}
-
-		public enum ObjectType {
-			Player, Npc, Room, Item, None
 		}
 	}
 }

@@ -7,6 +7,7 @@ using System.Threading;
 using MongoDB.Bson;
 using LuaInterface;
 using ClientHandling;
+using Interfaces;
 
 //Trigger can be used to kick off scripts for pretty much anything, ranging from Quests to a special action an item can perform
 //based on what the trigger is
@@ -95,8 +96,7 @@ namespace Triggers {
 				script.AddVariable(Character.NPCUtils.GetUserAsNPCFromList(new List<string>() { ((TriggerEventArgs)e).InstigatorID }), "player");
 			}
 
-			await Task.Run(() => script.RunScript());
-			// ThreadPool.QueueUserWorkItem(delegate { script.RunScript(); });           
+			await Task.Run(() => script.RunScript());      
 		}
 
 		public virtual void HandleEvent() {

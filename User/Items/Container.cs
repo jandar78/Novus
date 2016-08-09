@@ -7,9 +7,10 @@ using MongoDB.Bson;
 using MongoDB.Bson.Serialization.Attributes;
 using MongoDB.Bson.Serialization.Options;
 using MongoDB.Driver;
+using Interfaces;
 
 namespace Items {
-    public sealed partial class Items : Iitem, Iweapon, Iedible, Icontainer, Iiluminate, Iclothing, Ikey {
+    public sealed partial class Items : IItem, IWeapon, IEdible, IContainer, IIluminate, IClothing, IKey {
         
         public double WeightLimit { get; set; }
         public double CurrentWeight { get; set; }
@@ -24,10 +25,10 @@ namespace Items {
             return Contents;
         }
 
-        public Iitem RetrieveItem(string id) {
+        public IItem RetrieveItem(string id) {
             if ((IsOpenable && Opened) || !IsOpenable) {
                 if (Contents.Contains(id)) {
-                    Iitem temp = Items.GetByID(id);
+                    IItem temp = Items.GetByID(id);
                     CurrentWeight -= temp.Weight;
                     Contents.Remove(id);
                     Save();
@@ -43,7 +44,7 @@ namespace Items {
 
         public bool StoreItem(string id) {
             bool added = false;
-            Iitem temp = Items.GetByID(id);
+            IItem temp = Items.GetByID(id);
 
             //containers can't be encumbered they can only hold so much
             if ((IsOpenable && Opened) || !IsOpenable) {
@@ -114,7 +115,7 @@ namespace Items {
                 sb.AppendLine(Name + " contents:");
                 if (GetContents().Count > 0) {
                     foreach (string itemID in GetContents()) {
-                        Iitem tempItem = Items.GetByID(itemID);
+                        IItem tempItem = Items.GetByID(itemID);
                         sb.AppendLine(tempItem.Name);
                     }
 

@@ -6,15 +6,9 @@ using System.Threading.Tasks;
 using Extensions;
 using Triggers;
 using AI.PathFinding;
+using Interfaces;
 
 namespace AI {
-    public interface IState {
-         void Execute(Character.NPC actor, ITrigger trigger = null);
-         void Enter(Character.NPC actor);
-         void Exit(Character.NPC actor);
-         string ToString();
-    }
-
     public class Greet : IState {
          
         private static Greet _greet;
@@ -22,18 +16,18 @@ namespace AI {
         public static Greet GetState() {
             return _greet ?? (_greet = new Greet());
         }
-        public void Enter(Character.NPC actor) {
+        public void Enter(INpc actor) {
             actor.NextAiAction = DateTime.Now.AddSeconds(Extensions.RandomNumber.GetRandomNumber().NextNumber(0, 2)).ToUniversalTime();
         }
 
-        public void Exit(Character.NPC actor) {
+        public void Exit(INpc actor) {
         }
 
         public override string ToString() {
             return "Greet";
         }
 
-        public void Execute(Character.NPC actor, ITrigger trigger = null) {
+        public void Execute(INpc actor, ITrigger trigger = null) {
             if (actor.StanceState != CharacterEnums.CharacterStanceState.Laying_unconcious &&
                 actor.StanceState != CharacterEnums.CharacterStanceState.Laying_dead &&
                 actor.StanceState != CharacterEnums.CharacterStanceState.Decomposing) {
@@ -59,18 +53,18 @@ namespace AI {
 		public static Questing GetState() {
 			return _questing ?? (_questing = new Questing());
 		}
-		public void Enter(Character.NPC actor) {
+		public void Enter(INpc actor) {
 			actor.NextAiAction = DateTime.Now.AddSeconds(Extensions.RandomNumber.GetRandomNumber().NextNumber(1, 5)).ToUniversalTime();
 		}
 
-		public void Exit(Character.NPC actor) {
+		public void Exit(INpc actor) {
 		}
 
 		public override string ToString() {
 			return "Questing";
 		}
 
-		public void Execute(Character.NPC actor, ITrigger trigger = null) {
+		public void Execute(INpc actor, ITrigger trigger = null) {
 			if (actor.StanceState != CharacterEnums.CharacterStanceState.Laying_unconcious &&
 				actor.StanceState != CharacterEnums.CharacterStanceState.Laying_dead &&
 				actor.StanceState != CharacterEnums.CharacterStanceState.Decomposing) {
@@ -94,18 +88,18 @@ namespace AI {
 		public static WalkTo GetState() {
 			return _walkTo ?? (_walkTo = new WalkTo());
 		}
-		public void Enter(Character.NPC actor) {
+		public void Enter(INpc actor) {
 			actor.NextAiAction = DateTime.Now.AddSeconds(Extensions.RandomNumber.GetRandomNumber().NextNumber(0, 2)).ToUniversalTime();
 		}
 
-		public void Exit(Character.NPC actor) {
+		public void Exit(INpc actor) {
 		}
 
 		public override string ToString() {
 			return "WalkTo";
 		}
 
-		public void Execute(Character.NPC actor, ITrigger trigger = null) {
+		public void Execute(INpc actor, ITrigger trigger = null) {
 			if (actor.StanceState != CharacterEnums.CharacterStanceState.Laying_unconcious &&
 				actor.StanceState != CharacterEnums.CharacterStanceState.Laying_dead &&
 				actor.StanceState != CharacterEnums.CharacterStanceState.Decomposing) {
@@ -158,7 +152,7 @@ namespace AI {
             return _wander ?? (_wander = new Wander());
         }
 
-        public void Execute(Character.NPC actor, ITrigger trigger = null) {
+        public void Execute(INpc actor, ITrigger trigger = null) {
             if (!actor.IsDead() && !actor.InCombat) {
                 Rooms.Room room = Rooms.Room.GetRoom(actor.Location);
                 room.GetRoomExits();
@@ -177,11 +171,11 @@ namespace AI {
             }
         }
 
-        public void Enter(Character.NPC actor) {
+        public void Enter(INpc actor) {
             actor.NextAiAction = DateTime.Now.AddSeconds(Extensions.RandomNumber.GetRandomNumber().NextNumber(60, 121)).ToUniversalTime();
         }
 
-        public void Exit(Character.NPC actor) {
+        public void Exit(INpc actor) {
         }
 
         public override string ToString() {
@@ -198,7 +192,7 @@ namespace AI {
 			return _stay ?? (_stay = new Stay());
 		}
 
-		public void Execute(Character.NPC actor, ITrigger trigger = null) {
+		public void Execute(INpc actor, ITrigger trigger = null) {
 			if (!actor.IsDead() && !actor.InCombat) {
 				//Will stay in place until forced into combat or a script puts it in another state
 				actor.NextAiAction = DateTime.Now.AddSeconds(5).ToUniversalTime();
@@ -209,11 +203,11 @@ namespace AI {
 			}
 		}
 
-		public void Enter(Character.NPC actor) {
+		public void Enter(INpc actor) {
 			actor.NextAiAction = DateTime.Now.AddSeconds(5).ToUniversalTime();
 		}
 
-		public void Exit(Character.NPC actor) { 
+		public void Exit(INpc actor) { 
 		}
 
 		public override string ToString() {
@@ -230,7 +224,7 @@ namespace AI {
             return _speak ?? (_speak = new Speak());
         }
 
-        public void Execute(Character.NPC actor, ITrigger trigger = null) {
+        public void Execute(INpc actor, ITrigger trigger = null) {
             if (!actor.IsDead() && !actor.InCombat) {
                 if (DateTime.Now.ToUniversalTime() > actor.NextAiAction) {
                     //eventuall this literals will be gotten from the literals table for each different NPC
@@ -244,11 +238,11 @@ namespace AI {
             }
         }
 
-        public void Enter(Character.NPC actor) {
+        public void Enter(INpc actor) {
             actor.NextAiAction = DateTime.Now.AddSeconds(Extensions.RandomNumber.GetRandomNumber().NextNumber(15, 60)).ToUniversalTime();
         }
 
-        public void Exit(Character.NPC actor) {
+        public void Exit(INpc actor) {
         }
 
         public override string ToString() {
@@ -264,7 +258,7 @@ namespace AI {
             return _combat ?? (_combat = new Combat());
         }
 
-        public void Execute(Character.NPC actor, ITrigger trigger = null) {
+        public void Execute(INpc actor, ITrigger trigger = null) {
             //no target then switch to finding a target first
             if (actor.CurrentTarget == null) {
                 actor.Fsm.ChangeState(FindTarget.GetState(), actor);
@@ -280,12 +274,12 @@ namespace AI {
 
         }
 
-        public void Enter(Character.NPC actor) {
+        public void Enter(INpc actor) {
             //no target, no fighting
             
         }
 
-        public void Exit(Character.NPC actor) {
+        public void Exit(INpc actor) {
         }
 
         public override string ToString() {
@@ -301,7 +295,7 @@ namespace AI {
             return _findTarget ?? (_findTarget = new FindTarget());
         }
 
-        public void Execute(Character.NPC actor, ITrigger trigger = null) {
+        public void Execute(INpc actor, ITrigger trigger = null) {
             //first let's check to see if we got any messages telling us we are being attacked and use that
             //person attacking us as the target
             //if that gets us nowhere, we need to then just kill the first non npc we find in our same location
@@ -342,12 +336,12 @@ namespace AI {
             }
         }
 
-        public void Enter(Character.NPC actor) {
+        public void Enter(INpc actor) {
             Commands.CommandParser.ExecuteCommand(actor, "EMOTE", "starts looking around for something to attack");
             actor.NextAiAction = DateTime.Now.AddSeconds(30).ToUniversalTime(); //this way players will have some time to react and/or run away
         }
 
-        public void Exit(Character.NPC actor) { }
+        public void Exit(INpc actor) { }
 
         public override string ToString() {
             return "FindTarget";
@@ -363,21 +357,21 @@ namespace AI {
             return _hunt ?? (_hunt = new Hunt());
         }
 
-        public void Execute(Character.NPC actor, ITrigger trigger = null) {
+        public void Execute(INpc actor, ITrigger trigger = null) {
             Wander.GetState().Execute(actor); //let's go to another room
             actor.NextAiAction = DateTime.Now.AddSeconds(-2).ToUniversalTime(); //set next action back so we will immediately start searching for a target
             FindTarget.GetState().Execute(actor);//let's look for a target
             actor.NextAiAction = DateTime.Now.AddSeconds(Extensions.RandomNumber.GetRandomNumber().NextNumber(10, 31)).ToUniversalTime(); //we are actively looking so the wait time is not long to linger about
         }
 
-        public void Enter(Character.NPC actor) {
+        public void Enter(INpc actor) {
             //ok we were recently in combat and we are in hunt mode otherwise we passed the cool down period and will go back to wandering around
             if (actor.LastCombatTime != DateTime.MinValue.ToUniversalTime() && (DateTime.Now.ToUniversalTime() - actor.LastCombatTime).TotalMinutes >= 10) {
                 actor.Fsm.ChangeState(Wander.GetState(), actor);
             }
         }
 
-        public void Exit(Character.NPC actor) { }
+        public void Exit(INpc actor) { }
 
         public override string ToString() {
             return "Hunt";
@@ -393,7 +387,7 @@ namespace AI {
             return _rot ?? (_rot = new Rot());
         }
 
-        public void Execute(Character.NPC actor, ITrigger trigger = null) {
+        public void Execute(INpc actor, ITrigger trigger = null) {
             if (actor.StanceState != CharacterEnums.CharacterStanceState.Decomposing) {
                 Commands.CommandParser.ExecuteCommand(actor, "EMOTE", "carcass last bit of flesh has rotted away from its dead corpse.");
                 actor.Description = "The only remains of " + actor.FirstName + " are just bones.";
@@ -420,7 +414,7 @@ namespace AI {
             }
         }
 
-        public void Enter(Character.NPC actor) {
+        public void Enter(INpc actor) {
             //ok when we enter this state we will first set the description to the NPC is sitting here rotting, 
             //then decomposing and finally get rid of him on exit
             actor.Description = "The recently dead carcass of " + actor.FirstName + " is rotting as maggots feast on its entrails.";
@@ -428,7 +422,7 @@ namespace AI {
             actor.Save();
         }
 
-        public void Exit(Character.NPC actor) { }
+        public void Exit(INpc actor) { }
 
         public override string ToString() {
             return "Rot";

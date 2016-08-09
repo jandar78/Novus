@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using MongoDB.Bson;
 using MongoDB.Driver;
 using MongoDB.Driver.Builders;
+using Interfaces;
 
 namespace Triggers {
 	public class ScriptFactory {
@@ -47,7 +48,7 @@ namespace Triggers {
         }
 
 
-        public enum ScriptTypes { Lua, Roslyn, None };
+      //  public enum ScriptTypes { Lua, Roslyn, None };
 
 	}
 }

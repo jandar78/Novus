@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Interfaces;
 
 namespace Groups {
 	//this class will hold all the pertinent information about a group, like who the leader is, what players are in it, which rules apply to it etc.
@@ -314,7 +315,7 @@ namespace Groups {
 			}
 		}
 
-		public void Loot(User.User looter, List<string> commands, Character.NPC npc) {
+		public void Loot(IUser looter, List<string> commands, Character.NPC npc) {
 			//okay the group looting rule is not free for all thats why we arrived here.  We now need to abide by the looting rule that governs the
 			//group.
 

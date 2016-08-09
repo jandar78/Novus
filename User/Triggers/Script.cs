@@ -51,9 +51,9 @@ namespace Triggers {
 			}
 		}
 
-		public override ScriptFactory.ScriptTypes ScriptType {
+		public override ScriptTypes ScriptType {
 			get {
-				return ScriptFactory.ScriptTypes.Roslyn;
+				return ScriptTypes.Roslyn;
 			}
 		}
 
@@ -169,9 +169,9 @@ namespace Triggers {
 			}
 		}
 
-		public override ScriptFactory.ScriptTypes ScriptType {
+		public override ScriptTypes ScriptType {
 			get {
-				return ScriptFactory.ScriptTypes.Lua;
+				return ScriptTypes.Lua;
 			}
 		}
 
@@ -288,9 +288,9 @@ namespace Triggers {
 			}
 		}
 
-		public virtual ScriptFactory.ScriptTypes ScriptType {
+		public virtual ScriptTypes ScriptType {
 			get {
-				return ScriptFactory.ScriptTypes.None;
+				return ScriptTypes.None;
 			}
 		}
 

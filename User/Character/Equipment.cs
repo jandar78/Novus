@@ -8,25 +8,26 @@ using MongoDB.Bson;
 using MongoDB.Driver;
 using MongoDB.Driver.Builders;
 using MongoDB;
+using Interfaces;
 
 //this used to be the Inventory/Equipment class and it held both the inventory and equipment containers and all the methods for each.
 //I decided that breaking them both up was a better idea and would make the code easier to maintain and debug.
 //played with the idea of an interface but the fact that each one contains a different type of container  made me toss that decision.
 
 namespace Character {
-    public class Equipment {
+    public class Equipment : IEquipment{
         public string playerID { get; set; } 
 
-        public Dictionary<Items.Wearable, Items.Iitem> equipped;
+        public Dictionary<Wearable, IItem> equipped { get; set; }
 
         public Equipment() {
-            equipped = new Dictionary<Items.Wearable, Items.Iitem>();
+            equipped = new Dictionary<Wearable, IItem>();
         }
         
-        public bool EquipItem(Items.Iitem item, Inventory inventory) {
+        public bool EquipItem(IItem item, IInventory inventory) {
             bool result = false;
 
-            Items.Iweapon weaponItem = item as Items.Iweapon;
+            IWeapon weaponItem = item as IWeapon;
             if (weaponItem != null && weaponItem.IsWieldable) {
                 //can't equip a wieldable weapon
             }
@@ -38,9 +39,9 @@ namespace Character {
                     }
                     result = true;
                 }
-                else if (item.WornOn == Items.Wearable.WIELD_LEFT || item.WornOn == Items.Wearable.WIELD_RIGHT) { //this item can go in the free hand
-                    Items.Wearable freeHand = Items.Wearable.WIELD_LEFT; //we default to right hand for weapons
-                    if (equipped.ContainsKey(freeHand)) freeHand = Items.Wearable.WIELD_RIGHT; //maybe this perosn is left handed
+                else if (item.WornOn == Wearable.WIELD_LEFT || item.WornOn == Wearable.WIELD_RIGHT) { //this item can go in the free hand
+                    Wearable freeHand = Wearable.WIELD_LEFT; //we default to right hand for weapons
+                    if (equipped.ContainsKey(freeHand)) freeHand = Wearable.WIELD_RIGHT; //maybe this perosn is left handed
                     if (!equipped.ContainsKey(freeHand)) { //ok let's equip this
                         item.WornOn = freeHand;
                         item.Save();
@@ -56,7 +57,7 @@ namespace Character {
             return result;
         }
 
-        public bool UnequipItem(Items.Iitem item, Iactor player) {
+        public bool UnequipItem(IItem item, IActor player) {
             bool result = false;
             if (equipped.ContainsKey(item.WornOn)) {
                 player.Inventory.inventory.Add(item); //unequipped stuff goes to inventory
@@ -64,9 +65,9 @@ namespace Character {
                 
                 //if their main hand is now empty, we will make the other hand the main hand
                 if (!string.IsNullOrEmpty(player.MainHand) && string.Equals(item.WornOn.ToString(), player.MainHand, StringComparison.InvariantCultureIgnoreCase)){
-                    player.MainHand = Items.Wearable.WIELD_RIGHT.ToString();
-                    if (item.WornOn == Items.Wearable.WIELD_RIGHT) {
-                        player.MainHand = Items.Wearable.WIELD_LEFT.ToString();
+                    player.MainHand = Wearable.WIELD_RIGHT.ToString();
+                    if (item.WornOn == Wearable.WIELD_RIGHT) {
+                        player.MainHand = Wearable.WIELD_LEFT.ToString();
                     }
                 }
                 result = true;
@@ -74,15 +75,15 @@ namespace Character {
             return result;
         }
 
-        public bool WieldItem(Items.Iitem item, Inventory inventory) {
+        public bool WieldItem(IItem item, IInventory inventory) {
             bool wielded = false;
 
-            if (!equipped.ContainsKey(Items.Wearable.WIELD_RIGHT)) {
-                item.WornOn = Items.Wearable.WIELD_RIGHT;
+            if (!equipped.ContainsKey(Wearable.WIELD_RIGHT)) {
+                item.WornOn = Wearable.WIELD_RIGHT;
                 wielded = true;    
             }
-            else if (!equipped.ContainsKey(Items.Wearable.WIELD_LEFT)) {
-                item.WornOn = Items.Wearable.WIELD_LEFT;
+            else if (!equipped.ContainsKey(Wearable.WIELD_LEFT)) {
+                item.WornOn = Wearable.WIELD_LEFT;
                 wielded = true;
             }
 
@@ -95,14 +96,14 @@ namespace Character {
             return false;
         }
 
-        private void UpdateEquipmentFromDatabase(Dictionary<Items.Wearable, Items.Iitem> equipped) {
+        public void UpdateEquipmentFromDatabase(Dictionary<Wearable, IItem> equipped) {
             if (playerID != null) {
                 MongoCollection col = MongoUtils.MongoData.GetCollection("World", "Items");
                 var docs = col.FindAs<BsonDocument>(Query.EQ("Owner", playerID));
                 foreach (BsonDocument dbItem in docs) {
                     ObjectId itemID = dbItem["_id"].AsObjectId;
                     //do they have this item equipped?
-                    Items.Iitem temp = equipped.Where(i => i.Value.Id == itemID).SingleOrDefault().Value;
+                    IItem temp = equipped.Where(i => i.Value.Id == itemID).SingleOrDefault().Value;
                     if (temp == null) {
                     //let's equip it then 
                     temp = Items.Items.GetByID(dbItem["_id"].AsObjectId.ToString());
@@ -112,32 +113,32 @@ namespace Character {
             }
         }
 
-        public Dictionary<Items.Wearable, Items.Iitem> GetEquipment() {
+        public Dictionary<Wearable, IItem> GetEquipment() {
             UpdateEquipmentFromDatabase(equipped);
             return equipped;
         }
 
-        public void Wield(Items.Iitem item, Inventory inventory) {
+        public void Wield(IItem item, IInventory inventory) {
             WieldItem(item, inventory);
         }
 
-        public List<Items.Iitem> GetWieldedWeapons() {
-            List<Items.Iitem> result = new List<Items.Iitem>();
-            if (equipped.ContainsKey(Items.Wearable.WIELD_RIGHT)) {
-                result.Add((Items.Iitem)Items.ItemFactory.CreateItem(equipped[Items.Wearable.WIELD_RIGHT].Id));
+        public List<IItem> GetWieldedWeapons() {
+            List<IItem> result = new List<IItem>();
+            if (equipped.ContainsKey(Wearable.WIELD_RIGHT)) {
+                result.Add((IItem)Items.ItemFactory.CreateItem(equipped[Wearable.WIELD_RIGHT].Id));
             }
-            if (equipped.ContainsKey(Items.Wearable.WIELD_LEFT)) {
-                result.Add((Items.Iitem)Items.ItemFactory.CreateItem(equipped[Items.Wearable.WIELD_LEFT].Id));
+            if (equipped.ContainsKey(Wearable.WIELD_LEFT)) {
+                result.Add((IItem)Items.ItemFactory.CreateItem(equipped[Wearable.WIELD_LEFT].Id));
             }
 
             return result;
         }
 
-        public Items.Wearable GetMainHandWeapon(Iactor player) {
+        public Wearable GetMainHandWeapon(IActor player) {
             if (player.MainHand != null) {
-                return (Items.Wearable)Enum.Parse(typeof(Items.Wearable), player.MainHand);
+                return (Wearable)Enum.Parse(typeof(Wearable), player.MainHand);
             }
-            return Items.Wearable.NONE;
+            return Wearable.NONE;
         }
     }
 }

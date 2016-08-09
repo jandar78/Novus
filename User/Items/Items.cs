@@ -11,6 +11,7 @@ using MongoDB.Bson.Serialization;
 using MongoDB.Bson.Serialization.Attributes;
 using MongoDB.Bson.Serialization.Options;
 using Triggers;
+using Interfaces;
 
 //Items now perform an event any time they do an action, triggers can now use the event that gets raised to do whatever they may want to do by subscribing
 
@@ -20,7 +21,7 @@ using Triggers;
 //Item triggers can give the players a tip as to where they can go to start a quest.  This could also mean they can tell the player where they can be given to to complete/start a quest.
 
 namespace Items {
-    public sealed partial class Items : Iitem, Iweapon, Iedible, Icontainer, Iiluminate, Iclothing, Ikey {
+    public sealed partial class Items : IItem, IWeapon, IEdible, IContainer, IIluminate, IClothing, IKey {
         
         #region Properties
         public ObjectId Id { get; set; }
@@ -98,7 +99,7 @@ namespace Items {
             return itemName.ToString().Trim().CamelCaseString();
         }
 
-        public static List<Iitem> GetByName(string name, string owner) {
+        public static List<IItem> GetByName(string name, string owner) {
             MongoUtils.MongoData.ConnectToDatabase();
             MongoDatabase db = MongoUtils.MongoData.GetDatabase("World");
             MongoCollection collection = db.GetCollection("Items");
@@ -106,7 +107,7 @@ namespace Items {
             //find any items in the location that match what the player typed
             var doc = collection.FindAs<BsonDocument>(Query.And(Query.Matches("Name", name), Query.EQ("Owner", owner)));
             
-            List<Iitem> result = new List<Iitem>();
+            List<IItem> result = new List<IItem>();
 
             if (doc != null) {
                 foreach (BsonDocument itemDoc in doc) {
@@ -123,27 +124,27 @@ namespace Items {
             var doc = collection.FindAs<BsonDocument>(Query.And(Query.EQ("ItemType", 5), Query.EQ("isLit", true)));
 
             foreach (BsonDocument item in doc) {
-                Iitem lightSource = GetByID(item["_id"].AsObjectId.ToString());
+                IItem lightSource = GetByID(item["_id"].AsObjectId.ToString());
                 Iiluminate light = lightSource as Iiluminate;
                 light.Drain();
             }
         }
 
-        public static Iitem GetByID(string id) {
+        public static IItem GetByID(string id) {
             MongoUtils.MongoData.ConnectToDatabase();
             MongoDatabase db = MongoUtils.MongoData.GetDatabase("World");
             MongoCollection collection = db.GetCollection("Items");
             var doc = collection.FindOneAs<BsonDocument>(Query.EQ("_id", ObjectId.Parse(id)));
-            Iitem result = null;
+            IItem result = null;
             if (doc != null) {
                 result = ItemFactory.CreateItem(doc["_id"].AsObjectId);
             }
             return result;
         }
 
-        public static Iitem GetByIDFromList(List<string> id) {
+        public static IItem GetByIDFromList(List<string> id) {
             if (id.Count > 0) {
-                Iitem result = GetByID(id[0]);
+                IItem result = GetByID(id[0]);
                 return result;
             }
 
@@ -286,11 +287,11 @@ namespace Items {
             return Description;
         }
 
-        public static Iitem GetBestItem(List<Iitem> set) {
-            Iitem bestItem = null;
+        public static IItem GetBestItem(List<IItem> set) {
+            IItem bestItem = null;
             if (set.Count() > 0) {
                 bestItem = set[0];
-                foreach (Iitem comparee in set) {
+                foreach (IItem comparee in set) {
                     if (bestItem == comparee) {
                         continue;
                     }
@@ -301,15 +302,15 @@ namespace Items {
         }
 
         //we are going to base the best item on an accumulation of points based on every stat difference for the item
-        private static Iitem CompareItems(Iitem bestItem, Iitem comparee) {
+        private static IItem CompareItems(IItem bestItem, IItem comparee) {
             List<int> scores = new List<int>();
-            List<Iitem> bothItems = new List<Iitem> { bestItem, comparee };
+            List<IItem> bothItems = new List<IItem> { bestItem, comparee };
             
             int index = 0;
-            foreach (Iitem item in bothItems) {
-                Iclothing clothing = item as Iclothing;
-                Iweapon weapon = item as Iweapon;
-                Icontainer container = item as Icontainer;
+            foreach (IItem item in bothItems) {
+                IClothing clothing = item as IClothing;
+                IWeapon weapon = item as IWeapon;
+                IContainer container = item as IContainer;
 
                 if (clothing != null) {
                     scores[index] += (int)clothing.CurrentDefense;
@@ -337,22 +338,4 @@ namespace Items {
         }
 
     }
-
-    public class ItemEventArgs : EventArgs {
-        public ItemEvent ItemEvent { get; private set; }
-        public ObjectId ItemID { get; private set; }
-        
-        public ItemEventArgs(ItemEvent itemEvent, ObjectId itemID) {
-            ItemEvent = itemEvent;
-            ItemID = itemID;
-        }
-    }
-
-    #region Public Enumerations
-    public enum Wearable { NONE, HEAD, LEFT_EAR, RIGHT_EAR, NECK, BACK, CHEST, SHOULDERS, WAIST, FEET, HANDS, WIELD, WIELD_RIGHT, WIELD_LEFT} //this is enough for now add more later
-    public enum ItemCondition {NONE, DESTROYED_BEYOND_REPAIR, DESTROYED, DAMAGED, VERY_WORN, WORN, GOOD, VERY_GOOD, EXCELLENT } //a few item conditions
-    public enum ItemsType { WEAPON, CLOTHING, EDIBLE, DRINKABLE, CONTAINER, ILUMINATION, KEY } //a couple of item types
-    public enum EdibleType { FOOD, BEVERAGE }
-    public enum ItemEvent { OPEN, CLOSE, WEAR, LOOK_IN, STORE, RETRIEVE, DRAIN, RECHARGE, IGNITE, EXTINGUISH, EXAMINE, DETERIORATE, IMPROVE, CONSUME, WIELD }
-    #endregion Public Enumerations
 }

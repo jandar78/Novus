@@ -13,10 +13,11 @@ using MongoDB.Driver.Builders;
 using MongoDB.Bson.Serialization;
 using LuaInterface;
 using System.Text.RegularExpressions;
+using Interfaces;
 
 namespace WorldBuilder {
     public partial class Form1 : Form {
-        private Items.ItemsType ItemType { get; set; }
+        private ItemsType ItemType { get; set; }
         private BsonArray _wieldAffects;
         private List<BsonDocument> _itemList;
         private BsonArray _itemTriggers;
@@ -92,5 +93,6 @@ namespace WorldBuilder {
         private void DisplayValidationErrorBox(string msg) {
             MessageBox.Show(msg, "Validation error", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
         }
-	}
+
+    }
 }

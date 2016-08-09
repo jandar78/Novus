@@ -95,6 +95,7 @@ namespace MudTime
 
             List<string> zonesToAffect = new List<string>();
 
+            //Randomly pick zones that can be affected by the weather.  Eventually the weather gets to choose what zones it affects, this way rain/snow/fog won't happen in a desert area.
             for (int i = 0; i < numberOfZones; i++) {
                 string zoneToAdd = zones[Extensions.RandomNumber.GetRandomNumber().NextNumber(0, zones.Count)];
                 while (!zonesToAffect.Contains(zoneToAdd)) {

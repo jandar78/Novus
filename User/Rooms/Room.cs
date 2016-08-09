@@ -15,6 +15,7 @@ using MongoDB.Bson.Serialization;
 using MongoDB.Bson.Serialization.Attributes;
 using MongoDB.Bson.Serialization.Options;
 using ClientHandling;
+using Interfaces;
 
 //An explanation on how rooms, exits and doors work
 //Rooms have exits whose direction points to the room it connects to.  These connections can have doors in between them that can block the player
@@ -38,12 +39,12 @@ namespace Rooms {
     public class Room : IRoom, IWeather {
         private string _description;
         private string _title;
-        private List<string> players;
-        private List<string> npcs;
-        private List<string> items;
+        public List<string> players { get; set; }
+        public List<string> npcs { get; set; }
+        public List<string> items { get; set; }
         
 
-        private List<Triggers.ITrigger> _triggers;
+        private List<ITrigger> _triggers;
 
         public string Id { get; set; }
         public string Title {
@@ -110,17 +111,17 @@ namespace Rooms {
         public string Type { get; set; }
         public BsonArray Exits { private get; set; }
         public BsonArray Modifiers { get; set; }
-        public List<Exits> RoomExits { get; private set; }
+        public List<IExit> RoomExits { get; set; }
         public int WeatherIntensity { get; set; }
         public string Weather { get; set; }
         private BsonArray Triggers { get; set; }
         //constructor
         public Room() { }
 
-        public Exits GetRoomExit(RoomExits direction = Rooms.RoomExits.None) {
+        public IExit GetRoomExit(RoomExits direction = Interfaces.RoomExits.None) {
             GetRoomExits();
-            Exits result = null;
-            if (direction != Rooms.RoomExits.None) {
+            IExit result = null;
+            if (direction != Interfaces.RoomExits.None) {
                 result = RoomExits.Where(e => e.Direction.ToUpper() == direction.ToString().ToUpper()).SingleOrDefault();
             }
             else {
@@ -136,17 +137,17 @@ namespace Rooms {
         public void GetRoomExits() {
             MongoCollection doorCollection = MongoUtils.MongoData.GetCollection("World", "Doors");
 
-            List<Exits> exitList = new List<Exits>();
+            List<IExit> exitList = new List<IExit>();
 
             foreach (BsonDocument doc in Exits) {
-                Exits exit = new Exits();
+                IExit exit = new Exits();
                 exit.availableExits.Add((RoomExits)Enum.Parse(typeof(RoomExits),doc["Name"].AsString), GetRoom(doc["LeadsToRoom"].AsString)); //causing stackoverflow because exits point to each other
                 //if it has door grab that as well
                 //this query looks for a door with an id of either "roomid-adjecentroomid" or "adjacentroomid-roomid"
                 string oneWay = Id.ToString() + "-" + exit.availableExits[(RoomExits)Enum.Parse(typeof(RoomExits), doc["Name"].AsString)].Id;
                 string anotherWay = exit.availableExits[(RoomExits)Enum.Parse(typeof(RoomExits), doc["Name"].AsString)].Id + "-" + Id.ToString();
                 
-                Door door = Door.GetDoor(oneWay, anotherWay);
+                IDoor door = Door.GetDoor(oneWay, anotherWay);
 				RoomExits exitDirection = (RoomExits)Enum.Parse(typeof(RoomExits), doc["Name"].AsString);
                 if (door != null) {
                     exit.doors.Add(exitDirection, door);
@@ -167,7 +168,7 @@ namespace Rooms {
 
         public string GetDirectionOfDoor(int doorId) {
             GetRoomExits(); //populate the Exit list
-			RoomExits direction = Rooms.RoomExits.None;
+			RoomExits direction = Interfaces.RoomExits.None;
 
             //only get the exits that have doors
             foreach(Exits exit in RoomExits){
@@ -202,10 +203,10 @@ namespace Rooms {
 
             //check th eplayers and see if anyones equipment is a lightsource
             foreach (string id in players) {
-                User.User temp = MySockets.Server.GetAUser(id);
-                Dictionary<Items.Wearable, Items.Iitem> equipped = temp.Player.Equipment.GetEquipment();
-                foreach (Items.Iitem item in equipped.Values) {
-                    Items.Iiluminate light = item as Items.Iiluminate;
+                IUser temp = MySockets.Server.GetAUser(id);
+                Dictionary<Wearable, IItem> equipped = temp.Player.Equipment.GetEquipment();
+                foreach (IItem item in equipped.Values) {
+                    IIluminate light = item as IIluminate;
                     if (light != null && light.isLit) {
                         lightSource = true;
                         break;
@@ -217,10 +218,10 @@ namespace Rooms {
             //check the NPCS and do the same as we did with the players
             if (!lightSource) {
                 foreach (string id in npcs) {
-                    Character.Iactor actor = Character.NPCUtils.GetAnNPCByID(id);
-                    Dictionary<Items.Wearable, Items.Iitem> equipped = actor.Equipment.GetEquipment();
-                    foreach (Items.Iitem item in equipped.Values) {
-                        Items.Iiluminate light = item as Items.Iiluminate;
+                    IActor actor = Character.NPCUtils.GetAnNPCByID(id);
+                    Dictionary<Wearable, IItem> equipped = actor.Equipment.GetEquipment();
+                    foreach (IItem item in equipped.Values) {
+                        IIluminate light = item as IIluminate;
                         if (light != null && light.isLit) {
                             lightSource = true;
                             break;
@@ -233,17 +234,17 @@ namespace Rooms {
             //finally check for items in the room (just ones laying in the room, if a container is open check in container)
             if (!lightSource) {
                 foreach (string id in items) {
-                    Items.Iitem item = Items.Items.GetByID(id);
-                    Items.Icontainer container = item as Items.Icontainer;
-                    Items.Iiluminate light = item as Items.Iiluminate; //even if container check this first. Container may have light enchanment.
+                    IItem item = Items.Items.GetByID(id);
+                    IContainer container = item as IContainer;
+                    IIluminate light = item as IIluminate; //even if container check this first. Container may have light enchanment.
                     if (light != null && light.isLit) {
                         lightSource = true;
                         break;
                     }
                     if (container != null && (container.Contents != null && container.Contents.Count > 0) && container.Opened) {//let's look in the container only if it's open
                         foreach (string innerId in container.Contents) {
-                            Items.Iitem innerItem = Items.Items.GetByID(id);
-                            light = innerItem as Items.Iiluminate;
+                            IItem innerItem = Items.Items.GetByID(id);
+                            light = innerItem as IIluminate;
                             if (light != null && light.isLit) {
                                 lightSource = true;
                                 break;
@@ -259,17 +260,17 @@ namespace Rooms {
 
         //just an overload since Lua will return any of our lists as objects. We just cast and call the real method.
         //I tried just using generic methods like Table2List<T>() but it didn't work out, Lua still complained.
-        public void InformPlayersInRoom(Message message, List<object> ignoreId) {
+        public void InformPlayersInRoom(IMessage message, List<object> ignoreId) {
             InformPlayersInRoom(message, ignoreId.Select(s => s.ToString()).ToList());
         }
 
-        public void InformPlayersInRoom(Message message, List<string> ignoreId) {
+        public void InformPlayersInRoom(IMessage message, List<string> ignoreId) {
             if (!string.IsNullOrEmpty(message.Room)) {
                 GetPlayersInRoom();
                 foreach (string id in players) {
                     if (!ignoreId.Contains(id)) { 
-                        User.User otherUser = MySockets.Server.GetAUser(id);
-                        if (otherUser != null && otherUser.CurrentState == User.User.UserState.TALKING) {
+                        IUser otherUser = MySockets.Server.GetAUser(id);
+                        if (otherUser != null && otherUser.CurrentState == UserState.TALKING) {
                             otherUser.MessageHandler(message.Room);
                         }
                     }
@@ -278,8 +279,8 @@ namespace Rooms {
                 GetNPCsInRoom();
                 foreach (string id in npcs) {
                     if (!ignoreId.Contains(id)) {
-                        User.User otherUser = Character.NPCUtils.GetUserAsNPCFromList(new List<string>(new string[] { id }));
-                        if (otherUser != null && otherUser.CurrentState == User.User.UserState.TALKING) {
+                        IUser otherUser = Character.NPCUtils.GetUserAsNPCFromList(new List<string>(new string[] { id }));
+                        if (otherUser != null && otherUser.CurrentState == UserState.TALKING) {
                             otherUser.MessageHandler(message);
                         }
                     }
@@ -289,9 +290,9 @@ namespace Rooms {
                 CheckRoomTriggers(message.Room);
                 GetRoomExits();
                 if (RoomExits != null) {
-					RoomExits exitDirection = Rooms.RoomExits.None;
+					RoomExits exitDirection = Interfaces.RoomExits.None;
                     foreach (Exits exit in RoomExits) {
-						exitDirection = (Rooms.RoomExits)Enum.Parse(typeof(Rooms.RoomExits), exit.Direction.CamelCaseWord());
+						exitDirection = (Interfaces.RoomExits)Enum.Parse(typeof(Interfaces.RoomExits), exit.Direction.CamelCaseWord());
                         if (exit.doors.Count > 0 && exit.doors[exitDirection].Listener) {
                             string methodToCall = exit.doors[exitDirection].CheckPhrase(message.Room);
                         }
@@ -304,7 +305,7 @@ namespace Rooms {
         //we have to iterate through each trigger and then fire off each one that's a hit.  Same concept is going to apply to the exits.
         private void CheckRoomTriggers(string message) {
             if (_triggers != null) {
-                foreach (Triggers.ITrigger trigger in _triggers) {
+                foreach (ITrigger trigger in _triggers) {
 					bool hasOn = false;
 					bool hasAnd = false;
 					foreach (string on in trigger.TriggerOn) {
@@ -370,28 +371,26 @@ namespace Rooms {
             return result;
         }
 
-        public enum RoomObjects { Players, Npcs, Items };
-
         public void Save() {
             BsonDocument roomDoc = new BsonDocument();
             MongoUtils.MongoData.ConnectToDatabase();
-            MongoDatabase db = MongoUtils.MongoData.GetDatabase("World");
-            MongoCollection collection = db.GetCollection("Rooms");
+            var db = MongoUtils.MongoData.GetDatabase("World");
+            var collection = db.GetCollection("Rooms");
 
             collection.Save<Room>(this);
         }
 
         private void Save(BsonDocument roomDoc) {
             MongoUtils.MongoData.ConnectToDatabase();
-            MongoDatabase db = MongoUtils.MongoData.GetDatabase("World");
-            MongoCollection collection = db.GetCollection("Rooms");
+            var db = MongoUtils.MongoData.GetDatabase("World");
+            var collection = db.GetCollection("Rooms");
 
             collection.Save(roomDoc);
         }
 
         private void GetNPCsInRoom() {
-            MongoDatabase npcDB = MongoUtils.MongoData.GetDatabase("Characters");
-            MongoCollection npcCollection = npcDB.GetCollection("NPCCharacters");
+            var npcDB = MongoUtils.MongoData.GetDatabase("Characters");
+            var npcCollection = npcDB.GetCollection("NPCCharacters");
             IMongoQuery query = Query.EQ("Location", Id);
             MongoCursor npcsInRoom = npcCollection.FindAs<BsonDocument>(query);
 
@@ -407,31 +406,31 @@ namespace Rooms {
         }
 
         private void GetPlayersInRoom() {
-            MongoCollection playerCollection = MongoUtils.MongoData.GetCollection("Characters", "PlayerCharacter");
+            var playerCollection = MongoUtils.MongoData.GetCollection("Characters", "PlayerCharacter");
             IMongoQuery query = Query.EQ("Location", Id);
             MongoCursor playersInRoom = playerCollection.FindAs<BsonDocument>(query);
 
             players = new List<string>();
 
             foreach (BsonDocument doc in playersInRoom) {
-                User.User temp = MySockets.Server.GetAUser(doc["_id"].AsObjectId.ToString());
-                if (temp != null && (temp.CurrentState != User.User.UserState.LIMBO || temp.CurrentState != User.User.UserState.LOGGING_IN ||
-                    temp.CurrentState != User.User.UserState.CREATING_CHARACTER || temp.CurrentState != User.User.UserState.JUST_CONNECTED)) {
+                IUser temp = MySockets.Server.GetAUser(doc["_id"].AsObjectId.ToString());
+                if (temp != null && (temp.CurrentState != UserState.LIMBO || temp.CurrentState != UserState.LOGGING_IN ||
+                    temp.CurrentState != UserState.CREATING_CHARACTER || temp.CurrentState != UserState.JUST_CONNECTED)) {
                     players.Add(doc["_id"].AsObjectId.ToString());
                 }
             }
         }
 
         private void GetItemsInRoom() {
-            MongoDatabase playersDB = MongoUtils.MongoData.GetDatabase("World");
-            MongoCollection playerCollection = playersDB.GetCollection("Items");
+            var playersDB = MongoUtils.MongoData.GetDatabase("World");
+            var playerCollection = playersDB.GetCollection("Items");
             IMongoQuery query = Query.EQ("Location", Id);
             MongoCursor itemsInRoom = playerCollection.FindAs<BsonDocument>(query);
 
             items = new List<string>();
 
             foreach (BsonDocument doc in itemsInRoom) {
-                Items.Iitem item = Items.Items.GetByID(doc["_id"].AsObjectId.ToString());
+                IItem item = Items.Items.GetByID(doc["_id"].AsObjectId.ToString());
                 if (item != null) {
                     items.Add(item.Id.ToString());
                 }
@@ -448,8 +447,8 @@ namespace Rooms {
 
 				//allright this isn't as bad as it seems this actually executed pretty fast and it's running on a separate thread anyways since it's
 				//coming off a timer event
-				Room room = null;
-				Message message = new Message();
+				IRoom room = null;
+				IMessage message = new ClientHandling.Message();
 
 				foreach (BsonDocument doc in roomsFound) {
 					room = Room.GetRoom(doc["_id"].AsString);
@@ -470,7 +469,7 @@ namespace Rooms {
 								}
 
 								foreach (string playerid in room.players) {
-									User.User user = MySockets.Server.GetAUser(playerid);
+									IUser user = MySockets.Server.GetAUser(playerid);
 
 									if (user != null) {
 										user.Player.ApplyEffectOnAttribute("Hitpoints", affect["Value"].AsDouble);
@@ -478,7 +477,7 @@ namespace Rooms {
 										message.Room = String.Format(affect["DescriptionOthers"].AsString, user.Player.FirstName,
 															user.Player.Gender.ToString() == "Male" ? "his" : "her");
 										message.InstigatorID = user.Player.ID;
-										message.InstigatorType = user.Player.IsNPC ? Message.ObjectType.Npc : Message.ObjectType.Player;
+										message.InstigatorType = user.Player.IsNPC ? ObjectType.Npc : ObjectType.Player;
 										room.InformPlayersInRoom(message, new List<string>() { user.UserID });
 									}
 								}
@@ -502,8 +501,8 @@ namespace Rooms {
             return affects;
         }
 
-        public static List<RoomModifier> GetModifiers(string roomId) {
-            List<RoomModifier> roomModifierList = new List<RoomModifier>();
+        public static List<IRoomModifier> GetModifiers(string roomId) {
+            List<IRoomModifier> roomModifierList = new List<IRoomModifier>();
 
             BsonDocument roomFound = MongoUtils.MongoData.GetCollection("Rooms", GetZoneCode(roomId)).FindOneAs<BsonDocument>(Query.EQ("_id", roomId));
             BsonArray modifiers = roomFound["Modifiers"].AsBsonArray;
@@ -514,7 +513,7 @@ namespace Rooms {
                 IMongoQuery modifierQuery = Query.EQ("_id", mod["id"]);
                 BsonDocument modifier = modifierCollection.FindOneAs<BsonDocument>(modifierQuery);
                 if (modifier != null) { //just in case you never know what stupid thing a builder might have done
-                    RoomModifier roomMod = new RoomModifier();
+                    IRoomModifier roomMod = new RoomModifier();
                     roomMod.TimeInterval = modifier["Timer"].AsInt32;
 
                     //get the hints for the modifier
@@ -543,7 +542,7 @@ namespace Rooms {
             return roomModifierList;
         }
 
-        public static Room GetRoom(string roomID) {
+        public static IRoom GetRoom(string roomID) {
             Room room = null;
 
             MongoCollection roomCollection = MongoUtils.MongoData.GetCollection("Rooms", GetZoneCode(roomID));
@@ -559,8 +558,8 @@ namespace Rooms {
             return room;
         }
 
-        private static List<Triggers.ITrigger> LoadTriggers(BsonArray triggers) {
-            List<Triggers.ITrigger> triggerList = new List<Triggers.ITrigger>();
+        private static List<ITrigger> LoadTriggers(BsonArray triggers) {
+            List<ITrigger> triggerList = new List<ITrigger>();
             if (triggers != null) {
                 foreach (BsonDocument doc in triggers) {
                    Triggers.GeneralTrigger triggerToAdd = new Triggers.GeneralTrigger(doc, global::Triggers.TriggerType.Room);

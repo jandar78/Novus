@@ -9,11 +9,12 @@ using MongoDB.Bson;
 using Extensions;
 using MongoDB.Bson.Serialization;
 using Triggers;
+using Interfaces;
 
 namespace Items {
    public class ItemFactory {
 
-        public static Iitem CreateItem(ObjectId id){
+        public static IItem CreateItem(ObjectId id){
             BsonDocument tempItem = null;
 
             if (id != null) { //id got passed in so we are looking for a specific edible item
@@ -21,7 +22,7 @@ namespace Items {
                 tempItem = itemCollection.FindOneAs<BsonDocument>(Query.EQ("_id", id));
             }
 
-            Iitem result = null;
+            IItem result = null;
             try {
                 result = BsonSerializer.Deserialize<Items>(tempItem);
 
@@ -41,7 +42,7 @@ namespace Items {
        /// <param name="result"></param>
        /// <param name="tempItem"></param>
        /// <returns></returns>
-        private static Iitem AddTriggersToItem(Iitem result, BsonDocument tempItem) {
+        private static IItem AddTriggersToItem(IItem result, BsonDocument tempItem) {
             //This method could probably just return an ITriggers List instead
             result.ItemTriggers = new List<ITrigger>();
           //  result.SpeechTriggers = new List<ITrigger>();
@@ -66,7 +67,7 @@ namespace Items {
         /// </summary>
         /// <param name="result"></param>
         /// <param name="trigger"></param>
-        private static void SubscribeToCorrectEvent(Iitem result, ItemTrigger trigger) {
+        private static void SubscribeToCorrectEvent(IItem result, ItemTrigger trigger) {
 			if (trigger.TriggerOn.Count > 0) {
 				foreach (var on in trigger.TriggerOn) {
 					switch (on.ToUpper()) {

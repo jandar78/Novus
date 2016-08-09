@@ -6,9 +6,10 @@ using System.Threading.Tasks;
 using MongoDB.Bson;
 using MongoDB.Driver;
 using ClientHandling;
+using Interfaces;
 
 namespace Items {
-    public sealed partial class Items : Iitem, Iweapon, Iedible, Icontainer, Iiluminate, Iclothing, Ikey {
+    public sealed partial class Items : IItem, IWeapon, IEdible, IContainer, IIluminate, IClothing, IKey {
        
         public bool isLit {
             get;
@@ -57,8 +58,8 @@ namespace Items {
             set;
         }
 
-        public Message Ignite() {
-            Message msg = new Message();
+        public IMessage Ignite() {
+            IMessage msg = new ClientHandling.Message();
             if (!isLit) {
                 //TODO: get these messages from the DB based on fuel source or type
                 msg.Self = "You turn on " + Name + " and can now see in the dark.";
@@ -74,8 +75,8 @@ namespace Items {
             return msg;
         }
 
-        public Message Extinguish() {
-			Message msg = new Message();
+        public IMessage Extinguish() {
+			IMessage msg = new ClientHandling.Message();
             if (isLit) {
                 //TODO: get these messages from the DB based on fuel source or type
                 msg.Self = "You turn off " + Name + " and can no longer see in the dark.";
@@ -93,12 +94,12 @@ namespace Items {
 
 		
         public void Drain() {
-			Message msg = new Message();
+			IMessage msg = new ClientHandling.Message();
 			msg.InstigatorID = this.Id.ToString();
-			msg.InstigatorType = Message.ObjectType.Item;
+			msg.InstigatorType = ObjectType.Item;
 
             currentCharge -= chargeDecayRate;
-            User.User temp = MySockets.Server.GetAUser(this.Owner);
+            IUser temp = MySockets.Server.GetAUser(this.Owner);
             if ((Math.Round(currentCharge/maxCharge,2) * 100) == chargeLowWarning){
                 //TODO: these message should be grabbed from the DB and should reflect the type of light it is
                 if (temp != null) {
