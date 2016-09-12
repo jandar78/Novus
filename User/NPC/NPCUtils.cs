@@ -8,7 +8,6 @@ using MongoDB.Bson;
 using MongoDB.Driver;
 using MongoDB.Driver.Builders;
 using Extensions;
-using CharacterEnums;
 using Interfaces;
 
 namespace Character {
@@ -40,7 +39,7 @@ namespace Character {
 				LoadNPCs();
 				//loop through each NPC and call the Update() method
 				foreach (string id in _npcList) {
-					IActor actor = CharacterFactory.Factory.CreateCharacter(CharacterType.NPC);
+					IActor actor = Factories.Factory.CreateCharacter(CharacterType.NPC);
 					actor.Load(id);
 					INpc npc = actor as INpc;
 					if (DateTime.Now.ToUniversalTime() > npc.NextAiAction) {
@@ -58,21 +57,19 @@ namespace Character {
 		//this creates a new type of NPC as long as it hasn't hit the max world amount permissible
 		public static IActor CreateNPC(int MobTypeID, string state = null) {
 			MongoUtils.MongoData.ConnectToDatabase();
-			MongoDatabase character = MongoUtils.MongoData.GetDatabase("World");
-			MongoCollection npcCollection = character.GetCollection("NPCs");
-			IMongoQuery query = Query.EQ("_id", MobTypeID);
-			BsonDocument doc = npcCollection.FindOneAs<BsonDocument>(query);
+			var npcCollection = MongoUtils.MongoData.GetCollection<BsonDocument>("World", "NPCs");
+            var npcMobs = MongoUtils.MongoData.RetrieveObjectAsync<BsonDocument>(npcCollection, n => n["MobTypeID"] == MobTypeID).Result;
 
 			IActor actor = null;
 
-			if (doc["Current"].AsInt32 < doc["Max"].AsInt32) {
-				actor = CharacterFactory.Factory.CreateNPCCharacter(MobTypeID);
+			if (npcMobs["Current"].AsInt32 < npcMobs["Max"].AsInt32) {
+				actor = Factories.Factory.CreateNPCCharacter(MobTypeID).Result;
 				INpc npc = actor as INpc;
 				if (state != null) {//give it a starting state, so it can be something other than Wander
 					npc.Fsm.state = npc.Fsm.GetStateFromName(state.CamelCaseWord());
 				}
-				doc["Current"] = doc["Current"].AsInt32 + 1;
-				npcCollection.Save(doc);
+				npcMobs["Current"] = npcMobs["Current"].AsInt32 + 1;
+				var saveResult = MongoUtils.MongoData.SaveAsync<BsonDocument>(npcCollection, n => n["MobTypeId"] == MobTypeID, npcMobs).Result;
 			}
 
 			return actor;
@@ -81,7 +78,7 @@ namespace Character {
 		public void RegenerateAttributes() {
 			if (_npcList != null) {
 				foreach (string id in _npcList) {
-					IActor actor = CharacterFactory.Factory.CreateCharacter(CharacterType.NPC);
+					IActor actor = Factories.Factory.CreateCharacter(CharacterType.NPC);
 					actor.Load(id);
 					foreach (KeyValuePair<string, IAttributes> attrib in actor.GetAttributes()) {
 						actor.ApplyRegen(attrib.Key);
@@ -94,7 +91,7 @@ namespace Character {
 		public void CleanupBonuses() {
 			if (_npcList != null) {
 				foreach (string id in _npcList) {
-					IActor actor = CharacterFactory.Factory.CreateCharacter(CharacterType.NPC);
+					IActor actor = Factories.Factory.CreateCharacter(CharacterType.NPC);
 					actor.Load(id);
 					actor.CleanupBonuses();
 					actor.Save();
@@ -103,53 +100,44 @@ namespace Character {
 		}
 
 		private void GetNPCList() {
-			MongoUtils.MongoData.ConnectToDatabase();
-			MongoDatabase character = MongoUtils.MongoData.GetDatabase("Characters");
-			MongoCollection npcCollection = character.GetCollection("NPCCharacters");
-
+			var npcCollection = MongoUtils.MongoData.GetCollection<NPC>("Characters", "NPCCharacters");
 
 			if (!_npcList.IsEmpty) {
 				_npcList = new ConcurrentBag<string>(); //new it up to clear it
 			}
 
-
-			foreach (BsonDocument id in npcCollection.FindAllAs<BsonDocument>()) {
-				_npcList.Add(id["_id"].AsObjectId.ToString());
+            
+            foreach (var npc in MongoUtils.MongoData.FindAll<NPC>(npcCollection).Result) {
+				_npcList.Add(npc.ID);
 			}
 		}
 
 		public static List<IActor> GetAnNPCByName(string name, string location = null) {
 			List<IActor> npcList = null;
-			MongoUtils.MongoData.ConnectToDatabase();
-			MongoDatabase character = MongoUtils.MongoData.GetDatabase("Characters");
-			MongoCollection npcCollection = character.GetCollection("NPCCharacters");
-			IMongoQuery query;
-			if (string.IsNullOrEmpty(location)) {
-				query = Query.EQ("FirstName", name.CamelCaseWord());
-			}
-			else {
-				query = Query.And(Query.EQ("FirstName", name.CamelCaseWord()), Query.EQ("Location", location));
-			}
+            IEnumerable<NPC> results;
+			var npcCollection = MongoUtils.MongoData.GetCollection<NPC>("Charcaters", "NPCCharacters");
+            if (!string.IsNullOrEmpty(location)) {
+                results = MongoUtils.MongoData.RetrieveObjectsAsync<NPC>(npcCollection, n => n.FirstName == name.CamelCaseWord() && n.Location == location).Result;
+            }
+            else {
+                results = MongoUtils.MongoData.RetrieveObjectsAsync<NPC>(npcCollection, n => n.FirstName == name.CamelCaseWord()).Result;
+            }
 
-			var results = npcCollection.FindAs<BsonDocument>(query);
-
-			if (results != null) {
+			if (results.Count() > 0) {
 				npcList = new List<IActor>();
-				foreach (BsonDocument found in results) {
-					IActor npc = CharacterFactory.Factory.CreateCharacter(CharacterType.NPC);
-					npc.Load(found["_id"].AsObjectId.ToString());
-					npcList.Add(npc);
+				foreach (var found in results) {
+					npcList.Add(found);
 				}
 			}
 
 			return npcList;
 		}
 
-		public static User.User GetUserAsNPCFromList(List<string> id) {
+		public static IUser GetUserAsNPCFromList(List<string> id) {
 			if (id.Count > 0) {
-				User.User result = new User.User();
+				IUser result = new Sockets.User();
 				result.Player = GetAnNPCByID(id[0]);
-				result.CurrentState = User.User.UserState.TALKING;
+				result.CurrentState = UserState.TALKING;
 				return result;
 			}
 
@@ -161,36 +149,26 @@ namespace Character {
 				return null;
 			}
 
-			MongoUtils.MongoData.ConnectToDatabase();
-			MongoDatabase character = MongoUtils.MongoData.GetDatabase("Characters");
-			MongoCollection npcCollection = character.GetCollection("NPCCharacters");
-			IMongoQuery query = Query.EQ("_id", ObjectId.Parse(id));
+			var npcCollection = MongoUtils.MongoData.GetCollection<NPC>("Characters", "NPCCharacters");
+			var result = MongoUtils.MongoData.RetrieveObjectAsync<NPC>(npcCollection, n => n.ID == id).Result;
+			
+			//if (results != null) {
+			//	npc = CharacterFactory.Factory.CreateCharacter(CharacterType.NPC);
+			//	npc.Load(results["_id"].AsObjectId.ToString());
+			//}
 
-			BsonDocument results = npcCollection.FindOneAs<BsonDocument>(query);
-			Iactor npc = null;
-
-			if (results != null) {
-				npc = CharacterFactory.Factory.CreateCharacter(CharacterType.NPC);
-				npc.Load(results["_id"].AsObjectId.ToString());
-			}
-
-			return npc;
+			return result;
 		}
 
-		public static void AlertOtherMobs(int location, int mobType, string id) {
-			MongoUtils.MongoData.ConnectToDatabase();
-			MongoDatabase db = MongoUtils.MongoData.GetDatabase("Characters");
-			MongoCollection collection = db.GetCollection("NPCCharacters");
+		public async static void AlertOtherMobs(string location, int mobType, string id) {
+			var collection = MongoUtils.MongoData.GetCollection<NPC>("Characters", "NPCCharacters");
+			var results = MongoUtils.MongoData.RetrieveObjectsAsync<NPC>(collection, n => n.Location == location && n.MobTypeID == mobType).Result;
 
-			IMongoQuery query = Query.And(Query.EQ("Location", location), Query.EQ("MobtypeID", mobType));
-
-			var results = collection.FindAs<BsonDocument>(query);
-
-			foreach (BsonDocument npc in results) {
-				npc["CurrentTarget"] = id;
-				npc["AiState"] = AI.Combat.GetState().ToString();
-				npc["NextAiAction"] = DateTime.Now.ToUniversalTime();
-				collection.Save(npc);
+			foreach (var npc in results) {
+				npc.CurrentTarget = id;
+				npc.Fsm.ChangeState(AI.Combat.GetState(), npc);
+				npc.NextAiAction = DateTime.Now.ToUniversalTime();
+				await MongoUtils.MongoData.SaveAsync<NPC>(collection, n => n.ID == npc.ID, npc);
 			}
 		}
 	}

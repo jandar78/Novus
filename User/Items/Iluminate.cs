@@ -5,8 +5,8 @@ using System.Text;
 using System.Threading.Tasks;
 using MongoDB.Bson;
 using MongoDB.Driver;
-using ClientHandling;
 using Interfaces;
+using Rooms;
 
 namespace Items {
     public sealed partial class Items : IItem, IWeapon, IEdible, IContainer, IIluminate, IClothing, IKey {
@@ -59,7 +59,7 @@ namespace Items {
         }
 
         public IMessage Ignite() {
-            IMessage msg = new ClientHandling.Message();
+            IMessage msg = new Message();
             if (!isLit) {
                 //TODO: get these messages from the DB based on fuel source or type
                 msg.Self = "You turn on " + Name + " and can now see in the dark.";
@@ -76,7 +76,7 @@ namespace Items {
         }
 
         public IMessage Extinguish() {
-			IMessage msg = new ClientHandling.Message();
+			IMessage msg = new Message();
             if (isLit) {
                 //TODO: get these messages from the DB based on fuel source or type
                 msg.Self = "You turn off " + Name + " and can no longer see in the dark.";
@@ -94,12 +94,12 @@ namespace Items {
 
 		
         public void Drain() {
-			IMessage msg = new ClientHandling.Message();
+			IMessage msg = new Message();
 			msg.InstigatorID = this.Id.ToString();
 			msg.InstigatorType = ObjectType.Item;
 
             currentCharge -= chargeDecayRate;
-            IUser temp = MySockets.Server.GetAUser(this.Owner);
+            IUser temp = Sockets.Server.GetAUser(this.Owner);
             if ((Math.Round(currentCharge/maxCharge,2) * 100) == chargeLowWarning){
                 //TODO: these message should be grabbed from the DB and should reflect the type of light it is
                 if (temp != null) {
@@ -128,7 +128,7 @@ namespace Items {
 				temp.MessageHandler(msg.Self);
 			}
 
-			Rooms.Room.GetRoom(temp.Player.Location).InformPlayersInRoom(msg, new List<string>() { temp.UserID });
+			Room.GetRoom(temp.Player.Location).InformPlayersInRoom(msg, new List<string>() { temp.UserID });
 			
             OnDrained(new ItemEventArgs(ItemEvent.DRAIN, this.Id));
             temp.Player.Inventory.GetInventoryAsItemList(); //this will force an update on the inventory items 

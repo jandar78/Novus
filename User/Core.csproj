@@ -7,8 +7,8 @@
     <ProjectGuid>{ECA43097-56B3-45C9-93C2-C6ADA9F0D8A4}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>User</RootNamespace>
-    <AssemblyName>User</AssemblyName>
+    <RootNamespace>Core</RootNamespace>
+    <AssemblyName>Core</AssemblyName>
     <TargetFrameworkVersion>v4.5.2</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <TargetFrameworkProfile />
@@ -22,6 +22,7 @@
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
     <UseVSHostingProcess>true</UseVSHostingProcess>
+    <PlatformTarget>x86</PlatformTarget>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>pdbonly</DebugType>
@@ -78,9 +79,6 @@
     </Reference>
     <Reference Include="Common.Logging">
       <HintPath>..\packages\Common.Logging.2.1.2\lib\net40\Common.Logging.dll</HintPath>
-    </Reference>
-    <Reference Include="DynamicUtilities">
-      <HintPath>..\DynamicUtilities\bin\Debug\DynamicUtilities.dll</HintPath>
     </Reference>
     <Reference Include="lua51">
       <HintPath>..\packages\VikingErik.LuaInterface.1.0.4213.34901\lib\net35\lua51.dll</HintPath>
@@ -157,56 +155,70 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Calendar\Calendar.cs" />
-    <Compile Include="Character\IActor.cs" />
-    <Compile Include="Character\Attribute.cs" />
-    <Compile Include="Character\Bonuses.cs" />
-    <Compile Include="Character\Character.cs" />
-    <Compile Include="Character\CharacterEnums.cs" />
-    <Compile Include="Character\CharacterFactory.cs" />
-    <Compile Include="Character\Inventory.cs" />
-    <Compile Include="Character\Equipment.cs" />
-    <Compile Include="Character\IAttribute.cs" />
+    <Compile Include="Classes\AI\AI.cs" />
+    <Compile Include="Classes\AI\MessageParser.cs" />
+    <Compile Include="Classes\AI\QuestHandler.cs" />
+    <Compile Include="Classes\AI\States.cs" />
+    <Compile Include="Classes\AI\TreeNode.cs" />
+    <Compile Include="Classes\Character\Character.cs" />
+    <Compile Include="Classes\Mapper\ClassMapper.cs" />
+    <Compile Include="Classes\Common\Attribute.cs" />
+    <Compile Include="Classes\Common\Bonuses.cs" />
+    <Compile Include="Classes\Common\CharacterFactory.cs" />
+    <Compile Include="Classes\Common\Equipment.cs" />
+    <Compile Include="Classes\Common\Inventory.cs" />
+    <Compile Include="Classes\Groups\Group.cs" />
+    <Compile Include="Classes\Groups\Groups.cs" />
+    <Compile Include="Classes\NPC\NPC.cs" />
+    <Compile Include="Classes\Sockets\Client.cs" />
+    <Compile Include="Classes\Sockets\Server.cs" />
+    <Compile Include="Classes\User\User.cs" />
     <Compile Include="Commands\Groups.cs" />
     <Compile Include="Commands\Items.cs" />
     <Compile Include="Commands\MessageParser.cs" />
     <Compile Include="Commands\Skill.cs" />
-    <Compile Include="Groups\Group.cs" />
-    <Compile Include="Groups\Groups.cs" />
+    <Compile Include="Interfaces\IActor.cs" />
+    <Compile Include="Interfaces\IAttribute.cs" />
+    <Compile Include="Interfaces\IClothing.cs" />
+    <Compile Include="Interfaces\IContainer.cs" />
+    <Compile Include="Interfaces\IEdible.cs" />
+    <Compile Include="Interfaces\IEquipment.cs" />
+    <Compile Include="Interfaces\IExit.cs" />
+    <Compile Include="Interfaces\IFsm.cs" />
+    <Compile Include="Interfaces\IIluminate.cs" />
+    <Compile Include="Interfaces\IInventory.cs" />
+    <Compile Include="Interfaces\IItem.cs" />
+    <Compile Include="Interfaces\IKey.cs" />
+    <Compile Include="Interfaces\IMessage.cs" />
+    <Compile Include="Interfaces\IMessageBuffer.cs" />
+    <Compile Include="Interfaces\INpc.cs" />
+    <Compile Include="Interfaces\IQuest.cs" />
+    <Compile Include="Interfaces\IRoom.cs" />
+    <Compile Include="Interfaces\IScript.cs" />
+    <Compile Include="Interfaces\IStatBonuses.cs" />
+    <Compile Include="Interfaces\IState.cs" />
+    <Compile Include="Interfaces\ITrigger.cs" />
+    <Compile Include="Interfaces\IUser.cs" />
+    <Compile Include="Interfaces\IWeapon.cs" />
     <Compile Include="Items\Beverage.cs" />
     <Compile Include="Items\Clothing.cs" />
     <Compile Include="Items\Container.cs" />
-    <Compile Include="Items\IClothing.cs" />
     <Compile Include="Items\Edible.cs" />
-    <Compile Include="Items\IContainer.cs" />
-    <Compile Include="Items\IEdible.cs" />
-    <Compile Include="Items\IIluminate.cs" />
-    <Compile Include="Items\IItem.cs" />
-    <Compile Include="Items\IKey.cs" />
     <Compile Include="Items\Iluminate.cs" />
     <Compile Include="Items\ItemFactory.cs" />
-    <Compile Include="Items\Iweapon.cs" />
     <Compile Include="Items\Key.cs" />
     <Compile Include="Items\Weapons.cs" />
-    <Compile Include="MessageHandling\Message.cs" />
-    <Compile Include="NPC\INpc.cs" />
-    <Compile Include="NPC\MessageParser.cs" />
     <Compile Include="NPC\NPCUtils.cs" />
-    <Compile Include="NPC\QuestHandler.cs" />
-    <Compile Include="NPC\States.cs" />
-    <Compile Include="NPC\AI.cs" />
-    <Compile Include="NPC\NPC.cs" />
-    <Compile Include="NPC\TreeNode.cs" />
-    <Compile Include="Quests\IQuest.cs" />
     <Compile Include="Quests\Quest.cs" />
-    <Compile Include="Rooms\IRoom.cs" />
+    <Compile Include="Rooms\Exits.cs" />
+    <Compile Include="Rooms\Room.cs" />
+    <Compile Include="Rooms\RoomModifier.cs" />
     <Compile Include="Triggers\IScript.cs" />
-    <Compile Include="Triggers\ITrigger.cs" />
     <Compile Include="Triggers\Script.cs" />
     <Compile Include="Triggers\ScriptFactory.cs" />
     <Compile Include="Triggers\ScriptMethods.cs" />
     <Compile Include="Triggers\Trigger.cs" />
     <Compile Include="Triggers\TriggerEventArgs.cs" />
-    <Compile Include="Utils.cs" />
     <Compile Include="Commands\CommandList.cs" />
     <Compile Include="Commands\Combat.cs" />
     <Compile Include="Commands\PlayerInformation.cs" />
@@ -215,35 +227,31 @@
     <Compile Include="Commands\Movement.cs" />
     <Compile Include="Commands\Parser.cs" />
     <Compile Include="Items\Items.cs" />
-    <Compile Include="MessageHandling\Incoming.cs" />
-    <Compile Include="MessageHandling\OutGoing.cs" />
-    <Compile Include="Rooms\Enumerations.cs" />
-    <Compile Include="Rooms\Exits.cs" />
-    <Compile Include="Rooms\Room.cs" />
-    <Compile Include="Rooms\RoomModifier.cs" />
-    <Compile Include="Sockets\Client.cs" />
-    <Compile Include="Sockets\Server.cs" />
     <Compile Include="Timer.cs" />
-    <Compile Include="User\User.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\Interfaces\Interfaces.csproj">
-      <Project>{2de36f1e-82c8-4004-bd8d-2861e9cdeada}</Project>
-      <Name>Interfaces</Name>
-    </ProjectReference>
     <ProjectReference Include="..\Logger\Logger.csproj">
       <Project>{9f4433d9-c6e6-4734-a70d-e19b0ebc7139}</Project>
       <Name>Logger</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\Messages\Messages.csproj">
+      <Project>{6b9ffaa7-8b43-4f13-87c4-cef9b6e95c3f}</Project>
+      <Name>Messages</Name>
     </ProjectReference>
     <ProjectReference Include="..\MongoWrapper\MongoWrapper.csproj">
       <Project>{4b12be0d-5ae3-4c79-b6e7-7dddd2c5a4ba}</Project>
       <Name>MongoWrapper</Name>
     </ProjectReference>
+    <ProjectReference Include="..\Utils\Utils.csproj">
+      <Project>{ea6f1d8a-1702-4ff4-a9aa-20ea80cc395e}</Project>
+      <Name>Utils</Name>
+    </ProjectReference>
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
   </ItemGroup>
+  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.

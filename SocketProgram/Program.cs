@@ -8,7 +8,7 @@ namespace SocketProgram {
 	class Program {
 		static void Main(string[] args) {
 			StringBuilder sb = new StringBuilder();
-			MySockets.Client client = new MySockets.Client("127.0.0.1", 1301);
+			Sockets.Client client = new Sockets.Client("127.0.0.1", 1301);
 			Console.Title = "IP: " + client.IPAddress.ToString() + "   Port: " + client.Port + "   Status : " + (client.Connected == true ? "CONNECTED" : "DISCONNECTED");
 
 			while (true) {

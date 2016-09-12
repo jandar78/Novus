@@ -3,35 +3,30 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using Rooms;
-using User;
 using MongoDB.Driver;
 using MongoDB.Bson;
 using MongoDB.Driver.Builders;
 using Extensions;
-using ClientHandling;
 using Interfaces;
+using Sockets;
+using Rooms;
 
 namespace Commands {
 	public partial class CommandParser {
 		
-		public static void Move(User.User player, List<string> commands) {
-			IMessage message = new ClientHandling.Message();
+		public static void Move(IUser player, List<string> commands) {
+			IMessage message = new Message();
 			message.InstigatorID = player.UserID;
      		message.InstigatorType = player.Player.IsNPC ? ObjectType.Npc : ObjectType.Player;
-			
-
 
 			if (!player.Player.InCombat) {
 
                 bool foundExit = false;
                 string direction = commands[1].ToLower();
 				RoomExits directionToGo = RoomExits.None;
-                MongoUtils.MongoData.ConnectToDatabase();
-                MongoDatabase worldDB = MongoUtils.MongoData.GetDatabase("Commands");
-                MongoCollection roomCollection = worldDB.GetCollection("General"); //this is where general command messages are stored
+                var roomCollection = MongoUtils.MongoData.GetCollection<BsonDocument>("Commands", "General"); //this is where general command messages are stored
 
-                IRoom room = Rooms.Room.GetRoom(player.Player.Location);
+                IRoom room = Room.GetRoom(player.Player.Location);
                 room.GetRoomExits();
 
                 if (direction.ToUpper() == RoomExits.North.ToString().ToUpper()) directionToGo = RoomExits.North;
@@ -41,7 +36,7 @@ namespace Commands {
                 else if (direction.ToUpper() == RoomExits.Up.ToString().ToUpper()) directionToGo = RoomExits.Up;
                 else if (direction.ToUpper() == RoomExits.Down.ToString().ToUpper()) directionToGo = RoomExits.Down;
 
-				foreach (Exits exit in room.RoomExits) {
+				foreach (var exit in room.RoomExits) {
                     if (exit.availableExits.ContainsKey(directionToGo)) {
 
                         //is there a door blocking the exit?
@@ -55,8 +50,7 @@ namespace Commands {
 							player.Player.Location = exit.availableExits[directionToGo].Id;
 							player.Player.Save();
 
-							IMongoQuery query = Query.EQ("_id", "Leaves");
-							BsonDocument leave = roomCollection.FindOneAs<BsonDocument>(query);
+                            var leave = MongoUtils.MongoData.RetrieveObject<BsonDocument>(roomCollection, r => r["_id"] == "Leaves");
 
 							//so we don't sound retarded when making the output string
 							if (directionToGo == RoomExits.Up) {
@@ -83,7 +77,7 @@ namespace Commands {
 							//when sneaking the skill displays the leave/arrive message
 							if (player.Player.ActionState != CharacterActionState.Sneaking) {
 								message.Room = String.Format(leave["ShowOthers"].AsString, who, direction);
-								Rooms.Room.GetRoom(player.Player.LastLocation).InformPlayersInRoom(message, new List<string>() { player.UserID });
+								Room.GetRoom(player.Player.LastLocation).InformPlayersInRoom(message, new List<string>() { player.UserID });
 							}
 
 							//now we reverse the direction
@@ -100,9 +94,8 @@ namespace Commands {
 							else
 								directionToGo = RoomExits.East;
 
-							query = Query.EQ("_id", "Arrives");
-							BsonDocument arrive = roomCollection.FindOneAs<BsonDocument>(query);
-							room = Rooms.Room.GetRoom(player.Player.Location); //need to get the new room player moved into
+							var arrive = MongoUtils.MongoData.RetrieveObject<BsonDocument>(roomCollection, r => r["_id"] == "Arrives");
+                            room = Room.GetRoom(player.Player.Location); //need to get the new room player moved into
 
 							if (room.IsDark) {
 								who = "Someone";
@@ -138,14 +131,11 @@ namespace Commands {
 						}
 						else {//uh-oh there's a door and it's closed
 							foundExit = true; //we did find an exit it just happens to be blocked by a door
-							IMongoQuery query = Query.EQ("_id", "NoExit");
-							BsonDocument noExit = roomCollection.FindOneAs<BsonDocument>(query);
+							var noExit = MongoUtils.MongoData.RetrieveObject<BsonDocument>(roomCollection, r => r["_id"] == "NoExit");
 							message.Self = noExit["ShowSelf"].AsString;
-							query = Query.EQ("_id", "Blocked");
-							noExit = roomCollection.FindOneAs<BsonDocument>(query);
+							noExit = MongoUtils.MongoData.RetrieveObject<BsonDocument>(roomCollection, r => r["_id"] == "Blocked"); 
 							message.Self += " " + noExit["ShowSelf"];
-							query = Query.EQ("_id", "ClosedDoor");
-							noExit = roomCollection.FindOneAs<BsonDocument>(query);
+							noExit = MongoUtils.MongoData.RetrieveObject<BsonDocument>(roomCollection, r => r["_id"] == "ClosedDoor");
 							message.Self = message.Self.Remove(message.Self.Length - 1); //get rid of previous line period
 							message.Self += " because " + String.Format(noExit["ShowSelf"].AsString.ToLower(), exit.doors[directionToGo].Description.ToLower());
 
@@ -157,8 +147,7 @@ namespace Commands {
                     }
                 }
 				if (!foundExit) {
-					IMongoQuery query = Query.EQ("_id", "NoExit");
-					BsonDocument noExit = roomCollection.FindOneAs<BsonDocument>(query);
+					var noExit = MongoUtils.MongoData.RetrieveObject<BsonDocument>(roomCollection, r => r["_id"] == "NoExit");
 					message.Self = noExit["ShowSelf"].AsString + "\r\n";
 
 				}
@@ -175,7 +164,7 @@ namespace Commands {
 			else {
 				player.MessageHandler(message.Self);
 			}
-			Rooms.Room.GetRoom(player.Player.Location).InformPlayersInRoom(message, new List<string>() { player.UserID });
+			Room.GetRoom(player.Player.Location).InformPlayersInRoom(message, new List<string>() { player.UserID });
 		}
 
 		#region Open things
@@ -210,10 +199,10 @@ namespace Commands {
             OpenContainer(player, commands);
 		}
 
-        private static void OpenContainer(IUser player, List<string> commands) {
+        private async static void OpenContainer(IUser player, List<string> commands) {
 			//this is a quick work around for knowing which container to open without implementing the dot operator
 			//I need to come back and make it work like with NPCS once I've tested everything works correctly
-			IMessage message = new ClientHandling.Message();
+			IMessage message = new Message();
 			message.InstigatorID = player.UserID;
 			message.InstigatorType = player.Player.IsNPC == false ? ObjectType.Player : ObjectType.Npc;
 
@@ -236,10 +225,10 @@ namespace Commands {
             }
             
             int index = 1;
-            IRoom room = Rooms.Room.GetRoom(location);
+            IRoom room = Room.GetRoom(location);
             if (!string.IsNullOrEmpty(location)) {//player didn't specify it was in his inventory check room first
                 foreach (string itemID in room.GetObjectsInRoom(RoomObjects.Items)) {
-                    IItem inventoryItem = Items.Items.GetByID(itemID);
+                    IItem inventoryItem = await Items.Items.GetByID(itemID);
                     inventoryItem = KeepOpening(itemNameToGet, inventoryItem, itemPosition);
 
                     if (string.Equals(inventoryItem.Name, itemNameToGet, StringComparison.InvariantCultureIgnoreCase)) {
@@ -295,7 +284,7 @@ namespace Commands {
 
             if (item.ItemType.ContainsKey(ItemsType.CONTAINER) && container.Contents.Count > 0) {
                 foreach (string innerID in container.GetContents()) {
-                    IItem innerItem = Items.Items.GetByID(innerID);
+                    IItem innerItem = Items.Items.GetByID(innerID).Result;
                     if (innerItem != null && KeepOpening(itemName, innerItem, itemPosition, itemIndex).Name.Contains(itemName)) {
                         if (itemIndex == itemPosition) {
                             return innerItem;
@@ -316,10 +305,10 @@ namespace Commands {
         }
 
 		private static void OpenDoor(IUser player, IDoor door) {
-			IMessage message = new ClientHandling.Message();
+			IMessage message = new Message();
 			message.InstigatorID = player.UserID;
 			message.InstigatorType = player.Player.IsNPC == false ? ObjectType.Player : ObjectType.Npc;
-			IRoom room = Rooms.Room.GetRoom(player.Player.Location);
+			IRoom room = Room.GetRoom(player.Player.Location);
 
 			if (!player.Player.InCombat) {
                 if (!room.IsDark) {
@@ -376,8 +365,8 @@ namespace Commands {
            
 		}
 
-        private static void CloseContainer(IUser player, List<string> commands) {
-			IMessage message = new ClientHandling.Message();
+        private async static void CloseContainer(IUser player, List<string> commands) {
+			IMessage message = new Message();
 			message.InstigatorID = player.UserID;
 			message.InstigatorType = player.Player.IsNPC == false ? ObjectType.Player : ObjectType.Npc;
 			string location;
@@ -392,7 +381,7 @@ namespace Commands {
             string itemNameToGet = Items.Items.ParseItemName(commands);
             bool itemFound = false;
 
-            IRoom room = Rooms.Room.GetRoom(player.Player.Location);
+            IRoom room = Room.GetRoom(player.Player.Location);
 
             int itemPosition = 1;
             string[] position = commands[commands.Count - 1].Split('.'); //we are separating based on using the decimal operator after the name of the npc/item
@@ -408,7 +397,7 @@ namespace Commands {
 
             if (!string.IsNullOrEmpty(location)) {//player didn't specify it was in his inventory check room first
                 foreach (string itemID in room.GetObjectsInRoom(RoomObjects.Items)) {
-                    IItem roomItem = Items.Items.GetByID(itemID);
+                    IItem roomItem = await Items.Items.GetByID(itemID);
                     if (string.Equals(roomItem.Name, itemNameToGet, StringComparison.InvariantCultureIgnoreCase)) {
                         if (index == itemPosition) {
                             IContainer container = roomItem as IContainer;
@@ -464,8 +453,8 @@ namespace Commands {
         }
 
         private static void CloseDoor(IUser player, IDoor door) {
-			IMessage message = new ClientHandling.Message();
-			IRoom room = Rooms.Room.GetRoom(player.Player.Location);
+			IMessage message = new Message();
+			IRoom room = Room.GetRoom(player.Player.Location);
 			message.InstigatorID = player.UserID;
 			message.InstigatorType = player.Player.IsNPC == false ? ObjectType.Player : ObjectType.Npc;
 
@@ -536,8 +525,8 @@ namespace Commands {
         }
 
 		private static void LockDoor(IUser player, IDoor door) {
-			IRoom room = Rooms.Room.GetRoom(player.Player.Location);
-			IMessage message = new ClientHandling.Message();
+			IRoom room = Room.GetRoom(player.Player.Location);
+			IMessage message = new Message();
 			message.InstigatorID = player.UserID;
 			message.InstigatorType = player.Player.IsNPC == false ? ObjectType.Player : ObjectType.Npc;
 
@@ -607,12 +596,12 @@ namespace Commands {
 		}
 
 		private static void UnlockDoor(IUser player, IDoor door) {
-			IMessage message = new ClientHandling.Message();
+			IMessage message = new Message();
 			message.InstigatorID = player.UserID;
 			message.InstigatorType = player.Player.IsNPC == false ? ObjectType.Player : ObjectType.Npc;
 
             if (!player.Player.InCombat) {
-                IRoom room = Rooms.Room.GetRoom(player.Player.Location);
+                IRoom room = Room.GetRoom(player.Player.Location);
                 bool hasKey = false;
                 if (!room.IsDark) {
                     if (door.Lockable) {
@@ -677,7 +666,7 @@ namespace Commands {
         }
 
        private static void Prone(IUser player, List<string> commands) {
-			IMessage message = new ClientHandling.Message();
+			IMessage message = new Message();
 			message.InstigatorID = player.UserID;
 			message.InstigatorType = player.Player.IsNPC == false ? ObjectType.Player : ObjectType.Npc;
 
@@ -701,20 +690,20 @@ namespace Commands {
 			else {
 				player.MessageHandler(message.Self);
 			}
-			Rooms.Room.GetRoom(player.Player.Location).InformPlayersInRoom(message, new List<string>() { player.UserID });
+			Room.GetRoom(player.Player.Location).InformPlayersInRoom(message, new List<string>() { player.UserID });
 		}
 
 		//this should replace any current methods that change a players stance like Stand() and Prone() we just need to add the messages to the DB
 		//and we should then be able to get rid of them.
 		//***** This has not been tested!! ******
 		private static void ChangeStance(IUser player, List<string> commands) {
-			IMessage message = new ClientHandling.Message();
+			IMessage message = new Message();
 			message.InstigatorID = player.UserID;
 			message.InstigatorType = player.Player.IsNPC == false ? ObjectType.Player : ObjectType.Npc;
 
-			var stances = MongoUtils.MongoData.GetCollection("Charcaters", "Stances");
+			var stances = MongoUtils.MongoData.GetCollection<BsonDocument>("Charcaters", "Stances");
 			IMongoQuery query = Query.EQ("_id", commands[0].Replace(" ", "_"));
-			var stanceMessages = stances.FindOneAs<BsonDocument>(query);
+            var stanceMessages = MongoUtils.MongoData.RetrieveObjectAsync<BsonDocument>(stances, s => s["_id"] == commands[0].Replace(" ", "_")).Result;
 
 			CharacterStanceState newStance = (CharacterStanceState)Enum.Parse(typeof(CharacterStanceState), commands[1].Replace(" ","_"));
 			if (player.Player.StanceState != newStance && (player.Player.ActionState == CharacterActionState.None
@@ -737,11 +726,11 @@ namespace Commands {
 			else {
 				player.MessageHandler(message.Self);
 			}
-			Rooms.Room.GetRoom(player.Player.Location).InformPlayersInRoom(message, new List<string>() { player.UserID });
+			Room.GetRoom(player.Player.Location).InformPlayersInRoom(message, new List<string>() { player.UserID });
 		}
 
 		private static void Stand(IUser player, List<string> commands) {
-			IMessage message = new ClientHandling.Message();
+			IMessage message = new Message();
 			message.InstigatorID = player.UserID;
 			message.InstigatorType = player.Player.IsNPC == false ? ObjectType.Player : ObjectType.Npc;
 
@@ -767,11 +756,11 @@ namespace Commands {
 				player.MessageHandler(message.Self);
 			}
 
-			Rooms.Room.GetRoom(player.Player.Location).InformPlayersInRoom(message, new List<string>() { player.UserID });
+			Room.GetRoom(player.Player.Location).InformPlayersInRoom(message, new List<string>() { player.UserID });
 		}
 
 		private static void Sit(IUser player, List<string> commands) {
-			IMessage message = new ClientHandling.Message();
+			IMessage message = new Message();
 			message.InstigatorID = player.UserID;
 			message.InstigatorType = player.Player.IsNPC == false ? ObjectType.Player : ObjectType.Npc;
 
@@ -795,7 +784,7 @@ namespace Commands {
 			else {
 				player.MessageHandler(message.Self);
 			}
-			Rooms.Room.GetRoom(player.Player.Location).InformPlayersInRoom(message, new List<string>(){ player.UserID });
+			Room.GetRoom(player.Player.Location).InformPlayersInRoom(message, new List<string>(){ player.UserID });
 		}
 
         
@@ -820,7 +809,7 @@ namespace Commands {
 				if (i + 1 < commands.Count) objectName += " ";
 			}
 
-            IRoom room = Rooms.Room.GetRoom(location);
+            IRoom room = Room.GetRoom(location);
 			RoomExits directionToGo = RoomExits.None;
 
 			//let's see if the player provided a direction first
@@ -841,17 +830,10 @@ namespace Commands {
 			else if (possibleDirection.ToUpper().Contains("BELOW"))
                 directionToGo = RoomExits.Down;
 
-			//if (possibleDirection.ToUpper().Contains("NORTH")) possibleDirection = "North";
-			//else if (possibleDirection.ToUpper().Contains("SOUTH")) possibleDirection = "South";
-			//else if (possibleDirection.ToUpper().Contains("EAST")) possibleDirection = "East";
-			//else if (possibleDirection.ToUpper().Contains("WEST")) possibleDirection = "West";
-			//else if (possibleDirection.ToUpper().Contains("UP") || possibleDirection.ToUpper().Contains("ABOVE")) possibleDirection = "Up";
-			//else if (possibleDirection.ToUpper().Contains("DOWN") || possibleDirection.ToUpper().Contains("BELOW")) possibleDirection = "Down";
-
 			IDoor door = null;
 			//get the exit based on the direction, if we find an exit then we can start looking for a door
             room.GetRoomExits();
-			List<IExit> exits = room.RoomExits;
+			var exits = room.RoomExits;
 			IExit exit = exits.Where(e => e.availableExits.ContainsKey(directionToGo)).SingleOrDefault();
 
 			//let's see if we find one based on a direction

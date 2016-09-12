@@ -7,7 +7,6 @@ using Triggers;
 using MongoDB.Bson;
 using MongoDB.Bson.Serialization;
 using MongoDB.Driver.Builders;
-using ClientHandling;
 using Interfaces;
 
 namespace Quests {
@@ -57,6 +56,7 @@ namespace Quests {
 			}
 		}
         
+        public string Id { get; set; }
         public string QuestID {
             get;
             set;
@@ -78,11 +78,13 @@ namespace Quests {
 			}
 		}
 
+        public Quest() { }
+
         public Quest(string questID, Dictionary<string, int> playerSteps) {
 			AutoProcessPlayer = new Queue<string>();
 			QuestID = questID;
 			CurrentPlayerStep = playerSteps;
-            LoadQuestSteps();
+          //  LoadQuestSteps();
 			
         }
 
@@ -102,29 +104,28 @@ namespace Quests {
 			get; set;
 		}
         
-        private void LoadQuestSteps() {
-            BsonDocument doc = MongoUtils.MongoData.GetCollection("Quests", "QuestProgress")
-                                   .FindOneAs<BsonDocument>(Query.EQ("_id", QuestID));
+   //     private void LoadQuestSteps() {
+   //         var quest = MongoUtils.MongoData.RetrieveObject<Quest>(MongoUtils.MongoData.GetCollection<Quest>("Quests", "QuestProgress"), q => q.QuestID == QuestID);
+            
+			//if (quest != null) {
+			//	//AllowOutOfOrder = doc["AllowOutOfOrder"].AsBoolean;
+			//	//IsUnique = doc["IsUnique"].AsBoolean;
+			//	int stepNumber = 0;
+			//	foreach (BsonDocument stepDoc in doc["Steps"].AsBsonArray) {
+			//		QuestStep temp = new QuestStep();
+			//		temp = new QuestStep();
+			//		temp.QuestID = QuestID;
+			//		temp.AppliesToNPC = stepDoc["AppliesToNPC"].AsBoolean;
+			//		temp.IfPreviousCompleted = stepDoc["OnlyIfPreviousCompleted"].AsBoolean;
+			//		temp.Trigger = new Triggers.QuestTrigger((stepDoc["Trigger"].AsBsonDocument));
+			//		temp.Step = stepNumber;
+			//		temp.AutoProcess = stepDoc["AutoProcess"].AsBoolean;
+			//		QuestSteps.Add(temp);
 
-			if (doc != null) {
-				AllowOutOfOrder = doc["AllowOutOfOrder"].AsBoolean;
-				IsUnique = doc["IsUnique"].AsBoolean;
-				int stepNumber = 0;
-				foreach (BsonDocument stepDoc in doc["Steps"].AsBsonArray) {
-					QuestStep temp = new QuestStep();
-					temp = new QuestStep();
-					temp.QuestID = QuestID;
-					temp.AppliesToNPC = stepDoc["AppliesToNPC"].AsBoolean;
-					temp.IfPreviousCompleted = stepDoc["OnlyIfPreviousCompleted"].AsBoolean;
-					temp.Trigger = new Triggers.QuestTrigger((stepDoc["Trigger"].AsBsonDocument));
-					temp.Step = stepNumber;
-					temp.AutoProcess = stepDoc["AutoProcess"].AsBoolean;
-					QuestSteps.Add(temp);
-
-					stepNumber++;
-				}
-			}
-        }
+			//		stepNumber++;
+			//	}
+			//}
+   //     }
 
         public int AddPlayerToQuest(string playerID, int stepNumber) {
 			foreach (QuestStep step in QuestSteps.Where(s => s.Step > stepNumber)) {
@@ -146,7 +147,7 @@ namespace Quests {
 		public void AutoProcessQuestStep(IActor npc) {
 			string id = AutoProcessPlayer.Dequeue();
 
-			IUser player = MySockets.Server.GetAUser(id);
+			IUser player = Sockets.Server.GetAUser(id);
 
 			if (player == null) {
 				player = Character.NPCUtils.GetUserAsNPCFromList(new List<string> { id });
@@ -176,7 +177,7 @@ namespace Quests {
 				foreach (ITrigger trigger in parser.TriggersToExecute) {
 					if (trigger.AutoProcess && currentStep == step.Step) {
 						AutoProcessPlayer.Enqueue(message.InstigatorID);
-						((Character.NPC)npc).Fsm.ChangeState(AI.Questing.GetState(), npc as Character.NPC);
+						((NPC)npc).Fsm.ChangeState(AI.Questing.GetState(), npc as NPC);
 						currentStep = AddPlayerToQuest(message.InstigatorID, currentStep);
 						break;
 					}

@@ -8,6 +8,7 @@ using MongoDB.Driver;
 using MongoDB.Bson;
 using MongoDB.Driver.Builders;
 using Extensions;
+using Interfaces;
 
 namespace Scripts
 {
@@ -21,12 +22,12 @@ namespace Scripts
 			 return loginScript ?? (loginScript = new Login());
 		 }
 
-		 public void AddUserToScript(User.User user){
+		 public void AddUserToScript(IUser user){
 			 usersLoggingIn.Add(new UserScript(user));
 		 }
 
-		 public User.User.UserState InsertResponse(string response, string userId) {
-			 User.User.UserState state = User.User.UserState.LOGGING_IN; 
+		 public UserState InsertResponse(string response, string userId) {
+			 UserState state =UserState.LOGGING_IN; 
 			 
 			 UserScript specificUser = usersLoggingIn.Where(u => u.user.UserID == userId).SingleOrDefault();
 			 
@@ -58,7 +59,7 @@ namespace Scripts
 						 break;
                      case Steps.CREATECHAR:
                          if (String.Compare(response[0].ToString(), "y", true) == 0) {
-                             state = User.User.UserState.CREATING_CHARACTER;
+                             state =UserState.CREATING_CHARACTER;
                              usersLoggingIn.Remove(specificUser);
                          }
                          else {
@@ -96,17 +97,17 @@ namespace Scripts
 						 break;
 					 case Steps.SUCCEEDED:
 						 //let's see if they are connecting back to a limbo character first and set things right
-						 User.User user = new User.User();
-						 user = MySockets.Server.GetAUserPlusState(specificUser.user.UserID, User.User.UserState.LIMBO);
+						 IUser user = new Sockets.User();
+						 user = Sockets.Server.GetAUserPlusState(specificUser.user.UserID, UserState.LIMBO);
 						 if (user != null) {
-							 MySockets.Server.UpdateUserSocket(specificUser.user.UserID);
+							 Sockets.Server.UpdateUserSocket(specificUser.user.UserID);
 							 specificUser.user = user; 
 						 }
 						 else {
                              specificUser.user.Player.Load(specificUser.user.Player.ID);
 						 }
 						 message = "Welcome " + specificUser.user.Player.FirstName + " " + specificUser.user.Player.LastName + "!";
-						 specificUser.user.CurrentState = User.User.UserState.TALKING;
+						 specificUser.user.CurrentState = UserState.TALKING;
 						 specificUser.user.InBuffer = "look\r\n";
 						 usersLoggingIn.Remove(specificUser);
 						 break;
@@ -131,11 +132,7 @@ namespace Scripts
 		 }
 
 		 private bool ValidatePlayerPassword(string userID, string response) {
-			 MongoUtils.MongoData.ConnectToDatabase();
-			 MongoDatabase characterDB = MongoUtils.MongoData.GetDatabase("Characters");
-			 MongoCollection characterCollection = characterDB.GetCollection("PlayerCharacter");
-			 IMongoQuery query = Query.And(Query.EQ("_id", ObjectId.Parse(userID) ), Query.EQ("Password", response));
-			 BsonDocument found = characterCollection.FindOneAs<BsonDocument>(query);
+			 var found = MongoUtils.MongoData.RetrieveObjectAsync<Character.Character>(MongoUtils.MongoData.GetCollection<Character.Character>("Characters", "PlayerCharacter"), c => c.ID == userID && c.Password == response).Result;
 			 if (found != null) {
 				 return true;
 			 }
@@ -143,33 +140,29 @@ namespace Scripts
 			 return false;
 		 }
 
-		 private bool ValidatePlayerName(string userID, string response) {
-			 string[] names = response.Split(' ');
-			 if (names.Count() != 2) {
-				 return false;
-			 }
+        private bool ValidatePlayerName(string userID, string response) {
+            string[] names = response.Split(' ');
+            if (names.Count() != 2) {
+                return false;
+            }
 
-			 MongoUtils.MongoData.ConnectToDatabase();
-			 MongoDatabase characterDB = MongoUtils.MongoData.GetDatabase("Characters");
-			 MongoCollection characterCollection = characterDB.GetCollection("PlayerCharacter");
-			 IMongoQuery query = Query.And(Query.EQ("FirstName", names[0].ToLower()), Query.EQ("LastName", names[1].ToLower()));
-			 BsonDocument found = characterCollection.FindOneAs<BsonDocument>(query);
-			
-		    if (found != null) {
-				 //set the id to the ID of the one we found in the database for the PlayerCharacter to match up on the Password
-				 usersLoggingIn.Where(u => u.user.UserID == userID).SingleOrDefault().user.UserID = found["_id"].AsObjectId.ToString();
-				 userID = found["_id"].AsObjectId.ToString();
-				 usersLoggingIn.Where(u => u.user.UserID == userID).SingleOrDefault().user.Player.ID = userID;
+            var found = MongoUtils.MongoData.RetrieveObjectAsync<Character.Character>(MongoUtils.MongoData.GetCollection<Character.Character>("Characters", "PlayerCharcater"), c => c.FirstName.ToLower() == names[0].ToLower() && c.LastName.ToLower() == names[1].ToLower()).Result;
 
-				 //this should prevent a single character from logging in more than once while that character is actively playing
-				 if ((usersLoggingIn.Where(u => u.user.UserID == userID).SingleOrDefault().user.CurrentState != User.User.UserState.TALKING &&
-					 usersLoggingIn.Where(u => u.user.UserID == userID).SingleOrDefault().user.CurrentState != User.User.UserState.JUST_CONNECTED &&
-					 usersLoggingIn.Where(u => u.user.UserID == userID).SingleOrDefault().user.CurrentState != User.User.UserState.CREATING_CHARACTER)){
-					 return true;
-				 }
-			 }
-			 return false;
-		 }
+            if (found != null) {
+                //set the id to the ID of the one we found in the database for the PlayerCharacter to match up on the Password
+                usersLoggingIn.Where(u => u.user.UserID == userID).SingleOrDefault().user.UserID = found.ID;
+                userID = found.ID;
+                usersLoggingIn.Where(u => u.user.UserID == userID).SingleOrDefault().user.Player.ID = userID;
+
+                //this should prevent a single character from logging in more than once while that character is actively playing
+                if ((usersLoggingIn.Where(u => u.user.UserID == userID).SingleOrDefault().user.CurrentState != UserState.TALKING &&
+                    usersLoggingIn.Where(u => u.user.UserID == userID).SingleOrDefault().user.CurrentState != UserState.JUST_CONNECTED &&
+                    usersLoggingIn.Where(u => u.user.UserID == userID).SingleOrDefault().user.CurrentState != UserState.CREATING_CHARACTER)) {
+                    return true;
+                }
+            }
+            return false;
+        }
 
          private string SplashScreen() {
              string splash = @"        Welcome to                                                  
@@ -203,11 +196,11 @@ namespace Scripts
    internal enum Steps { NAME, PASSWORD, AWAITINGRESPONSE, SUCCEEDED, CREATECHAR, SPLASH, NONE };
 
 	internal class UserScript{
-		public User.User user = null;
+		public IUser user = null;
 		public Steps currentStep;
 		public Steps lastStep;
 
-		public UserScript(User.User user) {
+		public UserScript(IUser user) {
 			this.user = user;
 			currentStep = Steps.SPLASH;
 			lastStep = Steps.NONE;

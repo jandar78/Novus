@@ -12,8 +12,8 @@ namespace Triggers {
 	public class ScriptFactory {
 		public static IScript GetScript(string scriptID, string scriptCollection){
 			IScript script = null;
-			MongoCollection collection = MongoUtils.MongoData.GetCollection("Scripts", scriptCollection);
-            BsonDocument doc = collection.FindOneAs<BsonDocument>(Query.EQ("_id", scriptID));
+			var collection = MongoUtils.MongoData.GetCollection<BsonDocument>("Scripts", scriptCollection);
+            var doc = MongoUtils.MongoData.RetrieveObjectAsync<BsonDocument>(collection, s => s["_id"] == scriptID).Result;
             
             script = GetScript((byte[])doc["Bytes"].AsBsonBinaryData, (ScriptTypes)Enum.Parse(typeof(ScriptTypes), doc["Type"].ToString()));
 			return script;
@@ -47,6 +47,21 @@ namespace Triggers {
             return script;
         }
 
+        public static IScript CreateScript(ScriptTypes type) {
+            IScript newScript;
+
+            switch (type) {
+                case ScriptTypes.Roslyn:
+                    newScript = new RoslynScript();
+                    break;
+                case ScriptTypes.Lua:
+                default:
+                    newScript = new LuaScript();
+                    break;
+            }
+
+            return newScript;
+        }
 
       //  public enum ScriptTypes { Lua, Roslyn, None };
 

@@ -15,28 +15,31 @@ using Triggers;
 using Interfaces;
 
 namespace Rooms {
+
     public class Exits : IExit {
 
         public Dictionary<RoomExits, IRoom> availableExits { get; set; }
-		public Dictionary<RoomExits, IDoor> doors { get; set; }
+        public Dictionary<RoomExits, IDoor> doors { get; set; }
 
-		public bool HasDoor {
-			get {
-				return doors.Count > 0;
-			}
-		}
+        public bool HasDoor {
+            get {
+                return doors.Count > 0;
+            }
+        }
 
-		public string Description { get; set; }
+        public string Description { get; set; }
+        public string Direction { get; set; }
+        public string Name { get; set; }
+        public string LeadsToRoom { get; set; }
 
-		public string Direction { get; set; }
+        public Exits() {
+            availableExits = new Dictionary<RoomExits, IRoom>();
+            doors = new Dictionary<RoomExits, IDoor>();
+        }
+    }
 
-		public Exits() {
-			availableExits = new Dictionary<RoomExits, IRoom>();
-			doors = new Dictionary<RoomExits, IDoor>();
-		}
-	}
 
-	public class Door : IDoor {
+    public class Door : IDoor {
 		#region Public Properties
 		public string Id { get; set; }
 
@@ -107,19 +110,16 @@ namespace Rooms {
 		public Door() { }
 
 		public static IDoor GetDoor(string doorID, string doorID2 = "") {
-			Door door = null;
+			var doorCollection = MongoUtils.MongoData.GetCollection<Door>("World", "Doors");
+			var doorDocument = MongoUtils.MongoData.RetrieveObject<Door>(doorCollection, d => d.Id == doorID || d.Id == doorID2);
 
-			MongoCollection roomCollection = MongoUtils.MongoData.GetCollection("World", "Doors");
-			IMongoQuery doorQuery = Query.Or(Query.EQ("_id", doorID), Query.EQ("_id", doorID2));
-			BsonDocument roomDocument = roomCollection.FindOneAs<BsonDocument>(doorQuery);
-
-			if (roomDocument != null) {
-				door = BsonSerializer.Deserialize<Door>(roomDocument);
-				if (door.Listener)
-					door.LoadTriggers();
+			if (doorDocument != null) {
+                if (doorDocument.Listener) {
+                    doorDocument.LoadTriggers();
+                }
 			}
 
-			return door;
+			return doorDocument;
 		}
 
 		public void LoadTriggers() {
@@ -128,16 +128,18 @@ namespace Rooms {
                 _exitTriggers = new List<ITrigger>();
             }
 
-			foreach (BsonDocument doc in Triggers) {
-				Triggers.GeneralTrigger trigger = new Triggers.GeneralTrigger(doc, TriggerType.Door);
-				trigger.script.AddVariable(this, "door");
-				if (trigger.script.ScriptType == ScriptTypes.Lua) {
-					LuaScript luaScript = trigger.script as LuaScript;
-					luaScript.RegisterMarkedMethodsOf(new DoorHelpers());
+            if (Triggers != null) {
+                foreach (BsonDocument doc in Triggers) {
+                    Triggers.GeneralTrigger trigger = new Triggers.GeneralTrigger(doc, TriggerType.Door);
+                    trigger.script.AddVariable(this, "door");
+                    if (trigger.script.ScriptType == ScriptTypes.Lua) {
+                        LuaScript luaScript = trigger.script as LuaScript;
+                        luaScript.RegisterMarkedMethodsOf(new DoorHelpers());
 
-				}
-				_exitTriggers.Add(trigger);
-			}
+                    }
+                    _exitTriggers.Add(trigger);
+                }
+            }
 		}
 
 		public List<string> ApplyDamage(double damage) {
@@ -157,28 +159,25 @@ namespace Rooms {
 			return message;
 		}
 
-		public BsonDocument GetDoorFromDB() {
-			MongoCollection doorCollection = GetDoorCollection();
-
-			IMongoQuery query = Query.EQ("_id", this.Id);
-
-			return doorCollection.FindOneAs<BsonDocument>(query);
+		public IDoor GetDoorFromDB() {
+			var doorCollection = GetDoorCollection();
+            return MongoUtils.MongoData.RetrieveObjectAsync<IDoor>(doorCollection, d => d.Id == this.Id).Result;
 		}
 
-		public MongoCollection GetDoorCollection() {
-			return MongoUtils.MongoData.GetCollection("World", "Doors");
+		public IMongoCollection<IDoor> GetDoorCollection() {
+			return MongoUtils.MongoData.GetCollection<IDoor>("World", "Doors");
 		}
 
-		public void UpdateDoorStatus() {
-			BsonDocument door = GetDoorFromDB();
+		public async void UpdateDoorStatus() {
+			var door = GetDoorFromDB() as Rooms.Door;
 
 			//these are the only things that players can change
-			door["Open"] = this.Open;
-			door["Locked"] = this.Locked;
-			door["Hitpoints"] = this.Hitpoints;
-			door["Destroyed"] = this.Destroyed;
+			door.Open = this.Open;
+			door.Locked = this.Locked;
+			door.Hitpoints = this.Hitpoints;
+			door.Destroyed = this.Destroyed;
 
-			GetDoorCollection().Save(door, WriteConcern.Acknowledged);
+			await MongoUtils.MongoData.SaveAsync<IDoor>(GetDoorCollection(), d => d.Id == door.Id, door);
 		}
 
 		public string CheckPhrase(string message) {

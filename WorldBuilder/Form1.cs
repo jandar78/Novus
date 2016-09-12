@@ -19,8 +19,8 @@ namespace WorldBuilder {
     public partial class Form1 : Form {
         private ItemsType ItemType { get; set; }
         private BsonArray _wieldAffects;
-        private List<BsonDocument> _itemList;
-        private BsonArray _itemTriggers;
+        private List<IItem> _itemList;
+        private List<ITrigger> _itemTriggers;
         private bool ConnectedToDB { get; set; }
 
         public Form1() {
@@ -31,10 +31,12 @@ namespace WorldBuilder {
             this.attackEffectsTarget.Enabled = false;
             this.idValue.ReadOnly = true;
             _wieldAffects = new BsonArray();
-            _itemList = new List<BsonDocument>();
-            _itemTriggers = new BsonArray();
+            _itemList = new List<IItem>();
+            _itemTriggers = new List<ITrigger>();
             tabControl1.Enabled = false;
             ScriptError = true;
+
+            MongoUtils.ClassMapper.RegisterMappings();
 
             CheckConnectionStatus();
         }

@@ -70,13 +70,13 @@ namespace MudTime
             //Every 5 seconds
 			Character.NPCUtils.GetInstance().CleanupBonuses(); //NPCs
 
-			foreach (User.User user in MySockets.Server.GetCurrentUserList()) { //Players
+			foreach (var user in Sockets.Server.GetCurrentUserList()) { //Players
                 user.Player.CleanupBonuses();
             }
 
 			if (playerTicks % 10 == 0) {
-				foreach (User.User user in MySockets.Server.GetCurrentUserList()) {
-					foreach (KeyValuePair<string, Character.Attribute> attrib in user.Player.GetAttributes()) {
+				foreach (var user in Sockets.Server.GetCurrentUserList()) {
+					foreach (var attrib in user.Player.GetAttributes()) {
 						user.Player.ApplyRegen(attrib.Key);
 					}
 				}
@@ -89,17 +89,17 @@ namespace MudTime
 
 		private static void weatherTimerTick(uint ticks, EventArgs e) {
             //pick an area in which to change the weather
-                        
-            List<string> zones = MongoUtils.MongoData.GetDatabase("Rooms").GetCollectionNames().ToList();
+
+            var zones = MongoUtils.MongoData.GetCollections("Rooms").Result;
             int numberOfZones = Extensions.RandomNumber.GetRandomNumber().NextNumber(0, zones.Count);
 
             List<string> zonesToAffect = new List<string>();
 
             //Randomly pick zones that can be affected by the weather.  Eventually the weather gets to choose what zones it affects, this way rain/snow/fog won't happen in a desert area.
             for (int i = 0; i < numberOfZones; i++) {
-                string zoneToAdd = zones[Extensions.RandomNumber.GetRandomNumber().NextNumber(0, zones.Count)];
+                string zoneToAdd = zones[Extensions.RandomNumber.GetRandomNumber().NextNumber(0, zones.Count)]["Name"].AsString;
                 while (!zonesToAffect.Contains(zoneToAdd)) {
-                    zoneToAdd = zones[Extensions.RandomNumber.GetRandomNumber().NextNumber(0, zones.Count)];
+                    zoneToAdd = zones[Extensions.RandomNumber.GetRandomNumber().NextNumber(0, zones.Count)]["Name"].AsString;
                 }
 
                 zonesToAffect.Add(zoneToAdd);

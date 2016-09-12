@@ -12,6 +12,7 @@ using System.Reflection;
 using System.Collections;
 using Roslyn.Compilers;
 using Roslyn.Scripting.CSharp;
+using Interfaces;
 
 namespace Triggers {
 
@@ -55,6 +56,9 @@ namespace Triggers {
 			get {
 				return ScriptTypes.Roslyn;
 			}
+            set {
+                _scriptType = value;
+            }
 		}
 
         public RoslynScript() { }
@@ -64,11 +68,10 @@ namespace Triggers {
         /// <param name="scriptID"></param>
         /// <param name="registerMethods"></param>
         public RoslynScript(string scriptID, string scriptCollection, bool registerMethods = true) {
-            MongoCollection collection = MongoUtils.MongoData.GetCollection("Scripts", scriptCollection);
-            BsonDocument doc = collection.FindOneAs<BsonDocument>(Query.EQ("_id", scriptID));
-            if (doc != null && doc["Bytes"].AsBsonBinaryData != null) {
-                ScriptByteArray = (byte[])doc["Bytes"].AsBsonBinaryData;
-				if (registerMethods) {
+            var retrievedScript = MongoUtils.MongoData.RetrieveObject<Script>("Scripts", scriptCollection, s => s.ID == scriptID);
+            if (retrievedScript != null) {
+                ScriptByteArray = retrievedScript.ScriptByteArray;
+                if (registerMethods) {
 					RegisterMethods();
 				}
             }
@@ -91,10 +94,10 @@ namespace Triggers {
 						 typeof (IEnumerable<>).Assembly,
 						 typeof (IQueryable).Assembly,
 						 typeof (ScriptMethods).Assembly,
-						 typeof(Character.Iactor).Assembly,
+						 typeof(IActor).Assembly,
 						 typeof(Character.Character).Assembly,
-						 typeof(Character.NPC).Assembly,
-						 typeof(ClientHandling.Message).Assembly,
+						 typeof(NPC).Assembly,
+						 typeof(Message).Assembly,
 						 GetType().Assembly
 					}.ToList().ForEach(asm => Engine.AddReference(asm));
 
@@ -173,7 +176,10 @@ namespace Triggers {
 			get {
 				return ScriptTypes.Lua;
 			}
-		}
+            set {
+                _scriptType = value;
+            }
+        }
 
         public LuaScript() { }
         /// <summary>
@@ -182,10 +188,9 @@ namespace Triggers {
         /// <param name="scriptID"></param>
         /// <param name="registerMethods"></param>
         public LuaScript(string scriptID, string scriptCollection, bool registerMethods = true) {
-            MongoCollection collection = MongoUtils.MongoData.GetCollection("Scripts", scriptCollection);
-            BsonDocument doc = collection.FindOneAs<BsonDocument>(Query.EQ("_id", scriptID));
-            if (doc != null && doc["Bytes"].AsBsonBinaryData != null) {
-                ScriptByteArray = (byte[])doc["Bytes"].AsBsonBinaryData;
+            var retrievedScript = MongoUtils.MongoData.RetrieveObject<Script>("Scripts", scriptCollection, s => s.ID == scriptID);
+            if (retrievedScript != null) { 
+                ScriptByteArray = retrievedScript.ScriptByteArray;
 				if (registerMethods) {
 					Engine.RegisterMarkedMethodsOf(new ScriptMethods());
 				}
@@ -232,7 +237,7 @@ namespace Triggers {
 
 
 	public abstract class Script : IScript {
-		protected MemoryStream _memStream;
+        protected MemoryStream _memStream;
 		protected MemoryStream MemStream {
 			get {
 				if (_memStream == null) {
@@ -245,30 +250,28 @@ namespace Triggers {
 			}
 		}
 
-		public static void SaveScriptToDatabase(string scriptID, string scriptText) {
-			MongoCollection collection = MongoUtils.MongoData.GetCollection("Scripts", "Action");
-			BsonDocument doc = collection.FindOneAs<BsonDocument>(Query.EQ("_id", scriptID));
+        protected ScriptTypes _scriptType;
 
-			BsonBinaryData bytesArray = new BsonBinaryData(ASCIIEncoding.ASCII.GetBytes(scriptText));
+		public static async void SaveScriptToDatabase(string scriptID, string scriptText, ScriptTypes scriptType) {
+			var collection = MongoUtils.MongoData.GetCollection<Script>("Scripts", "Action");
 
-			if (doc == null) {
-				doc.Add("_id", scriptID);
-				doc.Add("Bytes", bytesArray);
-			}
-			else {
-				doc["Bytes"] = bytesArray;
-			}
+            IScript script = MongoUtils.MongoData.RetrieveObjectAsync<Script>(collection, x => x.ID == scriptID).Result;
+           
+            if (script == null) {
+                script = ScriptFactory.CreateScript(scriptType);
+            }
 
-			collection.Save(doc);
+            script.ID = scriptID;
+            script.ScriptByteArray = ASCIIEncoding.ASCII.GetBytes(scriptText);
+
+            await MongoUtils.MongoData.SaveAsync<Script>(collection, s => s.ID == scriptID, script as Script);
 		}
 
 		public static string GetScriptFromDatabase(string scriptID) {
 			string result = null;
-			MongoCollection collection = MongoUtils.MongoData.GetCollection("Scripts", "Action");
-			BsonDocument doc = collection.FindOneAs<BsonDocument>(Query.EQ("_id", scriptID));
-
-			if (doc != null) {
-				result = ASCIIEncoding.ASCII.GetString((byte[])doc["Bytes"].AsBsonBinaryData);
+            var retrievedScript = MongoUtils.MongoData.RetrieveObject<Script>("Scripts", "Actions", s => s.ID == scriptID);
+            if (retrievedScript != null) {
+                result = retrievedScript.MemStreamAsString;
 			}
 
 			return result;
@@ -277,7 +280,7 @@ namespace Triggers {
 
 		//added this because if we just initialize a the memory stream then we have very serious (crashing) issue when saving the items.
 		//the memory stream causes a "timeout not supported by stream" exception.  It wasn't fun to track down or figure out.
-		protected byte[] ScriptByteArray {
+		public byte[] ScriptByteArray {
 			get;
 			set;
 		}
@@ -290,9 +293,14 @@ namespace Triggers {
 
 		public virtual ScriptTypes ScriptType {
 			get {
-				return ScriptTypes.None;
+				return _scriptType;
 			}
+            set {
+                _scriptType = value;
+            }
 		}
+
+        
 
 		protected byte[] MemStreamAsByteArray {
 			get {
@@ -307,6 +315,8 @@ namespace Triggers {
 		public virtual void RunScript() {
 			throw new NotImplementedException();
 		}
+
+        public string ID { get; set; }
 
 		~Script() {
 			if (_memStream != null) {

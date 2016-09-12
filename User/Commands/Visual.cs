@@ -3,17 +3,18 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using Rooms;
-using User;
 using MongoDB.Driver;
 using MongoDB.Bson;
 using MongoDB.Driver.Builders;
 using Extensions;
+using Interfaces;
+using Sockets;
+using Rooms;
 
 namespace Commands {
 	public  partial class CommandParser {
 
-        private static void Examine(User.User player, List<string> commands) {
+        private static void Examine(IUser player, List<string> commands) {
             string message = "";
             bool foundIt = false;
             if (commands.Count > 2) {
@@ -22,8 +23,8 @@ namespace Commands {
                 //rooms should have a list of items that belong to the room (non removable) but which can be interacted with by the player.  For example a loose brick, oven, fridge, closet, etc.
                 //in turn these objects can have items that can be removed from the room I.E. food, clothing, weapons, etc.
 
-                Room room = Room.GetRoom(player.Player.Location);
-                Door door = FindDoor(player.Player.Location, commands);
+                IRoom room = Room.GetRoom(player.Player.Location);
+                IDoor door = FindDoor(player.Player.Location, commands);
 
                 if (door != null) {
                     message = door.Examine;
@@ -57,22 +58,22 @@ namespace Commands {
             player.MessageHandler(message);
         }
 
-        private static string FindAnNpc(List<string> commands, Room room, out bool foundIt) {
+        private static string FindAnNpc(List<string> commands, IRoom room, out bool foundIt) {
             foundIt = false;
             string message = null;
 
-            List<string> npcList = room.GetObjectsInRoom(Room.RoomObjects.Npcs);
+            List<string> npcList = room.GetObjectsInRoom(RoomObjects.Npcs);
 
-            MongoCollection npcCollection = MongoUtils.MongoData.GetCollection("Characters", "NPCCharacters");
+            var npcCollection = MongoUtils.MongoData.GetCollection<NPC>("Characters", "NPCCharacters");
             IMongoQuery query = null;
 
             foreach (string id in npcList) {
                 query = Query.EQ("_id", ObjectId.Parse(id));
-                BsonDocument result = npcCollection.FindOneAs<BsonDocument>(query);
+                var result = MongoUtils.MongoData.RetrieveObject<NPC>(npcCollection, n => n.ID == id);
 
-                string tempName = result["FirstName"].AsString + " " + result["LastName"].AsString;
+                string tempName = result.FirstName + " " + result.LastName;
 
-                if (commands[2].ToLower().Contains(result["FirstName"].AsString.ToLower()) || commands[2].ToLower().Contains(result["LastName"].AsString.ToLower())) {
+                if (commands[2].ToLower().Contains(result.FirstName.ToLower()) || commands[2].ToLower().Contains(result.LastName.ToLower())) {
 
                     string[] position = commands[0].Split('.'); //we are spearating based on using the decimal operator after the name of the npc/item
                     if (position.Count() > 1) {
@@ -80,15 +81,13 @@ namespace Commands {
                         int pos;
                         int.TryParse(position[position.Count() - 1], out pos);
                         if (pos != 0) {
-                            string idToParse = GetObjectInPosition(pos, commands[2], room.Id);
-                            
-                            query = Query.EQ("_id", ObjectId.Parse(idToParse));
-                            result = npcCollection.FindOneAs<BsonDocument>(query);
+                            string idToParse = GetObjectInPosition(pos, commands[2], room.Id);                            
+                            result = MongoUtils.MongoData.RetrieveObject<NPC>(npcCollection, n => n.ID == idToParse);
                         }
                     }
 
                     if (result != null) {
-                        message = result["Description"].AsString;
+                        message = result.Description;
                         foundIt = true;
                         break;
                     }
@@ -98,12 +97,12 @@ namespace Commands {
             return message;
         }
 
-        private static string FindAPlayer(List<string> commands, Room room, out bool foundIt) {
+        private static string FindAPlayer(List<string> commands, IRoom room, out bool foundIt) {
             foundIt = false;
             string message = null;
-            List<string> chars = room.GetObjectsInRoom(Room.RoomObjects.Players);
+            List<string> chars = room.GetObjectsInRoom(RoomObjects.Players);
             foreach (string id in chars) {
-                Character.Character playerChar = MySockets.Server.GetAUser(id).Player as Character.Character;
+                Character.Character playerChar = Server.GetAUser(id).Player as Character.Character;
                 string tempName = playerChar.FirstName + " " + playerChar.LastName;
                 if (commands[2].ToLower().Contains(playerChar.FirstName.ToLower()) || commands[2].ToLower().Contains(playerChar.LastName.ToLower())) {
                     message = playerChar.Examine();
@@ -115,14 +114,14 @@ namespace Commands {
             return message;
         }
 
-        private static string FindAnItem(List<string> commands, User.User player, Room room, out bool foundIt) {
+        private static string FindAnItem(List<string> commands, IUser player, IRoom room, out bool foundIt) {
             foundIt = false;
             string message = null;
 
-            List<string> itemsInRoom = room.GetObjectsInRoom(Room.RoomObjects.Items);
+            List<string> itemsInRoom = room.GetObjectsInRoom(RoomObjects.Items);
    
             foreach (string id in itemsInRoom) {
-                Items.Iitem item = Items.ItemFactory.CreateItem(ObjectId.Parse(id));
+                IItem item = Items.ItemFactory.CreateItem(ObjectId.Parse(id)).Result;
                 if (commands[2].ToLower().Contains(item.Name.ToLower())) {
                     message = item.Examine();
                     foundIt = true;
@@ -131,8 +130,8 @@ namespace Commands {
             }
 
             if (!foundIt) { //not in room check inventory
-                List<Items.Iitem> inventory = player.Player.Inventory.GetInventoryAsItemList();
-                foreach (Items.Iitem item in inventory) {
+                List<IItem> inventory = player.Player.Inventory.GetInventoryAsItemList();
+                foreach (IItem item in inventory) {
                     if (commands[2].ToLower().Contains(item.Name.ToLower())) {
                         message = item.Examine();
                         foundIt = true;
@@ -142,8 +141,8 @@ namespace Commands {
             }
 
             if (!foundIt) { //check equipment
-                Dictionary<Items.Wearable, Items.Iitem> equipment = player.Player.Equipment.GetEquipment();
-                foreach (Items.Iitem item in equipment.Values) {
+                Dictionary<Wearable, IItem> equipment = player.Player.Equipment.GetEquipment();
+                foreach (IItem item in equipment.Values) {
                     if (commands[2].ToLower().Contains(item.Name.ToLower())) {
                         message = item.Examine();
                         foundIt = true;
@@ -155,9 +154,9 @@ namespace Commands {
             return message;
         }
 
-		private static void Look(User.User player, List<string> commands) {
-            List<CharacterEnums.CharacterActionState> NonAllowableStates = new List<CharacterEnums.CharacterActionState> { CharacterEnums.CharacterActionState.Dead,
-                CharacterEnums.CharacterActionState.Rotting, CharacterEnums.CharacterActionState.Sleeping, CharacterEnums.CharacterActionState.Unconcious };
+		private static void Look(IUser player, List<string> commands) {
+            List<CharacterActionState> NonAllowableStates = new List<CharacterActionState> { CharacterActionState.Dead,
+                CharacterActionState.Rotting, CharacterActionState.Sleeping, CharacterActionState.Unconcious };
             
             StringBuilder sb = new StringBuilder();
 
@@ -168,9 +167,9 @@ namespace Commands {
                 }
 
                 //let's build the description the player will see
-                Room room = Room.GetRoom(player.Player.Location);
+                IRoom room = Room.GetRoom(player.Player.Location);
                 room.GetRoomExits();
-                List<Exits> exitList = room.RoomExits;
+                var exitList = room.RoomExits;
                                 
                 sb.AppendLine(("- " + room.Title + " -\t\t\t").FontStyle(Utils.FontStyles.BOLD));
                 //TODO: add a "Descriptive" flag, that we will use to determine if we need to display the room description.  Should be a player level
@@ -179,7 +178,7 @@ namespace Commands {
                 sb.AppendLine(room.Description);
                 sb.Append(HintCheck(player));
                
-                foreach (Exits exit in exitList) {
+                foreach (IExit exit in exitList) {
                     sb.AppendLine(GetExitDescription(exit, room));
                 }
 
@@ -194,7 +193,7 @@ namespace Commands {
             
 		}
 
-        private static string GetExitDescription(Exits exit, Room room) {
+        private static string GetExitDescription(IExit exit, IRoom room) {
             //there's a lot of sentence  
             string[] vowel = new string[] { "a", "e", "i", "o", "u" };
 
@@ -241,11 +240,11 @@ namespace Commands {
             return (directionCorrected + exit.Description + ".");
         }
 
-        private static void LookIn(User.User player, List<string> commands) {
+        private async static void LookIn(IUser player, List<string> commands) {
             commands.RemoveAt(2); //remove "in"
             string itemNameToGet = Items.Items.ParseItemName(commands);
             bool itemFound = false;
-            Room room = Room.GetRoom(player.Player.Location);
+            IRoom room = Room.GetRoom(player.Player.Location);
 
             string location;
             if (string.Equals(commands[commands.Count - 1], "inventory", StringComparison.InvariantCultureIgnoreCase)) {
@@ -266,12 +265,12 @@ namespace Commands {
             int index = 1;
 
             if (!string.IsNullOrEmpty(location)) {//player didn't specify it was in his inventory check room first
-                foreach (string itemID in room.GetObjectsInRoom(Room.RoomObjects.Items)) {
-                    Items.Iitem inventoryItem = Items.Items.GetByID(itemID);
+                foreach (string itemID in room.GetObjectsInRoom(RoomObjects.Items)) {
+                    IItem inventoryItem = await Items.Items.GetByID(itemID);
                     inventoryItem = KeepOpening(itemNameToGet, inventoryItem, itemPosition, index);
 
                     if (inventoryItem.Name.Contains(itemNameToGet)) {
-                        Items.Icontainer container = inventoryItem as Items.Icontainer;
+                        IContainer container = inventoryItem as IContainer;
                         player.MessageHandler(container.LookIn());
                         itemFound = true;
                         break;
@@ -283,12 +282,12 @@ namespace Commands {
 
             if (!itemFound) { //so we didn't find one in the room that matches
                 var playerInventory = player.Player.Inventory.GetInventoryAsItemList();
-                foreach (Items.Iitem inventoryItem in playerInventory) {
+                foreach (IItem inventoryItem in playerInventory) {
                     if (inventoryItem.Name.Contains(itemNameToGet)) {
                         //if player didn't specify an index number loop through all items until we find the first one we want otherwise we will
                         // keep going through each item that matches until we hit the index number
                         if (index == itemPosition) {
-                            Items.Icontainer container = inventoryItem as Items.Icontainer;
+                            IContainer container = inventoryItem as IContainer;
                             player.MessageHandler(container.LookIn());
                             itemFound = true;
                             break;
@@ -301,7 +300,7 @@ namespace Commands {
             }
         }
 
-		private static void DisplayDate(User.User player, List<string> commands) {
+		private static void DisplayDate(IUser player, List<string> commands) {
 			//full, short or whatever combination we feel like allowing the player to grab
 			Dictionary<string, string> dateInfo = Calendar.Calendar.GetDate();
 			string message = "";
@@ -324,7 +323,7 @@ namespace Commands {
 			player.MessageHandler(message);
 		}
 
-		private static void DisplayTime(User.User player, List<string> commands) {
+		private static void DisplayTime(IUser player, List<string> commands) {
 			//full, short or whatever combination we feel like allowing the player to grab
 			BsonDocument time = Calendar.Calendar.GetTime();
 			string message = "";

@@ -6,13 +6,14 @@ using System.Threading.Tasks;
 using System.IO;
 using LuaInterface;
 using System.Reflection;
-using Rooms;
 using Character;
 using Items;
 using Extensions;
 using Commands;
 using System.Collections;
 using NCalc;
+using Interfaces;
+using Rooms;
 
 namespace Triggers {
 	public class ScriptMethods {
@@ -36,12 +37,12 @@ namespace Triggers {
 		[LuaAccessible]
 		public static object GetPlayer(string playerID) {
 			object o = null;
-			o = MySockets.Server.GetAUser(playerID).Player;
+			o = Sockets.Server.GetAUser(playerID).Player;
 			return o;
 		}
 
-		public User.User GetUser(string playerID) {
-			return MySockets.Server.GetAUser(playerID);
+		public IUser GetUser(string playerID) {
+			return Sockets.Server.GetAUser(playerID);
 		}
 
 		[LuaAccessible]
@@ -65,7 +66,7 @@ namespace Triggers {
 					t = typeof(Character.Character);
 					break;
 				case "NPC":
-					t = typeof(Character.NPC);
+					t = typeof(NPC);
 					break;
 				case "NPCUtils":
 					t = typeof(Character.NPCUtils);
@@ -74,10 +75,10 @@ namespace Triggers {
 					t = typeof(Items.Items);
 					break;
 				case "User":
-					t = typeof(User.User);
+					t = typeof(Sockets.User);
 					break;
 				case "Server":
-					t = typeof(MySockets.Server);
+					t = typeof(Sockets.Server);
 					break;
 				case "CommandParser":
 					t = typeof(CommandParser);
@@ -230,7 +231,7 @@ namespace Triggers {
 
 		[LuaAccessible]
 		public static void SendMessage(string playerID, string message) {
-			User.User player = MySockets.Server.GetAUser(playerID);
+			IUser player = Sockets.Server.GetAUser(playerID);
 			player.MessageHandler(message);
 		}
 
@@ -291,7 +292,7 @@ namespace Triggers {
 		}
 
 		[LuaAccessible]
-		public double ParseAndCalculateCheck(Character.Iactor player, string calculation) {
+		public double ParseAndCalculateCheck(IActor player, string calculation) {
 			Expression expression = new Expression(ReplaceStringWithNumber(player, calculation));
 			double result = 0;
 			try {
@@ -326,7 +327,7 @@ namespace Triggers {
 		/// </summary>
 		/// <param name="player"></param>
 		/// <returns></returns>
-		private string ReplaceStringWithNumber(Character.Iactor player, string calculation) {
+		private string ReplaceStringWithNumber(IActor player, string calculation) {
 			//would like to make this a bit more generic so if new attributes are inserted we don't have to change this method
 			//I think easiest way is to have the expression be separated by spaces, but just so it works with anything let's get rid of
 			//any mathematical signs and then we should just have the name of the attributes we want.

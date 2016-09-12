@@ -11,7 +11,6 @@ using Extensions;
 using MongoDB.Bson.Serialization;
 using NCalc;
 using System.Reflection;
-using Rooms;
 using Character;
 using Items;
 using System.Xml;
@@ -19,6 +18,7 @@ using System.Collections;
 using LuaInterface;
 using Triggers;
 using Interfaces;
+using Sockets;
 
 namespace Commands {   
 
@@ -67,7 +67,7 @@ namespace Commands {
             //if they have a target or they passed one in let's add it to the script variables as well
             if (Player.Player.CurrentTarget != null || commands.Count > 3){
                 if (Player.Player.CurrentTarget != null && commands.Count <= 3) { //didn't pass a target because they have one
-                    Target = MySockets.Server.GetAUser(Player.Player.CurrentTarget);
+                    Target = Server.GetAUser(Player.Player.CurrentTarget);
                 }
                 else { //they passed in a target
                     Target = CommandParser.FindTargetByName(commands[2], user.Player.Location);

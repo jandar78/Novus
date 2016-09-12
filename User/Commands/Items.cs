@@ -3,14 +3,13 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using Rooms;
-using User;
 using MongoDB.Driver;
 using MongoDB.Bson;
 using MongoDB.Driver.Builders;
 using Extensions;
-using ClientHandling;
 using Interfaces;
+using Sockets;
+using Rooms;
 
 namespace Commands {
     public partial class CommandParser {
@@ -18,7 +17,7 @@ namespace Commands {
         public static void Drop(IUser player, List<string> commands) {
             //1.get the item name from the command, may have to join all the words after dropping the command
             StringBuilder itemName = new StringBuilder();
-            IRoom room = Rooms.Room.GetRoom(player.Player.Location);
+            IRoom room = Room.GetRoom(player.Player.Location);
 
             string full = commands[0];
             commands.RemoveAt(0);
@@ -40,7 +39,7 @@ namespace Commands {
             IItem item = items[itemPosition - 1];
 
 			//3.have player drop item
-			IMessage message = new ClientHandling.Message();
+			IMessage message = new Message();
 			message.InstigatorID = player.UserID;
 			message.InstigatorType = player.Player.IsNPC == false ? ObjectType.Player : ObjectType.Npc;
 
@@ -70,7 +69,7 @@ namespace Commands {
 		private static void Give(IUser player, List<string> commands) {
 			//get the item name from the command, may have to join all the words after dropping the command
 			StringBuilder itemName = new StringBuilder();
-			IRoom room = Rooms.Room.GetRoom(player.Player.Location);
+			IRoom room = Room.GetRoom(player.Player.Location);
 
 			string[] full = commands[0].Replace("give","").Split(new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
 			
@@ -116,7 +115,7 @@ namespace Commands {
 			//to be a bit more specific about who they are trying to directly speak to.
 			string[] nameBreakDown = toPlayerName.ToLower().Split(' ');
 			foreach (string id in room.GetObjectsInRoom(RoomObjects.Players, 100)) {
-				toPlayerList.Add(MySockets.Server.GetAUser(id));
+				toPlayerList.Add(Server.GetAUser(id));
 			}
 
 			if (toPlayerList.Where(p => p.Player.FirstName.ToLower() == nameBreakDown[0]).Count() > 1) { //let's narrow it down by including a last name (if provided)
@@ -170,7 +169,7 @@ namespace Commands {
 			}
 
 			//have player give item
-			IMessage message = new ClientHandling.Message();
+			IMessage message = new Message();
 
 			if (item != null && toPlayer != null) {
 				message.InstigatorID = player.Player.ID;
@@ -263,7 +262,7 @@ namespace Commands {
         public static void Unequip(IUser player, List<string> commands) {
             StringBuilder itemName = new StringBuilder();
             int itemPosition = 1;
-			IMessage message = new ClientHandling.Message();
+			IMessage message = new Message();
 			message.InstigatorID = player.UserID;
 			message.InstigatorType = player.Player.IsNPC == false ? ObjectType.Player : ObjectType.Npc;
 
@@ -315,13 +314,13 @@ namespace Commands {
 			else {
 				player.MessageHandler(message.Self);
 			}
-			Rooms.Room.GetRoom(player.Player.Location).InformPlayersInRoom(message, new List<string>(){ player.UserID });
+			Room.GetRoom(player.Player.Location).InformPlayersInRoom(message, new List<string>(){ player.UserID });
         }
 
-        public static void Equip(User.User player, List<string> commands) {
+        public static void Equip(IUser player, List<string> commands) {
             StringBuilder itemName = new StringBuilder();
             int itemPosition = 1;
-			IMessage message = new ClientHandling.Message();
+			IMessage message = new Message();
 			message.InstigatorID = player.UserID;
 			message.InstigatorType = player.Player.IsNPC == false ? ObjectType.Player : ObjectType.Npc;
 
@@ -386,10 +385,10 @@ namespace Commands {
 			else {
 				player.MessageHandler(message.Self);
 			}
-			Rooms.Room.GetRoom(player.Player.Location).InformPlayersInRoom(message, new List<string>(){ player.UserID });
+			Room.GetRoom(player.Player.Location).InformPlayersInRoom(message, new List<string>(){ player.UserID });
         }
 
-        public static void Wield(User.User player, List<string> commands) {
+        public static void Wield(IUser player, List<string> commands) {
             StringBuilder itemName = new StringBuilder();
             int itemPosition = 1;
             string[] position = commands[commands.Count - 1].Split('.'); //we are separating based on using the decimal operator after the name of the npc/item
@@ -405,7 +404,7 @@ namespace Commands {
                 itemName.Append(word + " ");
             }
 
-			IMessage message = new ClientHandling.Message();
+			IMessage message = new Message();
 			message.InstigatorID = player.UserID;
 			message.InstigatorType = player.Player.IsNPC == false ? ObjectType.Player : ObjectType.Npc;
 
@@ -446,10 +445,10 @@ namespace Commands {
 				player.MessageHandler(message.Self);
 			}
 
-			Rooms.Room.GetRoom(player.Player.Location).InformPlayersInRoom(message, new List<string>(new string[] { player.UserID }));
+			Room.GetRoom(player.Player.Location).InformPlayersInRoom(message, new List<string>(new string[] { player.UserID }));
 		}
 
-        public static void Eat(User.User player, List<string> commands) {		
+        public static void Eat(IUser player, List<string> commands) {		
             IItem item = GetItem(commands, player.Player.Location.ToString());
             if (item == null) {
                 player.MessageHandler("You don't seem to be carrying that to eat it.");
@@ -465,7 +464,7 @@ namespace Commands {
             
         }
 
-        public static void Drink(User.User player, List<string> commands) {
+        public static void Drink(IUser player, List<string> commands) {
             IItem item = GetItem(commands, player.Player.Location.ToString());
             if (item == null) {
                 player.MessageHandler("You don't seem to be carrying that to drink it.");
@@ -510,7 +509,7 @@ namespace Commands {
 
         private static void Consume(IUser player, List<string> commands, string action, IItem item){
             string upDown = "gain";
-			IMessage message = new ClientHandling.Message();
+			IMessage message = new Message();
                                    
             Dictionary<string, double> affectAttributes = null;
             
@@ -531,12 +530,9 @@ namespace Commands {
             player.Player.Inventory.RemoveInventoryItem(item, player.Player.Equipment);
 
             //item has been consumed so get rid of it from the DB
-            MongoUtils.MongoData.ConnectToDatabase();
-            MongoDatabase db = MongoUtils.MongoData.GetDatabase("World");
-            MongoCollection col = db.GetCollection("Items");
-            col.Remove(Query.EQ("_id", item.Id));
+            MongoUtils.MongoData.GetCollection<Items.Items>("World", "Items").DeleteOneAsync<Items.Items>(i => i.Id == item.Id);
 
-            Rooms.Room.GetRoom(player.Player.Location).InformPlayersInRoom(message, new List<string>{ player.UserID });
+            Room.GetRoom(player.Player.Location).InformPlayersInRoom(message, new List<string>{ player.UserID });
 			if (player.Player.IsNPC) {
 				player.MessageHandler(message);
 			}
@@ -546,7 +542,7 @@ namespace Commands {
 		}
 
         //container commands
-        public static void Put(User.User player, List<string> commands) {
+        public async static void Put(IUser player, List<string> commands) {
             //this command is used only for putting an Item in the root inventory of a player into a bag.  
             //If an item needs to go from a bag to the root inventory level player should use the GET command instead.
 
@@ -596,7 +592,7 @@ namespace Commands {
             }
             else{ //player specified it is in his inventory 
                 foreach (string id in player.Player.Inventory.GetInventoryList()) {
-                   IItem tempContainer = Items.Items.GetByID(id);
+                   IItem tempContainer = await Items.Items.GetByID(id);
                     containerItem = KeepOpening(containerName.CamelCaseString(), tempContainer, containerPosition);
                     if (string.Equals(containerItem.Name, containerName.CamelCaseString(), StringComparison.InvariantCultureIgnoreCase)) {
                         break;
@@ -650,7 +646,7 @@ namespace Commands {
             //using a recursive method we will dig down into each sub container and look for the appropriate item/container
             TraverseItems(player, containerName.ToString().Trim(), itemName.ToString().Trim(), containerPosition, itemPosition, out retrievedItem, out containerItem);
 
-			IMessage message = new ClientHandling.Message();
+			IMessage message = new Message();
 
             if (retrievedItem != null) {
                 IContainer container = containerItem as IContainer;
@@ -675,7 +671,7 @@ namespace Commands {
 				message.Self = "You can't seem to find " + itemName.ToString().Trim().ToLower() + " to grab it.";
             }
 
-            Rooms.Room.GetRoom(player.Player.Location).InformPlayersInRoom(message, new List<string>(){ player.UserID });
+            Room.GetRoom(player.Player.Location).InformPlayersInRoom(message, new List<string>(){ player.UserID });
 			if (player.Player.IsNPC) {
 				player.MessageHandler(message);
 			}
@@ -735,10 +731,10 @@ namespace Commands {
             int itemIndex = 1;
             retrievedItem = null;
             retrievedContainer = null;
-            IRoom room = Rooms.Room.GetRoom(player.Player.Location);
+            IRoom room = Room.GetRoom(player.Player.Location);
             if (!string.IsNullOrEmpty(containerName.CamelCaseString())) {
                 foreach (string itemID in room.GetObjectsInRoom(RoomObjects.Items)) {
-                    IItem inventoryItem = Items.Items.GetByID(itemID);
+                    IItem inventoryItem = Items.Items.GetByID(itemID).Result;
 
                     inventoryItem = KeepOpening(containerName.CamelCaseString(), inventoryItem, containerPosition, containerIndex);
 
@@ -754,7 +750,7 @@ namespace Commands {
                 IContainer container = null;
                 container = retrievedContainer as IContainer;
                 foreach (string itemID in container.GetContents()) {
-                    IItem inventoryItem = Items.Items.GetByID(itemID);
+                    IItem inventoryItem = Items.Items.GetByID(itemID).Result;
 
                     inventoryItem = KeepOpening(itemName.CamelCaseString(), inventoryItem, itemPosition, itemIndex);
 
@@ -766,7 +762,7 @@ namespace Commands {
             }
             else if (string.IsNullOrEmpty(containerName)) {//we are grabbing a container or an item without a specific index
                 foreach (string itemID in room.GetObjectsInRoom(RoomObjects.Items)) {
-                    IItem inventoryItem = Items.Items.GetByID(itemID);
+                    IItem inventoryItem = Items.Items.GetByID(itemID).Result;
 
                     inventoryItem = KeepOpening(itemName.CamelCaseString(), inventoryItem, itemPosition, itemIndex);
 
@@ -778,7 +774,7 @@ namespace Commands {
             }
             else {
                 foreach (string itemID in room.GetObjectsInRoom(RoomObjects.Items)) {
-                    IItem inventoryItem = Items.Items.GetByID(itemID);
+                    IItem inventoryItem = Items.Items.GetByID(itemID).Result;
                                      
                     if (inventoryItem.Name.Contains(itemName.CamelCaseString())) {
                         retrievedItem = inventoryItem;
@@ -801,8 +797,8 @@ namespace Commands {
                     break;
             }
             commands.RemoveRange(0, 2);
-            IMessage message = new ClientHandling.Message();
-			IRoom room = Rooms.Room.GetRoom(player.Player.Location);
+            IMessage message = new Message();
+			IRoom room = Room.GetRoom(player.Player.Location);
 
             
             lightItem = FindLightInEquipment(commands, player, room);
@@ -857,7 +853,7 @@ namespace Commands {
                 }
                 if (lightItem == null) { //not in players equipment let's check the room
                     foreach (string itemId in room.GetObjectsInRoom(RoomObjects.Items)) {
-                        lightItem = Items.Items.GetByID(itemId);
+                        lightItem = Items.Items.GetByID(itemId).Result;
                         IIluminate lightsource = lightItem as IIluminate;
                         if (lightsource != null && lightsource.isLightable) {
                             break;
@@ -867,7 +863,7 @@ namespace Commands {
                             IContainer containerItem = lightItem as IContainer;
                             if (containerItem.Opened) {
                                 foreach (string id in containerItem.GetContents()) {
-                                    lightItem = Items.Items.GetByID(itemId);
+                                    lightItem = Items.Items.GetByID(itemId).Result;
                                     lightsource = lightItem as IIluminate;
                                     if (lightsource != null && lightsource.isLightable) {
                                         break;
@@ -900,8 +896,8 @@ namespace Commands {
 
             commands.RemoveRange(0, 2);
 
-            IMessage message = new ClientHandling.Message();
-            IRoom room = Rooms.Room.GetRoom(player.Player.Location);
+            IMessage message = new Message();
+            IRoom room = Room.GetRoom(player.Player.Location);
 
             lightItem = FindLightInEquipment(commands, player, room);
 

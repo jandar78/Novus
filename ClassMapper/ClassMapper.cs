@@ -4,17 +4,22 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using MongoDB.Bson.Serialization;
-using Interfaces;
 
 namespace MongoUtils { 
     public class ClassMapper {
         public static void RegisterMappings() {
+            RegisterScriptMapping();
+            RegisterTriggerMappings();
+            RegisterItemMapping();
+            RegisterRoomModifierMapping();
+            RegisterExitsMapping();
+            RegisterDoorMapping();
+            RegisterRoomMapping();
+            RegisterQuestStepMapping();
+            RegisterQuestMapping();
             RegisterCharacterMapping();
             RegisterNPCMapping();
-            RegisterItemMapping();
-            RegisterRoomMapping();
-            RegisterDoorMapping();
-            RegisterQuestMapping();        }
+        }
 
         private static void RegisterCharacterMapping()
         {
@@ -53,7 +58,7 @@ namespace MongoUtils {
 
         private static void RegisterItemMapping()
         {
-            BsonClassMap.RegisterClassMap<Item>(cm =>
+            BsonClassMap.RegisterClassMap<Items>(cm =>
             {
                 cm.AutoMap();
                 cm.MapIdMember(r => r.Id);
@@ -75,6 +80,41 @@ namespace MongoUtils {
             {
                 cm.AutoMap();
                 cm.MapIdMember(r => r.QuestID);
+            });
+        }
+
+        private static void RegisterScriptMapping() {
+            BsonClassMap.RegisterClassMap<Script>(cm => {
+                cm.AutoMap();
+                cm.MapIdMember(s => s.ID);
+                cm.GetMemberMap(s => s.ScriptByteArray).SetElementName("Bytes");
+            });
+        }
+
+        private static void RegisterTriggerMappings() {
+            BsonClassMap.RegisterClassMap<GeneralTrigger>(cm => {
+                cm.AutoMap();
+            });
+
+            BsonClassMap.RegisterClassMap<QuestTrigger>(cm => {
+                cm.AutoMap();
+            });
+
+            BsonClassMap.RegisterClassMap<ItemTrigger>(cm => {
+                cm.AutoMap();
+            });
+        }
+
+        private static void RegisterRoomModifierMapping() {
+            BsonClassMap.RegisterClassMap<RoomModifier>(cm => {
+                cm.AutoMap();
+                cm.GetMemberMap(r => r.TimeInterval).SetElementName("Timer");
+            });
+        }
+
+        private static void RegisterExitsMapping() {
+            BsonClassMap.RegisterClassMap<Exits>(cm => {
+                cm.AutoMap();
             });
         }
     }

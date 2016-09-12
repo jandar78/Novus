@@ -8,6 +8,8 @@ using System.Threading;
 using Commands;
 using MudTime;
 using Extensions;
+using Interfaces;
+using Messages;
 
 namespace ServerConsole {
 	public class Program {
@@ -29,9 +31,9 @@ namespace ServerConsole {
 
 			Console.WriteLine(">>> MongoDB initialized <<<");
 
-			ClientHandling.MessageBuffer messageHandler = new ClientHandling.MessageBuffer("Server");
+			MessageBuffer messageHandler = new MessageBuffer("Server");
 
-			MySockets.Server server = MySockets.Server.GetServer();
+			Sockets.Server server = Sockets.Server.GetServer();
 
 			//get script singletons
 			Scripts.Login loginScript = Scripts.Login.GetScript();
@@ -84,25 +86,25 @@ namespace ServerConsole {
 							npcUtils.ProcessAIForNPCs();
 						});
 
-						if (MySockets.Server.GetCurrentUserList().Count > 0) {
+						if (Sockets.Server.GetCurrentUserList().Count > 0) {
 							int index = 0;
 							System.Diagnostics.Stopwatch stopWatch = System.Diagnostics.Stopwatch.StartNew();
 
-							foreach (User.User user in MySockets.Server.GetCurrentUserList()) {
-								if (user.CurrentState == User.User.UserState.TALKING || user.CurrentState == User.User.UserState.LIMBO) {
+							foreach (IUser user in Sockets.Server.GetCurrentUserList()) {
+								if (user.CurrentState == UserState.TALKING || user.CurrentState == UserState.LIMBO) {
 									CommandParser.ParseCommands(user);
 								}
 
-								else if (user.CurrentState == User.User.UserState.JUST_CONNECTED) {
+								else if (user.CurrentState == UserState.JUST_CONNECTED) {
 									//just connected let's make them login
-									loginScript.AddUserToScript(MySockets.Server.GetCurrentUserList().ElementAt(index));
-									user.CurrentState = User.User.UserState.LOGGING_IN;
+									loginScript.AddUserToScript(Sockets.Server.GetCurrentUserList().ElementAt(index));
+									user.CurrentState = UserState.LOGGING_IN;
 								}
 
 								 //the player should not receive any messages while in the level up script
-								else if (user.CurrentState == User.User.UserState.LEVEL_UP) {
-									if (user.CurrentState == User.User.UserState.LEVEL_UP) {
-										levelUpScript.AddUserToScript(MySockets.Server.GetCurrentUserList().ElementAt(index));
+								else if (user.CurrentState ==UserState.LEVEL_UP) {
+									if (user.CurrentState == UserState.LEVEL_UP) {
+										levelUpScript.AddUserToScript(Sockets.Server.GetCurrentUserList().ElementAt(index));
 									}
 
 									string temp = levelUpScript.ExecuteScript(user.UserID);
@@ -110,14 +112,14 @@ namespace ServerConsole {
 									user.MessageHandler(temp);
 
 
-									if (user.InBufferReady && user.CurrentState != User.User.UserState.TALKING) {
+									if (user.InBufferReady && user.CurrentState != UserState.TALKING) {
 										user.CurrentState = levelUpScript.InsertResponse(user.InBuffer, user.UserID);
 									}
 
 									
 								}
 
-								else if (user.CurrentState == User.User.UserState.LOGGING_IN) {
+								else if (user.CurrentState == UserState.LOGGING_IN) {
 									//they are in the middle of the login process
 									string temp = loginScript.ExecuteScript(user.UserID);
 									if (!string.IsNullOrEmpty(temp)) {
@@ -126,16 +128,16 @@ namespace ServerConsole {
 										user.MessageHandler(temp);
 									}
 
-									if (user.InBufferReady && user.CurrentState != User.User.UserState.TALKING) {
+									if (user.InBufferReady && user.CurrentState != UserState.TALKING) {
 										user.CurrentState = loginScript.InsertResponse(user.InBuffer, user.UserID);
 									}
 
-									if (user.CurrentState == User.User.UserState.CREATING_CHARACTER) {
-										CreationScript.AddUserToScript(MySockets.Server.GetCurrentUserList().ElementAt(index));
+									if (user.CurrentState == UserState.CREATING_CHARACTER) {
+										CreationScript.AddUserToScript(Sockets.Server.GetCurrentUserList().ElementAt(index));
 									}
 								}
 
-								else if (user.CurrentState == User.User.UserState.CREATING_CHARACTER) {
+								else if (user.CurrentState == UserState.CREATING_CHARACTER) {
 									string temp = CreationScript.ExecuteScript(user.UserID);
 									if (!string.IsNullOrEmpty(temp)) {
 										if (temp.Contains("Welcome"))
@@ -143,7 +145,7 @@ namespace ServerConsole {
 										user.MessageHandler(temp);
 									}
 
-									if (user.InBufferReady && user.CurrentState != User.User.UserState.TALKING) {
+									if (user.InBufferReady && user.CurrentState != UserState.TALKING) {
 										user.CurrentState = CreationScript.InsertResponse(user.InBuffer, user.UserID);
 									}
 								}
@@ -161,7 +163,7 @@ namespace ServerConsole {
 						}
 					}
 					catch (Exception ex) {
-						User.User temp = new User.User(true);
+						IUser temp = new Sockets.User(true);
 						temp.UserID = "Internal";
 						// CommandParser.ReportBug(temp, new List<string>(new string[] { "Bug Internal Error: " + ex.Message + "\n" + ex.StackTrace }));
 					}

@@ -56,33 +56,16 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="IActor.cs" />
-    <Compile Include="IAttribute.cs" />
-    <Compile Include="IClothing.cs" />
-    <Compile Include="IContainer.cs" />
-    <Compile Include="IEdible.cs" />
-    <Compile Include="IEquipment.cs" />
-    <Compile Include="IExit.cs" />
-    <Compile Include="IFsm.cs" />
-    <Compile Include="IIluminate.cs" />
-    <Compile Include="IItem.cs" />
-    <Compile Include="IKey.cs" />
-    <Compile Include="IMessage.cs" />
-    <Compile Include="IMessageBuffer.cs" />
-    <Compile Include="IInventory.cs" />
-    <Compile Include="INpc.cs" />
-    <Compile Include="IQuest.cs" />
-    <Compile Include="IRoom.cs" />
-    <Compile Include="IStatBonuses.cs" />
-    <Compile Include="IState.cs" />
-    <Compile Include="IScript.cs" />
-    <Compile Include="ITrigger.cs" />
-    <Compile Include="IUser.cs" />
-    <Compile Include="IWeapon.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Utils\Utils.csproj">
+      <Project>{ea6f1d8a-1702-4ff4-a9aa-20ea80cc395e}</Project>
+      <Name>Utils</Name>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

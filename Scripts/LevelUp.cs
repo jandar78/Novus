@@ -7,10 +7,11 @@ using MongoDB.Bson;
 using MongoDB.Driver;
 using MongoDB.Driver.Builders;
 using Character;
+using Interfaces;
 
 namespace Scripts {
     public class LevelUpScript : ScriptBase {
-         private static MongoCollection _scriptCollection;
+         private static IMongoCollection<BsonDocument> _scriptCollection;
 
          private static List<TempLvlChar> usersLevelingUp = new List<TempLvlChar>();
 
@@ -20,7 +21,7 @@ namespace Scripts {
              return levelUpScript ?? (levelUpScript = new LevelUpScript());
 		 }
 
-         public void AddUserToScript(User.User user) {
+         public void AddUserToScript(IUser user) {
              var temp = usersLevelingUp.Where(u => u.user.UserID == user.UserID).SingleOrDefault();
              if (temp == null){
                  usersLevelingUp.Add(new TempLvlChar(user));
@@ -29,23 +30,20 @@ namespace Scripts {
     
 
          private LevelUpScript() {
-             MongoUtils.MongoData.ConnectToDatabase();
-             MongoDatabase db = MongoUtils.MongoData.GetDatabase("Characters");
-             db = MongoUtils.MongoData.GetDatabase("Scripts");
-             _scriptCollection = db.GetCollection("LevelUp");
+             _scriptCollection = MongoUtils.MongoData.GetCollection<BsonDocument>("Scripts", "LevelUp");
          }
 
 
-		 public User.User.UserState InsertResponse(string response, string userId) {
-             User.User.UserState state = User.User.UserState.LEVEL_UP;
+		 public UserState InsertResponse(string response, string userId) {
+             UserState state = UserState.LEVEL_UP;
              if (string.IsNullOrEmpty(response)) return state;
 			 
 			 TempLvlChar currentUser = usersLevelingUp.Where(u => u.user.UserID == userId).SingleOrDefault();
 			 currentUser.Response = response;
-			 BsonDocument stepDoc = MongoUtils.MongoData.GetCollection("Scripts", "LevelUp").FindOneAs<BsonDocument>(Query.EQ("_id", currentUser.lastStep.ToString()));
+			 var stepDoc = MongoUtils.MongoData.RetrieveObject<BsonDocument>(MongoUtils.MongoData.GetCollection<BsonDocument>("Scripts", "LevelUp"), s => s["_id"] == currentUser.lastStep.ToString());
 
-			 if (currentUser != null && currentUser.currentStep == ScriptSteps.AwaitingResponse) {
-				 state = (User.User.UserState)ParseStepDocument(stepDoc, currentUser, levelUpScript);
+            if (currentUser != null && currentUser.currentStep == ScriptSteps.AwaitingResponse) {
+				 state = (UserState)ParseStepDocument(stepDoc, currentUser, levelUpScript);
 			 }
 			 currentUser.Response = "";
              return state;
@@ -56,7 +54,7 @@ namespace Scripts {
 
 			 TempLvlChar currentUser = usersLevelingUp.Where(u => u.user.UserID == userId).SingleOrDefault();
 			 //get the document for the step
-			 BsonDocument stepDoc = MongoUtils.MongoData.GetCollection("Scripts", "LevelUp").FindOneAs<BsonDocument>(Query.EQ("_id", currentUser.lastStep.ToString()));
+			 var stepDoc = MongoUtils.MongoData.RetrieveObject<BsonDocument>(MongoUtils.MongoData.GetCollection<BsonDocument>("Scripts", "LevelUp"), s => s["_id"] == currentUser.lastStep.ToString());
 
 			 if (currentUser != null && currentUser.lastStep != currentUser.currentStep && currentUser.currentStep != ScriptSteps.AwaitingResponse) {
 				 message = (string)ParseStepDocument(stepDoc, currentUser, levelUpScript);
@@ -73,21 +71,21 @@ namespace Scripts {
          }
 
 		 private void ExitScript(TempLvlChar currentUser) {
-			 currentUser.user.CurrentState = User.User.UserState.TALKING;
+			 currentUser.user.CurrentState = UserState.TALKING;
 			 usersLevelingUp.Remove(currentUser);
 		 }
 
-		 private User.User.UserState IncreaseStatResponse(string response, TempLvlChar currentUser) {
-			 User.User.UserState state = User.User.UserState.LEVEL_UP;
+		 private UserState IncreaseStatResponse(string response, TempLvlChar currentUser) {
+			 UserState state = UserState.LEVEL_UP;
 			 int stat = -1;
 			 decimal increase = 0m;
 			 int.TryParse(response, out stat);
 			 if (stat >= 1 && stat <= currentUser.maxOptions + 1) {
 				 string attribute = "";
-				 Dictionary<string, Character.Attribute> attributesPlayerHas = currentUser.user.Player.GetAttributes();
+				 Dictionary<string, IAttributes> attributesPlayerHas = currentUser.user.Player.GetAttributes();
 				 int i = 1;
 
-				 foreach (KeyValuePair<string, Character.Attribute> index in attributesPlayerHas) {
+				 foreach (var index in attributesPlayerHas) {
 					 if (i == stat) {
 						 attribute = index.Key;
 						 break;
@@ -100,7 +98,7 @@ namespace Scripts {
 				 }
 				 else {
 					 //player chose to quit while still having points to spend
-					 state = User.User.UserState.TALKING;
+					 state = UserState.TALKING;
 					 usersLevelingUp.Remove(currentUser);
 					 return state;
 				 }
@@ -115,7 +113,7 @@ namespace Scripts {
 					 currentUser.lastStep = ScriptSteps.None;
 				 }
 				 if (currentUser.user.Player.PointsToSpend == 0) {
-					 state = User.User.UserState.TALKING;
+					 state = UserState.TALKING;
 					 usersLevelingUp.Remove(currentUser);
 					 currentUser.user.MessageHandler("");
 
@@ -195,12 +193,12 @@ namespace Scripts {
              //The rank of the attribute also determines how many points it costs to increase it to the next rank.  The higher the rank the more expensive
              //the upgrade is limiting you to choose wisely.
 			 
-			 Dictionary<string, Character.Attribute> attributesPlayerHas = user.user.Player.GetAttributes();
+			 Dictionary<string, IAttributes> attributesPlayerHas = user.user.Player.GetAttributes();
 			 int i = 1;
 			 sb.AppendLine("Level: " + user.user.Player.Level);
 			 sb.AppendLine("Points Available: " + user.user.Player.PointsToSpend);
 
-			 foreach (KeyValuePair<string, Character.Attribute> attrib in attributesPlayerHas) {
+			 foreach (var attrib in attributesPlayerHas) {
 				 sb.AppendLine(i + ") " + attrib.Key  + " : " + user.user.Player.GetAttributeValue(attrib.Key) + "\tCost: " + GetRankCost(user.user.Player.GetAttributes(), attrib.Key));
 				 i++;
 			 }
@@ -210,7 +208,7 @@ namespace Scripts {
              return sb.ToString();
          }
 
-         private int GetRankCost(Dictionary<string, Character.Attribute> attributes, string attributeName) {
+         private int GetRankCost(Dictionary<string, Interfaces.IAttributes> attributes, string attributeName) {
              int currentRank = attributes[attributeName].Rank;
              //ranks cost more points as they increase
 			 //TODO: these should come from the DB
@@ -258,7 +256,7 @@ namespace Scripts {
 	};
 
     public class TempLvlChar {
-        public User.User user = null;
+        public IUser user = null;
 		public ScriptSteps currentStep;
 		public ScriptSteps lastStep;
         public int maxOptions;
@@ -268,7 +266,7 @@ namespace Scripts {
         public string Password { get; set; }
 		public string Response { get; set; }
 
-        public TempLvlChar(User.User player) {
+        public TempLvlChar(IUser player) {
             user = player;
 			currentStep = ScriptSteps.None;
 			lastStep = ScriptSteps.Step1;

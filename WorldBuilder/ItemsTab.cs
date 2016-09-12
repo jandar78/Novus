@@ -11,41 +11,57 @@ using MongoDB.Bson;
 using MongoDB.Driver;
 using MongoDB.Driver.Builders;
 using MongoDB.Bson.Serialization;
+using Interfaces;
+using System.Linq.Expressions;
+using Rooms;
 
 namespace WorldBuilder {
     public partial class Form1 : Form {
         #region Item Stuff
-        private void GetItemsFromDB() {
+        private async void GetItemsFromDB() {
             this.itemsInDBValue.Items.Clear();
             this._itemList.Clear();
 
             if (ConnectedToDB) {
-                MongoCursor<BsonDocument> result = null;
+                IEnumerable<IItem> result = null;
                 if (string.IsNullOrEmpty(filterValue.Text)) {
-                    result = MongoUtils.MongoData.GetCollection("World", "Items").FindAllAs<BsonDocument>();
+                    result = await MongoUtils.MongoData.FindAll<Items.Items>(MongoUtils.MongoData.GetCollection<Items.Items>("World", "Items"));
                 }
                 else {
                     if (filterTypeValue.Text == "_id") {
-                        result = MongoUtils.MongoData.GetCollection("World", "Items").FindAs<BsonDocument>(Query.EQ(filterTypeValue.Text, ObjectId.Parse(filterValue.Text)));
+                        result = await MongoUtils.MongoData.RetrieveObjectsAsync<Items.Items>(MongoUtils.MongoData.GetCollection<Items.Items>("World", "Items"), i => i.Id == ObjectId.Parse(filterValue.Text));
                     }
                     else {
-                        result = MongoUtils.MongoData.GetCollection("World", "Items").FindAs<BsonDocument>(Query.EQ(filterTypeValue.Text, filterValue.Text));
+                        result = await MongoUtils.MongoData.RetrieveObjectsAsync<Items.Items>(MongoUtils.MongoData.GetCollection<Items.Items>("World", "Items"), Contains<Items.Items>(filterTypeValue.Text, filterValue.Text));
+
                     }
                 }
 
                 if (result != null) {
-                    _itemList = result.ToList<BsonDocument>();
+                    _itemList = result.ToList();
                 }
 
-                foreach (BsonDocument doc in result) {
-                    this.itemsInDBValue.Items.Add(doc["Name"].AsString);
+                foreach (var doc in result) {
+                    this.itemsInDBValue.Items.Add(doc.Name);
                 }
             }
         }
 
+        private static Expression<Func<T, bool>> Contains<T>(string name, string value) {
+            var pe = Expression.Parameter(typeof(T));
+            var property = Expression.Property(pe, name);
+            var returnExp = Expression.Call(property,
+                 "Contains",
+                 new Type[] { typeof(String) },
+                 Expression.Constant(value));
+
+            return Expression.Lambda<Func<T, bool>>(returnExp, pe);
+
+        }
+
         private void wieldEffectValue_SelectedIndexChanged(object sender, EventArgs e) {
             AffectedForm affectedForm = null;
-            if (wieldEffectValue.SelectedItem == "New...") {
+            if (wieldEffectValue.SelectedItem.ToString() == "New...") {
                 affectedForm = new AffectedForm();
             }
             else if (wieldEffectValue.SelectedItem != null) {
@@ -75,13 +91,13 @@ namespace WorldBuilder {
         }
 
         private void loadItem_Click(object sender, EventArgs e) {
-            MongoCollection itemCollection = MongoUtils.MongoData.GetCollection("World", "Items");
-            BsonDocument item = null;
+            var itemCollection = MongoUtils.MongoData.GetCollection<Items.Items>("World", "Items");
+            IItem item = null;
             if (itemsInDBValue.SelectedIndex != -1) {
                 item = _itemList[this.itemsInDBValue.SelectedIndex];
             }
             else if (!string.IsNullOrEmpty(idValue.Text)) {
-                item = itemCollection.FindOneAs<BsonDocument>(Query.EQ("_id", ObjectId.Parse(idValue.Text)));
+                item = MongoUtils.MongoData.RetrieveObject<Items.Items>(itemCollection, i => i.Id == ObjectId.Parse(idValue.Text));
             }
 
             if (item != null) {
@@ -89,129 +105,83 @@ namespace WorldBuilder {
             }
         }
 
-        private void FillControls(BsonDocument item) {
+        private void FillControls(IItem item) {
             ClearItemCreateForm();
-            idValue.Text = item["_id"].AsObjectId.ToString();
-            nameValue.Text = item["Name"].AsString;
-            descriptionValue.Text = item["Description"].AsString;
+            idValue.Text = item.Id.ToString();
+            nameValue.Text = item.Name;
+            descriptionValue.Text = item.Description;
+            locationValue.Text = item.Location;
             //general stuff
-            if (item.Contains("Owner") && !item["Owner"].IsBsonNull) {
-                ownerValue.Text = item["Owner"].AsString;
-            }
-            if (item.Contains("MinimumLevel") && !item["MinimumLevel"].IsBsonNull) {
-                minLevelValue.Text = item["MinimumLevel"].AsInt32.ToString();
-            }
-            if (item.Contains("CurrentCondition") && !item["CurrentCondition"].IsBsonNull) {
-                conditionValue.Text = ((Items.ItemCondition)item["CurrentCondition"].AsInt32).ToString();
-            }
-            if (item.Contains("MaxCondition") && !item["MaxCondition"].IsBsonNull) {
-                maxConditionValue.Text = ((Items.ItemCondition)item["MaxCondition"].AsInt32).ToString();
-            }
-            if (item.Contains("Weight") && !item["Weight"].IsBsonNull) {
-                if (item["Weight"].IsDouble) {
-                    weightValue.Text = item["Weight"].AsDouble.ToString();
-                }
-                else {
-                    weightValue.Text = item["Weight"].AsInt32.ToString();
-                }
-            }
-            if (!item["ItemType"].IsBsonNull){
-                foreach (BsonDocument value in item["ItemType"].AsBsonArray) {
-                    switch (value["k"].AsInt32) {
-                        case 0:
+            ownerValue.Text = item.Owner;
+            minLevelValue.Text = item.MinimumLevel.ToString();
+            conditionValue.Text = item.CurrentCondition.ToString();
+            maxConditionValue.Text = item.MaxCondition.ToString();
+            weightValue.Text = item.Weight.ToString();
+
+            if (item.ItemType != null) {
+                foreach (var value in item.ItemType) {
+                    switch (value.Key) {
+                        case ItemsType.WEAPON:
                             typeWeaponValue.Checked = true;
                             break;
-                        case 1:
+                        case ItemsType.CLOTHING:
                             typeClothingValue.Checked = true;
                             break;
-                        case 2:
+                        case ItemsType.EDIBLE:
                             typeEdibleValue.Checked = true;
                             break;
-                        case 3:
+                        case ItemsType.DRINKABLE:
                             typeDrinkableValue.Checked = true;
                             break;
-                        case 4:
+                        case ItemsType.CONTAINER:
                             typeContainerValue.Checked = true;
                             break;
-                        case 5:
+                        case ItemsType.ILUMINATION:
                             typeIluminationValue.Checked = true;
                             break;
-                        case 6:
+                        case ItemsType.KEY:
                             typeKeyValue.Checked = true;
                             break;
                     }
                 }
             }
-            if (item.Contains("IsMovable") && !item["IsMovable"].IsBsonNull) {
-                isMovable.Checked = item["IsMovable"].AsBoolean;
-            }
-            if (item.Contains("IsWearable") && !item["IsWearable"].IsBsonNull) {
-                isWearable.Checked = item["IsWearable"].AsBoolean;
-            }
+            isMovable.Checked = item.IsMovable;
+            isWearable.Checked = item.IsWearable;
 
             //container stuff
-            if (item.Contains("ReduceCarryWeightBy") && !item["ReduceCarryWeightBy"].IsBsonNull) {
-                if (item["ReduceCarryWeightBy"].IsDouble) {
-                    reduceWeightValue.Text = item["ReduceCarryWeightBy"].AsDouble.ToString();
-                }
-                else {
-                    reduceWeightValue.Text = item["ReduceCarryWeightBy"].AsInt32.ToString();
-                }
-            }
-            if (item.Contains("WeightLimit") && !item["WeightLimit"].IsBsonNull) {
-                if (item["WeightLimit"].IsDouble) {
-                    weightLimitValue.Text = item["WeightLimit"].AsDouble.ToString();
-                }
-                else {
-                    weightLimitValue.Text = item["WeightLimit"].AsInt32.ToString();
-                }
-            }
-            if (item.Contains("IsOpenable") && !item["IsOpenable"].IsBsonNull) {
-                isOpenable.Checked = item["IsOpenable"].AsBoolean;
-            }
-            if (item.Contains("Opened") && !item["Opened"].IsBsonNull) {
-                isOpened.Checked = item["Opened"].AsBoolean;
-            }
-            if (item.Contains("Contents") && !item["Contents"].IsBsonNull) {
-                foreach (BsonValue value in item["Contents"].AsBsonArray) {
-                    itemContentsValue.Items.Add(value.AsString);
+            var castItem = item as Items.Items;
+            reduceWeightValue.Text = castItem.ReduceCarryWeightBy.ToString();
+            weightLimitValue.Text = castItem.WeightLimit.ToString();
+            isOpenable.Checked = castItem.IsOpenable;
+            isOpened.Checked = castItem.Opened;
+            
+
+            if (castItem.Contents != null) {
+                foreach (var value in castItem.Contents) {
+                    itemContentsValue.Items.Add(value);
                 }
             }
             //weapon stuff
-            if (item.Contains("AttackSpeed") && !item["AttackSpeed"].IsBsonNull) {
-                if (item["AttackSpeed"].IsDouble) {
-                    attackSpeedValue.Text = item["AttackSpeed"].AsDouble.ToString();
-                }
-                else {
-                    attackSpeedValue.Text = item["AttackSpeed"].AsInt32.ToString();
-                }
-            }
-            if (item.Contains("MaxDamage") && !item["MaxDamage"].IsBsonNull) {
-                if (item["MaxDamage"].IsDouble) {
-                    maxDamageValue.Text = item["MaxDamage"].AsDouble.ToString();
-                }
-                else {
-                    maxDamageValue.Text = item["MaxDamage"].AsInt32.ToString();
-                }
-            }
-            if (item.Contains("MinDamage") && !item["MinDamage"].IsBsonNull) {
-                if (item["MinDamage"].IsDouble) {
-                    minDamageValue.Text = item["MinDamage"].AsDouble.ToString();
-                }
-                else {
-                    minDamageValue.Text = item["MinDamage"].AsInt32.ToString();
-                }
-            }
+            attackSpeedValue.Text = castItem.AttackSpeed.ToString();
+            maxDamageValue.Text = castItem.MaxDamage.ToString();
+            minDamageValue.Text = castItem.MinDamage.ToString();
+
+            //illumination
+            isLightable.Checked = castItem.isLightable;
+            isLit.Checked = castItem.isLit;
+            decayRateValue.Text = castItem.chargeDecayRate.ToString();
+
 
             //added the triggers here, need to test
-            if (item.Contains("Triggers") && !item["Triggers"].IsBsonNull) {
-                foreach (BsonDocument value in item["Triggers"].AsBsonArray) {
+            if (item.ItemTriggers != null) {
+                foreach (var value in item.ItemTriggers) {
                     _itemTriggers.Add(value);
-                    triggersValue.Items.Add(value["Trigger"].AsString);
+                    triggersValue.Items.Add(value.TriggerOn);
                 }
             }
-
         }
+
+        
 
         private void button1_Click(object sender, EventArgs e) {
             GetItemsFromDB();
@@ -219,130 +189,122 @@ namespace WorldBuilder {
 
         private void button2_Click(object sender, EventArgs e) {
             if (ConnectedToDB) {
-                BsonDocument item = new BsonDocument();
+                var item = new Items.Items();
                 if (!string.IsNullOrEmpty(idValue.Text)) {
-                    item["_id"] = ObjectId.Parse(idValue.Text);
+                    item.Id = ObjectId.Parse(idValue.Text);
                 }
+
+                item.Location = locationValue.Text;
 
                 //general stuff
                 if (!IsEmpty(nameValue.Text)) {
-                    item["Name"] = nameValue.Text;
+                    item.Name = nameValue.Text;
                 }
                 if (!IsEmpty(descriptionValue.Text)) {
-                    item["Description"] = descriptionValue.Text;
+                    item.Description = descriptionValue.Text;
                 }
                 if (!IsEmpty(ownerValue.Text)) {
-                    item["Owner"] = ownerValue.Text;
+                    item.Owner = ownerValue.Text;
                 }
                 if (!IsEmpty(minLevelValue.Text)) {
-                    item["MinimumLevel"] = int.Parse(minLevelValue.Text);
+                    item.MinimumLevel = int.Parse(minLevelValue.Text);
                 }
                 if (!IsEmpty(conditionValue.Text)) {
-                    item["CurrentCondition"] = (Items.ItemCondition)Enum.Parse(typeof(Items.ItemCondition), conditionValue.Text);
+                    item.CurrentCondition = (ItemCondition)Enum.Parse(typeof(ItemCondition), conditionValue.Text);
                 }
                 if (!IsEmpty(maxConditionValue.Text)) {
-                    item["MaxCondition"] = (Items.ItemCondition)Enum.Parse(typeof(Items.ItemCondition), maxConditionValue.Text);
+                    item.MaxCondition = (ItemCondition)Enum.Parse(typeof(ItemCondition), maxConditionValue.Text);
                 }
                 if (!IsEmpty(weightValue.Text)) {
-                    item["Weight"] = double.Parse(weightValue.Text);
+                    item.Weight = double.Parse(weightValue.Text);
                 }
                 
                 
                 //attributes
-                item["IsMovable"] = isMovable.Checked;
-                item["IsWearable"] = isWearable.Checked;
-                item["IsOpenable"] = isOpenable.Checked;
-                item["Opened"] = isOpened.Checked;
-                item["IsWieldable"] = isWieldable.Checked;
-                item["isLit"] = isLit.Checked;
-                item["isChargeable"] = isChargeable.Checked;
-                item["isLightable"] = isLightable.Checked;
+                item.IsMovable = isMovable.Checked;
+                item.IsWearable = isWearable.Checked;
+                item.IsOpenable = isOpenable.Checked;
+                item.Opened = isOpened.Checked;
+                item.IsWieldable = isWieldable.Checked;
+                item.isLit = isLit.Checked;
+                item.isChargeable = isChargeable.Checked;
+                item.isLightable = isLightable.Checked;
 
                 //key
-                item["SkeletonKey"] = isSkeletonKey.Checked;
+                item.SkeletonKey = isSkeletonKey.Checked;
                 if (!IsEmpty(doorIdValue.Text)) {
-                    item["DoorID"] = doorIdValue.Text;
+                    item.DoorID = doorIdValue.Text;
                 }
 
                 //container stuff
                 if (!IsEmpty(reduceWeightValue.Text)) {
-                    item["ReduceCarryWeightBy"] = double.Parse(reduceWeightValue.Text);
+                    item.ReduceCarryWeightBy = double.Parse(reduceWeightValue.Text);
                 }
                 if (!IsEmpty(weightLimitValue.Text)) {
-                    item["WeightLimit"] = double.Parse(weightLimitValue.Text);
+                    item.WeightLimit = double.Parse(weightLimitValue.Text);
                 }
 
-                BsonArray contentsArray = new BsonArray();
+                List<String> contentsArray = new List<string>();
                 foreach (string value in itemContentsValue.Items) {
                     contentsArray.Add(value);
                 }
                 if (contentsArray.Count > 0) {
-                    item["Contents"] = contentsArray;
+                    item.Contents = contentsArray;
                 }
                 //weapon stuff
                 if (!IsEmpty(attackSpeedValue.Text)) {
-                    item["AttackSpeed"] = double.Parse(attackSpeedValue.Text);
+                    item.AttackSpeed = double.Parse(attackSpeedValue.Text);
                 }
                 if (!IsEmpty(maxDamageValue.Text)) {
-                    item["MaxDamage"] = double.Parse(maxDamageValue.Text);
+                    item.MaxDamage = double.Parse(maxDamageValue.Text);
                 }
                 if (!IsEmpty(minDamageValue.Text)) {
-                    item["MinDamage"] = double.Parse(minDamageValue.Text);
+                    item.MinDamage = double.Parse(minDamageValue.Text);
                 }
 
                 //clothing
                 if (!IsEmpty(maxDefenseValue.Text)) {
-                item["MaxDefense"] = double.Parse(maxDefenseValue.Text);
+                item.MaxDefense = double.Parse(maxDefenseValue.Text);
                 }
                 if (!IsEmpty(defenseValue.Text)) {
-                    item["CurrentDefense"] = double.Parse(defenseValue.Text);
+                    item.CurrentDefense = double.Parse(defenseValue.Text);
                 }
 
                 //light source
                 if (!IsEmpty(decayRateValue.Text)) {
-                    item["chargeDecayRate"] = double.Parse(decayRateValue.Text);
+                    item.chargeDecayRate = double.Parse(decayRateValue.Text);
                 }
                 if (!IsEmpty(lowWarningValue.Text)) {
-                    item["chargeLowWarning"] = double.Parse(lowWarningValue.Text);
+                    item.chargeLowWarning = double.Parse(lowWarningValue.Text);
                 }
                 if (!IsEmpty(chargeValue.Text)) {
-                    item["currentCharge"] = double.Parse(chargeValue.Text);
+                    item.currentCharge = double.Parse(chargeValue.Text);
                 }
                 if (!IsEmpty(maxChargeValue.Text)) {
-                    item["maxCharge"] = double.Parse(maxChargeValue.Text);
+                    item.maxCharge = double.Parse(maxChargeValue.Text);
                 }
                 if (!IsEmpty(lightTypeValue.Text)) {
-                    item["lightType"] = (Items.LightType)Enum.Parse(typeof(Items.LightType), lightTypeValue.Text);
+                    item.lightType = (LightType)Enum.Parse(typeof(LightType), lightTypeValue.Text);
                 }
                 if (!IsEmpty(fuelSourceValue.Text)) {
-                    item["fuelSource"] = (Items.FuelSource)Enum.Parse(typeof(Items.FuelSource), fuelSourceValue.Text);
+                    item.fuelSource = (FuelSource)Enum.Parse(typeof(FuelSource), fuelSourceValue.Text);
                 }
 
                 //item Type
-                BsonArray itemTypeArray = new BsonArray();
+                var itemTypeDictionary = new Dictionary<ItemsType, int>();
                 foreach (CheckBox cb in itemTypeGroup.Controls) {
-                    BsonDocument itemTypeBson = new BsonDocument {
-                        {"k",""},
-                        {"v",""}
-                    };
                     if (cb.Checked) {
-                        itemTypeBson["k"] = (Items.ItemsType)Enum.Parse(typeof(Items.ItemsType), cb.Text.ToUpper());
-                        itemTypeBson["v"] = 0;
-
-                        itemTypeArray.Add(itemTypeBson);
+                        itemTypeDictionary.Add((ItemsType)Enum.Parse(typeof(ItemsType), cb.Text.ToUpper()), 0);
                     }
                 }
                                         
-                item["ItemType"] = itemTypeArray;
+                item.ItemType = itemTypeDictionary;
 
                 if (_itemTriggers.Count > 0) {
-                    item["Triggers"] = _itemTriggers;
+                    item.ItemTriggers = _itemTriggers;
                 }
 
-
-                Items.Iitem result = null;
-                result = BsonSerializer.Deserialize<Items.Items>(item);
-                result.Save();
+                MongoUtils.MongoData.Save<Items.Items>(MongoUtils.MongoData.GetCollection<Items.Items>("World", "Items"), i => i.Id == item.Id, item);
                 GetItemsFromDB();
             }
         }
@@ -393,9 +355,9 @@ namespace WorldBuilder {
         }
 
         private void locationValue_Leave(object sender, EventArgs e) {
-            if (locationValue.Text != "-1" && !string.IsNullOrEmpty(locationValue.Text)) {
+            if (!string.IsNullOrEmpty(locationValue.Text)) {
                 try {
-                    BsonDocument room = MongoUtils.MongoData.GetCollection("World", "Rooms").FindOneAs<BsonDocument>(Query.EQ("_id", locationValue.Text));
+                    var room = MongoUtils.MongoData.RetrieveObject<Room>(MongoUtils.MongoData.GetCollection<Room>("Rooms", locationValue.Text[0].ToString()), r => r.Id == locationValue.Text);
                     if (room == null) {
                         DisplayValidationErrorBox("That is not a valid room location");
                     }
@@ -587,7 +549,7 @@ namespace WorldBuilder {
         private void GetTriggerResult(TriggerForm triggerForm) {
             if (triggerForm.DialogResult == System.Windows.Forms.DialogResult.OK) {
                 _itemTriggers.Add(triggerForm.Trigger);
-                triggersValue.Items.Add(triggerForm.Trigger["Trigger"].AsString);
+                triggersValue.Items.Add(triggerForm.Trigger);
             }
             else if (triggerForm.DialogResult == System.Windows.Forms.DialogResult.Abort) {
                 if (triggersValue.SelectedIndex != -1) {
@@ -605,7 +567,7 @@ namespace WorldBuilder {
 
         private void triggersValue_SelectedIndexChanged(object sender, EventArgs e) {
             if (triggersValue.SelectedIndex != -1) {
-                TriggerForm triggerForm = new TriggerForm(_itemTriggers[triggersValue.SelectedIndex].AsBsonDocument);
+                TriggerForm triggerForm = new TriggerForm(_itemTriggers[triggersValue.SelectedIndex]);
                 triggerForm.ShowDialog();
                 GetTriggerResult(triggerForm);
             }

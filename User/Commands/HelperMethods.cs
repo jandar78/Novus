@@ -3,28 +3,28 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using Rooms;
-using User;
 using MongoDB.Driver;
 using MongoDB.Bson;
 using MongoDB.Driver.Builders;
 using MongoDB.Driver.Linq;
 using Extensions;
-using ClientHandling;
+using Rooms;
+using Interfaces;
+using Sockets;
 
 namespace Commands {
     public partial class CommandParser {
 
         //called from the LOOK command
-        private static string DisplayPlayersInRoom(Room room, string ignoreId) {
+        private static string DisplayPlayersInRoom(IRoom room, string ignoreId) {
             StringBuilder sb = new StringBuilder();
 
             if (!room.IsDark) {
-                foreach (string id in room.GetObjectsInRoom(Room.RoomObjects.Players)) {
+                foreach (string id in room.GetObjectsInRoom(RoomObjects.Players)) {
                     if (id != ignoreId) {
-                        User.User otherUser = MySockets.Server.GetAUser(id);
-                        if (otherUser != null && otherUser.CurrentState == User.User.UserState.TALKING) {
-                            if (otherUser.Player.ActionState != CharacterEnums.CharacterActionState.Hiding && otherUser.Player.ActionState != CharacterEnums.CharacterActionState.Sneaking){  //(string.IsNullOrEmpty(PassesHideCheck(otherUser, ignoreId, out spot))) { //player should do a spot check this should not be a given
+                        IUser otherUser = Server.GetAUser(id);
+                        if (otherUser != null && otherUser.CurrentState == UserState.TALKING) {
+                            if (otherUser.Player.ActionState != CharacterActionState.Hiding && otherUser.Player.ActionState != CharacterActionState.Sneaking){  //(string.IsNullOrEmpty(PassesHideCheck(otherUser, ignoreId, out spot))) { //player should do a spot check this should not be a given
                                 sb.AppendLine(otherUser.Player.FirstName + " is " + otherUser.Player.StanceState.ToString().ToLower() + " here.");
                             }  
                         }
@@ -32,7 +32,7 @@ namespace Commands {
                 }
                 Dictionary<string, int> npcGroups = new Dictionary<string, int>();
 
-                foreach (string id in room.GetObjectsInRoom(Room.RoomObjects.Npcs)) {
+                foreach (string id in room.GetObjectsInRoom(RoomObjects.Npcs)) {
                     var npc = Character.NPCUtils.GetAnNPCByID(id);
 
                     if (!npcGroups.ContainsKey(npc.FirstName + "$" + npc.LastName + "$" + npc.StanceState)) {
@@ -50,17 +50,17 @@ namespace Commands {
             }
             else {
                 int count = 0;
-                foreach (string id in room.GetObjectsInRoom(Room.RoomObjects.Players)) {
+                foreach (string id in room.GetObjectsInRoom(RoomObjects.Players)) {
                     if (id != ignoreId) {
-                        User.User otherUser = MySockets.Server.GetAUser(id);
-                        if (otherUser != null && otherUser.CurrentState == User.User.UserState.TALKING) {
-                            if (otherUser.Player.ActionState != CharacterEnums.CharacterActionState.Hiding && otherUser.Player.ActionState != CharacterEnums.CharacterActionState.Sneaking) {  //player should do a spot check this should not be a given
+                        IUser otherUser = Server.GetAUser(id);
+                        if (otherUser != null && otherUser.CurrentState == UserState.TALKING) {
+                            if (otherUser.Player.ActionState != CharacterActionState.Hiding && otherUser.Player.ActionState != CharacterActionState.Sneaking) {  //player should do a spot check this should not be a given
                                 count++;
                             }
                         }
                     }
                 }
-                count += room.GetObjectsInRoom(Room.RoomObjects.Npcs).Count;
+                count += room.GetObjectsInRoom(RoomObjects.Npcs).Count;
 
                 if (count == 1) {
                     sb.AppendLine("A presence is here.");
@@ -73,23 +73,20 @@ namespace Commands {
             return sb.ToString();
         }
 
-       private static string DisplayItemsInRoom(Room room) {
+       private static string DisplayItemsInRoom(IRoom room) {
             StringBuilder sb = new StringBuilder();
 
-            List<string> itemsInRoom = room.GetObjectsInRoom(Room.RoomObjects.Items);
+            List<string> itemsInRoom = room.GetObjectsInRoom(RoomObjects.Items);
 
             Dictionary<string, int> itemGroups = new Dictionary<string, int>();
 
             if (!room.IsDark) {
                 foreach (string id in itemsInRoom) {
 
-                    Items.Iitem item = Items.Items.GetByID(id);
+                    IItem item = Items.Items.GetByID(id).Result;
                     if (item != null) {
-                       // Items.Icontainer containerItem = item as Items.Icontainer;
-                       // Items.Iedible edible = item as Items.Iedible;
-
-                        if (item.ItemType.ContainsKey(Items.ItemsType.CONTAINER)) {
-                            Items.Icontainer containerItem = item as Items.Icontainer;
+                       if (item.ItemType.ContainsKey(ItemsType.CONTAINER)) {
+                            IContainer containerItem = item as IContainer;
                             if (!itemGroups.ContainsKey(item.Name + "$" + (containerItem.IsOpenable == true ? (containerItem.Opened ? "[Opened]" : "[Closed]") : "[container]"))) {
                                 itemGroups.Add(item.Name + "$" + (containerItem.IsOpenable == true ? (containerItem.Opened ? "[Opened]" : "[Closed]") : "[container]"), 1);
                             }
@@ -97,7 +94,7 @@ namespace Commands {
                                 itemGroups[item.Name + "$" + (containerItem.IsOpenable == true ? (containerItem.Opened ? "[Opened]" : "[Closed]") : "[container]")] += 1;
                             }
                         }
-                        else if (item.ItemType.ContainsKey(Items.ItemsType.DRINKABLE) || item.ItemType.ContainsKey(Items.ItemsType.EDIBLE)) {
+                        else if (item.ItemType.ContainsKey(ItemsType.DRINKABLE) || item.ItemType.ContainsKey(ItemsType.EDIBLE)) {
                             if (!itemGroups.ContainsKey(item.Name)) {
                                 itemGroups.Add(item.Name, 1);
                             }
@@ -135,7 +132,7 @@ namespace Commands {
             else {
                 int count = 0;
                 foreach (string id in itemsInRoom) {
-                    Items.Iitem item = Items.Items.GetByID(id);
+                    IItem item = Items.Items.GetByID(id).Result;
                     if (item != null) {
                         count++;
                     }
@@ -153,13 +150,13 @@ namespace Commands {
         }
 
         //called from the LOOK command
-        private static string HintCheck(User.User player) {
+        private static string HintCheck(IUser player) {
             StringBuilder sb = new StringBuilder();
             //let's display the room hints if the player passes the check
-            foreach (RoomModifier mod in Rooms.Room.GetModifiers(player.Player.Location)) {
-                foreach (Dictionary<string, string> dic in mod.Hints) {
-                    if (player.Player.GetAttributeValue(dic["Attribute"]) >= int.Parse(dic["ValueToPass"])) {
-                        sb.AppendLine(dic["Display"]);
+            foreach (IRoomModifier mod in Room.GetModifiers(player.Player.Location)) {
+                foreach (Dictionary<string, object> dic in mod.Hints) {
+                    if (player.Player.GetAttributeValue((string)dic["Attribute"]) >= (int)dic["ValueToPass"]) {
+                        sb.AppendLine((string)dic["Display"]);
                     }
                 }
             }
@@ -167,38 +164,38 @@ namespace Commands {
         }
 
         //called from the MOVE command
-        private static void ApplyRoomModifier(User.User player) {
+        private static void ApplyRoomModifier(IUser player) {
             StringBuilder sb = new StringBuilder();
-			Message message = new Message();
-			message.InstigatorID = player.UserID;
-			message.InstigatorType = player.Player.IsNPC == false ? Message.ObjectType.Player : Message.ObjectType.Npc;
+            IMessage message = new Message();
+            message.InstigatorID = player.UserID;
+            message.InstigatorType = player.Player.IsNPC == false ? ObjectType.Player : ObjectType.Npc;
             //Todo:  Check the player bonuses to see if they are immune or have resistance to the modifier
-            foreach (Dictionary<string, string> modifier in Rooms.Room.GetModifierEffects(player.Player.Location)) {
-                player.Player.ApplyEffectOnAttribute("Hitpoints", double.Parse(modifier["Value"]));
+            foreach (var modifier in Room.GetModifierEffects(player.Player.Location)) {
+                player.Player.ApplyEffectOnAttribute("Hitpoints", (double)modifier["Value"]);
 
-                double positiveValue = double.Parse(modifier["Value"]);
+                double positiveValue = (double)modifier["Value"];
                 if (positiveValue < 0) {
                     positiveValue *= -1;
                 }
 
-                sb.Append(String.Format(modifier["DescriptionSelf"], positiveValue));
+                sb.Append(String.Format((string)modifier["DescriptionSelf"], positiveValue));
                 if (!player.Player.IsNPC) {
                     message.Self = "\r" + sb.ToString();
                 }
                 sb.Clear();
-                sb.Append(String.Format(modifier["DescriptionOthers"], player.Player.FirstName,
+                sb.Append(String.Format((string)modifier["DescriptionOthers"], player.Player.FirstName,
                            player.Player.Gender.ToString() == "Male" ? "he" : "she", positiveValue));
 
-				message.Room = "\r" + sb.ToString();
-                Room.GetRoom(player.Player.Location).InformPlayersInRoom(message, new List<string>(){ player.UserID });
-				if (player.Player.IsNPC) {
-					player.MessageHandler(message);
-				}
-				else {
-					player.MessageHandler(message.Self);
-				}
+                message.Room = "\r" + sb.ToString();
+                Room.GetRoom(player.Player.Location).InformPlayersInRoom(message, new List<string>() { player.UserID });
+                if (player.Player.IsNPC) {
+                    player.MessageHandler(message);
+                } else {
+                    player.MessageHandler(message.Self);
+                }
             }
         }
+        
 
        
         //could be an item or an npc, we'll figure it out
@@ -218,15 +215,14 @@ namespace Commands {
             string result = "";
 
             MongoUtils.MongoData.ConnectToDatabase();
-            MongoCollection itemCollection = MongoUtils.MongoData.GetCollection("World","Items" );
-            List<string> itemIds = Room.GetRoom(location).GetObjectsInRoom(Room.RoomObjects.Items);
+            var itemCollection = MongoUtils.MongoData.GetCollection<Items.Items>("World","Items" );
+            List<string> itemIds = Room.GetRoom(location).GetObjectsInRoom(RoomObjects.Items);
 
             int count = 1;
 
             foreach (string ids in itemIds) {
-                IMongoQuery query = Query.EQ("_id", ObjectId.Parse(ids));
-                BsonDocument item = itemCollection.FindOneAs<BsonDocument>(query);
-                if (string.Equals(item["Name"].AsString, parsedName[0], StringComparison.InvariantCultureIgnoreCase) && count == position) {
+                var item = MongoUtils.MongoData.RetrieveObject<Items.Items>(itemCollection, i => i.Id == ObjectId.Parse(ids));
+                if (string.Equals(item.Name, parsedName[0], StringComparison.InvariantCultureIgnoreCase) && count == position) {
                     result = ids;
                     break;
                 }
@@ -241,18 +237,14 @@ namespace Commands {
 
         private static string GetNPCInPosition(int position, string name, string location, string[] parsedName) {
             string result = "";
-            
-            MongoUtils.MongoData.ConnectToDatabase();
-            MongoDatabase db = MongoUtils.MongoData.GetDatabase("Characters");
-            MongoCollection npcs = db.GetCollection("NPCCharacters");
-            List<string> npcIds = Room.GetRoom(location).GetObjectsInRoom(Room.RoomObjects.Npcs);
+            var npcs = MongoUtils.MongoData.GetCollection<NPC>("Characters", "NPCCharacters");
+            List<string> npcIds = Room.GetRoom(location).GetObjectsInRoom(RoomObjects.Npcs);
 
             int count = 1;
 
             foreach (string ids in npcIds) {
-                IMongoQuery query = Query.EQ("_id", ObjectId.Parse(ids));
-                BsonDocument npc = npcs.FindOneAs<BsonDocument>(query);
-                if (string.Equals(npc["FirstName"].AsString, parsedName[0], StringComparison.InvariantCultureIgnoreCase) && count == position) {
+                var npc = MongoUtils.MongoData.RetrieveObject<NPC>(npcs, n => n.ID == ids);
+                if (string.Equals(npc.FirstName, parsedName[0], StringComparison.InvariantCultureIgnoreCase) && count == position) {
                     result = ids;
                     break;
                 }

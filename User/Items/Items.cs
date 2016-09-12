@@ -37,7 +37,7 @@ namespace Items {
         public Wearable WornOn { get; set; }
         public string Location { get; set; }
         public bool IsMovable { get; set; }
-        public BsonArray Triggers { get; set; }
+        public BsonArray Trigger { get; set; }
         public string Owner { get; set; }
 
         public event EventHandler<ItemEventArgs> Deteriorated;
@@ -67,17 +67,6 @@ namespace Items {
                 _itemTriggers = value;
             }
         }
-        
-
-        //public List<ITrigger> SpeechTriggers {
-        //    get {
-        //        return _speechTriggers;
-        //    }
-        //    set {
-        //        _speechTriggers = value;
-        //    }
-        //}
-        //private List<ITrigger> _speechTriggers;
         #endregion Properties
 
         #region Public Static Methods
@@ -100,51 +89,43 @@ namespace Items {
         }
 
         public static List<IItem> GetByName(string name, string owner) {
-            MongoUtils.MongoData.ConnectToDatabase();
-            MongoDatabase db = MongoUtils.MongoData.GetDatabase("World");
-            MongoCollection collection = db.GetCollection("Items");
+            var collection = MongoUtils.MongoData.GetCollection<BsonDocument>("World","Items");
             name = name.CamelCaseString();
             //find any items in the location that match what the player typed
-            var doc = collection.FindAs<BsonDocument>(Query.And(Query.Matches("Name", name), Query.EQ("Owner", owner)));
-            
-            List<IItem> result = new List<IItem>();
-
-            if (doc != null) {
-                foreach (BsonDocument itemDoc in doc) {
-                    result.Add(ItemFactory.CreateItem(itemDoc["_id"].AsObjectId));
-                }             
+            var items = MongoUtils.MongoData.RetrieveObjectsAsync<BsonDocument>(collection, i => i["Name"] == name && i["Owner"] == owner).Result;
+            List<IItem> itemList = new List<IItem>();
+            foreach (var item in items) {
+                itemList.Add(ItemFactory.CreateItem(item["_id"].AsObjectId).Result);
             }
-            return result;
+
+            return itemList;
         }
 
-        public static void DeChargeLightSources() {
-            MongoUtils.MongoData.ConnectToDatabase();
-            MongoDatabase db = MongoUtils.MongoData.GetDatabase("World");
-            MongoCollection collection = db.GetCollection("Items");
-            var doc = collection.FindAs<BsonDocument>(Query.And(Query.EQ("ItemType", 5), Query.EQ("isLit", true)));
+        public async static void DeChargeLightSources() {
+            var collection = MongoUtils.MongoData.GetCollection<BsonDocument>("World", "Items");
+            var doc = await MongoUtils.MongoData.RetrieveObjectsAsync<BsonDocument>(collection, i => i["ItemType"] == 5 && i["isLit"] == true);
 
-            foreach (BsonDocument item in doc) {
-                IItem lightSource = GetByID(item["_id"].AsObjectId.ToString());
-                Iiluminate light = lightSource as Iiluminate;
+            foreach (var item in doc) {
+                IItem lightSource = await GetByID(item["_id"].AsObjectId.ToString());
+                IIluminate light = lightSource as IIluminate;
                 light.Drain();
             }
         }
 
-        public static IItem GetByID(string id) {
-            MongoUtils.MongoData.ConnectToDatabase();
-            MongoDatabase db = MongoUtils.MongoData.GetDatabase("World");
-            MongoCollection collection = db.GetCollection("Items");
-            var doc = collection.FindOneAs<BsonDocument>(Query.EQ("_id", ObjectId.Parse(id)));
+        public async static Task<IItem> GetByID(string id) {
+            var collection = MongoUtils.MongoData.GetCollection<Items>("World", "Items");
+            var item = await MongoUtils.MongoData.RetrieveObjectAsync<Items>(collection, i => i.Id == ObjectId.Parse(id));
             IItem result = null;
-            if (doc != null) {
-                result = ItemFactory.CreateItem(doc["_id"].AsObjectId);
+            if (item != null) {
+                result = await ItemFactory.CreateItem(item.Id);
             }
+
             return result;
         }
 
-        public static IItem GetByIDFromList(List<string> id) {
+        public async static Task<IItem> GetByIDFromList(List<string> id) {
             if (id.Count > 0) {
-                IItem result = GetByID(id[0]);
+                IItem result = await GetByID(id[0]);
                 return result;
             }
 
@@ -177,11 +158,10 @@ namespace Items {
             OnImproved(new ItemEventArgs(ItemEvent.IMPROVE, this.Id));
         }
 
-        public void Save() {
-           MongoCollection collection = MongoUtils.MongoData.GetCollection("World", "Items");
+        public async void Save() {
+           var collection = MongoUtils.MongoData.GetCollection<Items>("World", "Items");
            this.ItemTriggers = null; //we don't want to save this when we deserialize and all triggers are saved in Triggers as BsonDocuments and can't be edited within the engine
-           collection.Save<Items>(this);
-
+           await MongoUtils.MongoData.SaveAsync<Items>(collection, i => i.Id == this.Id, this);
         }
         #endregion Public Methods
 

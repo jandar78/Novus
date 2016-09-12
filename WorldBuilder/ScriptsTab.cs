@@ -13,7 +13,6 @@ using MongoDB.Driver.Builders;
 using MongoDB.Bson.Serialization;
 using NCalc;
 using System.Reflection;
-using Rooms;
 using Character;
 using Items;
 using System.Xml;
@@ -22,6 +21,9 @@ using LuaInterface;
 using Triggers;
 using Roslyn.Compilers;
 using Roslyn.Scripting.CSharp;
+using Interfaces;
+using Sockets;
+using Rooms;
 
 namespace WorldBuilder {
     public partial class Form1 : Form {
@@ -31,20 +33,20 @@ namespace WorldBuilder {
         private Dictionary<string, object> DataSet { get; set; }
         private Stack<object> DataStack { get; set; }
 
-        private void saveScript_Click(object sender, EventArgs e) {
+        private async void saveScript_Click(object sender, EventArgs e) {
             if (!IsEmpty(scriptIdValue.Text) && !IsEmpty(scriptValue.Text) && !ScriptError) {
                 byte[] scriptBytes = System.Text.Encoding.ASCII.GetBytes(scriptValue.Text);
 
                 BsonBinaryData scriptArray = new BsonBinaryData(scriptBytes);
-                
-                BsonDocument doc = new BsonDocument();
-                doc.Add("_id", scriptIdValue.Text);
-                doc.Add(new BsonElement("Bytes", scriptArray.AsBsonValue));
-				doc.Add(new BsonElement("Type", scriptTypeValue.SelectedItem.ToString()));    
-                
 
-                MongoCollection collection = MongoUtils.MongoData.GetCollection("Scripts", (string)scriptTypesValue.SelectedItem);
-                collection.Save(doc);
+                Triggers.Script newScript = new LuaScript() {
+                    ID = scriptIdValue.Text,
+                    ScriptByteArray = scriptBytes,
+                    ScriptType = (ScriptTypes)Enum.Parse(typeof(ScriptTypes), scriptTypeValue.SelectedItem.ToString())
+                };
+
+                var collection = MongoUtils.MongoData.GetCollection<Triggers.Script>("Scripts", (string)scriptTypesValue.SelectedItem);
+                await collection.ReplaceOneAsync<Triggers.Script>(s => s.ID == scriptIdValue.Text, newScript, new UpdateOptions { IsUpsert = true });
                 
                 scriptValidatedValue.Visible = false;
             }
@@ -55,17 +57,15 @@ namespace WorldBuilder {
 
         private void loadScript_Click(object sender, EventArgs e) {
             if (!IsEmpty(scriptIdValue.Text) && !IsEmpty(scriptTypesValue.Text)) {
-                MongoCollection collection = MongoUtils.MongoData.GetCollection("Scripts", (string)scriptTypesValue.SelectedItem);
-                BsonDocument scriptDocument = collection.FindOneAs<BsonDocument>(Query.EQ("_id", scriptIdValue.Text));
-
-                byte[] scriptBytes = (byte[])scriptDocument["Bytes"].AsBsonBinaryData;
-				scriptTypeValue.Text = scriptDocument["Type"].AsString;
-				//scriptTypeValue.SelectedText = scriptDocument["Type"].AsString;
-				scriptValue.Text = System.Text.Encoding.ASCII.GetString(scriptBytes);
+                var collection = MongoUtils.MongoData.GetCollection<Triggers.Script>("Scripts", (string)scriptTypesValue.SelectedItem);
+                var script = MongoUtils.MongoData.RetrieveObject<Triggers.Script>(collection, s => s.ID == scriptIdValue.Text);
+                
+                byte[] scriptBytes = (byte[])script.ScriptByteArray;
+				scriptTypeValue.Text = script.ScriptType.ToString();
+				scriptValue.Text = script.MemStreamAsString;
                 
                 scriptValidatedValue.Visible = false;
             }
-
         }
 
         private void scriptFilterRefresh_Click(object sender, EventArgs e) {
@@ -73,16 +73,17 @@ namespace WorldBuilder {
                 if (!IsEmpty((string)scriptFilterTypeValue.SelectedItem)) {
                     scriptDatabaseValues.Items.Clear();
 
-                    MongoCursor<BsonDocument> result = null;
+                    IEnumerable<Triggers.Script> result = new List<Triggers.Script>();
+                    var collection = MongoUtils.MongoData.GetCollection<Triggers.Script>("Scripts", (string)scriptFilterTypeValue.SelectedItem);
                     if (IsEmpty(scriptFilterValue.Text)) {
-                        result = MongoUtils.MongoData.GetCollection("Scripts", (string)scriptFilterTypeValue.SelectedItem).FindAllAs<BsonDocument>();
+                        result = MongoUtils.MongoData.RetrieveObjects<Triggers.Script>(collection, s => s.ID != string.Empty);
                     }
                     else {
-                        result = MongoUtils.MongoData.GetCollection("Scripts", (string)scriptFilterTypeValue.SelectedItem).FindAs<BsonDocument>(Query.EQ("_id", scriptFilterValue.Text));
+                        result = new List<Triggers.Script>() { MongoUtils.MongoData.RetrieveObject<Triggers.Script>(collection, s => s.ID == scriptFilterValue.Text) };
                     }
 
-                    foreach (BsonDocument doc in result) {
-                        this.scriptDatabaseValues.Items.Add(doc["_id"].AsString);
+                    foreach (var script in result) {
+                        this.scriptDatabaseValues.Items.Add(script.ID);
                     }
                 }
                 else {
@@ -140,12 +141,12 @@ namespace WorldBuilder {
 						 typeof (IEnumerable<>).Assembly,
 						 typeof (IQueryable).Assembly,
 						 typeof (ScriptMethods).Assembly,
-						 typeof(Character.Iactor).Assembly,
+						 typeof(IActor).Assembly,
 						 typeof(Character.Character).Assembly,
-						 typeof(Character.NPC).Assembly,
+						 typeof(NPC).Assembly,
 						 typeof(Room).Assembly,
 						 typeof(Commands.CommandParser).Assembly,
-						 typeof(ClientHandling.Message).Assembly,
+						 typeof(Interfaces.Message).Assembly,
 						 GetType().Assembly
 					}.ToList().ForEach(asm => session.AddReference(asm));
 
@@ -172,7 +173,7 @@ namespace WorldBuilder {
         //these are just stub methods for th emost part solely to let th eLua interface run through the lua script and find any compiler errors
 		//this will not find logic errors in the script.  All scripts should be tested before in game before being moved to live.
         [LuaAccessible]
-        public double ParseAndCalculateCheck(Character.Iactor player, string calculation) {
+        public double ParseAndCalculateCheck(IActor player, string calculation) {
             return 1.0d;
         }
 
@@ -275,7 +276,7 @@ namespace WorldBuilder {
                     t = typeof(Character.Character);
                     break;
                 case "NPC":
-                    t = typeof(Character.NPC);
+                    t = typeof(NPC);
                     break;
                 case "NPCUtils":
                     t = typeof(Character.NPCUtils);
@@ -284,10 +285,10 @@ namespace WorldBuilder {
                     t = typeof(Items.Items);
                     break;
                 case "User":
-                    t = typeof(User.User);
+                    t = typeof(User);
                     break;
                 case "Server":
-                    t = typeof(MySockets.Server);
+                    t = typeof(Server);
                     break;
                 case "CommandParser":
                     t = typeof(Commands.CommandParser);
@@ -301,8 +302,8 @@ namespace WorldBuilder {
 
         [LuaAccessible]
         public object GetPlayer(string type) {
-            User.User user = new User.User();
-            Character.Iactor character = CharacterFactory.Factory.CreateCharacter(CharacterEnums.CharacterType.PLAYER);
+            IUser user = new User();
+            IActor character = Factories.Factory.CreateCharacter(CharacterType.PLAYER);
             user.Player = character;
             object o = null;
             if (string.Equals(type, "Character", StringComparison.CurrentCultureIgnoreCase)) {
@@ -317,8 +318,8 @@ namespace WorldBuilder {
 
         [LuaAccessible]
         public object GetTarget(string type) {
-            User.User user = new User.User();
-            Character.Iactor character = CharacterFactory.Factory.CreateCharacter(CharacterEnums.CharacterType.PLAYER);
+            IUser user = new User();
+            IActor character = Factories.Factory.CreateCharacter(CharacterType.PLAYER);
             user.Player = character;
             object o = null;
             if (string.Equals(type, "Character", StringComparison.CurrentCultureIgnoreCase)) {

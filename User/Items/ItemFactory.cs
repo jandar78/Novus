@@ -14,42 +14,31 @@ using Interfaces;
 namespace Items {
    public class ItemFactory {
 
-        public static IItem CreateItem(ObjectId id){
-            BsonDocument tempItem = null;
+        public async static Task<IItem> CreateItem(ObjectId id){
+            IItem tempItem = null;
 
             if (id != null) { //id got passed in so we are looking for a specific edible item
-                MongoCollection itemCollection = MongoUtils.MongoData.GetCollection("World","Items");
-                tempItem = itemCollection.FindOneAs<BsonDocument>(Query.EQ("_id", id));
+                var itemCollection = MongoUtils.MongoData.GetCollection<Items>("World","Items");
+                tempItem = await MongoUtils.MongoData.RetrieveObjectAsync<Items>(itemCollection, i => i.Id == id);
             }
 
-            IItem result = null;
-            try {
-                result = BsonSerializer.Deserialize<Items>(tempItem);
-
-                //add any triggers to the item
-                result = AddTriggersToItem(result, tempItem); //may be easier to just do result.ItemTriggers = AddTriggersToItem(tempItem);
-            }
-            catch (Exception ex) {
-                result.ToString();
-            }
-            
-            return result;
+            return tempItem;
         }
 
-       /// <summary>
-       /// Loops through the triggers array in the BsonDocument and adds them to the Item
-       /// </summary>
-       /// <param name="result"></param>
-       /// <param name="tempItem"></param>
-       /// <returns></returns>
-        private static IItem AddTriggersToItem(IItem result, BsonDocument tempItem) {
+        /// <summary>
+        /// Loops through the triggers array in the BsonDocument and adds them to the Item
+        /// </summary>
+        /// <param name="result"></param>
+        /// <param name="tempItem"></param>
+        /// <returns></returns>
+        private static IItem AddTriggersToItem(IItem result, IItem tempItem) {
             //This method could probably just return an ITriggers List instead
             result.ItemTriggers = new List<ITrigger>();
-          //  result.SpeechTriggers = new List<ITrigger>();
+            //  result.SpeechTriggers = new List<ITrigger>();
 
-            if (tempItem["Triggers"].AsBsonArray.Count > 0) {
+            if (tempItem.ItemTriggers.Count > 0) {
                 //loop through the triggers, an item can have multiple triggers for different things
-                foreach (BsonDocument doc in tempItem["Triggers"].AsBsonArray) {
+                foreach (BsonDocument doc in ((Items)tempItem).Trigger) {
                     ItemTrigger trigger = new ItemTrigger(doc);
                     SubscribeToCorrectEvent(result, trigger);
                     //for most scripts we are going to want the playerID to then get anything else we may want within it like rooms, items, etc

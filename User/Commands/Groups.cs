@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Interfaces;
+using Sockets;
 
 namespace Commands {
 	public partial class CommandParser {
@@ -11,10 +13,10 @@ namespace Commands {
 		//group invite willy wonka
 		//group disband
 		//this will further parse the command line and call the appropriate group commands
-		public static void Group(User.User player, List<string> commands) {
+		public static void Group(IUser player, List<string> commands) {
 			bool inGroup = !string.IsNullOrEmpty(player.GroupName);
 			string name = RemoveWords(commands[0]);
-			User.User user = null;
+			IUser user = null;
 			if (commands.Count > 2) {
 				switch (commands[2]) {
 					case "create":
@@ -30,9 +32,9 @@ namespace Commands {
 						Groups.Groups.GetInstance().AcceptDenyJoinRequest(player.UserID, name, false);
 						break;
 					case "promote":
-						user = MySockets.Server.GetAUserByFullName(name); 
+						user = Server.GetAUserByFullName(name); 
 						if (user == null){
-							user = MySockets.Server.GetAUserByFirstName(name).FirstOrDefault(); 
+							user = Server.GetAUserByFirstName(name).FirstOrDefault(); 
 						}
 
 						if (user != null) {
@@ -70,9 +72,9 @@ namespace Commands {
 						Groups.Groups.GetInstance().RequestGroupJoin(player.UserID, name);
 						break;
 					case "master":
-						user = MySockets.Server.GetAUserByFullName(name);
+						user = Server.GetAUserByFullName(name);
 						if (user == null) {
-							user = MySockets.Server.GetAUserByFirstName(name).FirstOrDefault();
+							user = Server.GetAUserByFirstName(name).FirstOrDefault();
 						}
 						if (user == null) {
 							player.MessageHandler("No player by that name was found.  If you only used a first name try including the last name as well.");

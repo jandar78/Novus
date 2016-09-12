@@ -3,14 +3,13 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using Rooms;
-using User;
 using MongoDB.Driver;
 using MongoDB.Bson;
 using MongoDB.Driver.Builders;
 using Extensions;
-using ClientHandling;
+using Sockets;
 using Interfaces;
+using Rooms;
 
 namespace Commands {
 	public partial class CommandParser {
@@ -128,9 +127,8 @@ namespace Commands {
         }
 
         private static double GetAndEvaluateExpression(string calculationName, IActor player) {
-            MongoCollection col = MongoUtils.MongoData.GetCollection("Calculations", "Combat");
-            IMongoQuery query = Query.EQ("_id", calculationName);
-            BsonDocument doc = col.FindOneAs<BsonDocument>(query).AsBsonDocument;
+            var col = MongoUtils.MongoData.GetCollection<BsonDocument>("Calculations", "Combat");
+            var doc = MongoUtils.MongoData.RetrieveObjectAsync<BsonDocument>(col, c => c["_id"] == calculationName).Result;
             NCalc.Expression expression = new NCalc.Expression(ReplaceStringWithNumber(player, doc["Expression"].AsString));
             double expressionResult = (double)expression.Evaluate();
             //let's take into consideration some other factors.  Visibility, stance, etc.
@@ -185,7 +183,7 @@ namespace Commands {
             double defense = 0.0d;
             double attack = 0.0d;
             double damage = CalculateDamage(player, enemy, offHand, out defense, out attack); 
-            IRoom room = Rooms.Room.GetRoom(player.Player.Location);
+            IRoom room = Room.GetRoom(player.Player.Location);
             
             SendRoundOutcomeMessage(player, enemy, room, damage, defense, attack);
 
@@ -206,7 +204,7 @@ namespace Commands {
                 INpc npc = enemy.Player as INpc;
                 if (npc != null) {
                     npc.CalculateXP();
-                    npc.Fsm.ChangeState(AI.Rot.GetState(), npc);
+                    npc.Fsm.ChangeState(AI.Rot.GetState(), (IActor)npc);
                     enemy.Player = npc as IActor;
                     enemy.Player.Save();
                 }
@@ -228,7 +226,7 @@ namespace Commands {
 			//Get the weapon type and append it to the "Hit" or "Miss" type when getting the message 
 			//ex: HitSword, HitClub, MissAxe, MissUnarmed could even get really specific HitRustyShortSword, MissLegendaryDaggerOfBlindness
 			//Make a method to figure out the type by having a lookup table in the DB that points to a weapon type string
-			IMessage message = new ClientHandling.Message();
+			IMessage message = new Message();
 			message.InstigatorID = player.UserID;
 			message.InstigatorType = player.Player.IsNPC == false ? ObjectType.Player : ObjectType.Npc;
 			message.TargetID = enemy.UserID;
@@ -290,7 +288,7 @@ namespace Commands {
 
         public static IUser FindTargetByName(string name, string location) {
             IUser enemy = null;
-            foreach (IUser foe in MySockets.Server.GetAUserByFirstName(name)) {
+            foreach (IUser foe in Server.GetAUserByFirstName(name)) {
                 if (foe.Player.Location == location) {
                     enemy = foe;
                     break;
@@ -300,7 +298,7 @@ namespace Commands {
             if (enemy == null) {
                 //ok it's not a player lets look through the NPC list
                 foreach (INpc npc in Character.NPCUtils.GetAnNPCByName(name, location)) {
-                    IUser foe = new User.User(true);
+                    IUser foe = new User(true);
                     foe.UserID = ((NPC)npc).ID;
                     foe.Player = npc as IActor;
                     enemy = foe;
@@ -325,7 +323,7 @@ namespace Commands {
             }
             //couldn't find the target by name, now let's see if our current Target is around
             if (enemy == null) {
-                enemy = MySockets.Server.GetAUser(player.Player.CurrentTarget);
+                enemy = Server.GetAUser(player.Player.CurrentTarget);
             }
 
             //didn't find a player character so let's look for an npc
@@ -345,7 +343,7 @@ namespace Commands {
                 }
 
                 if (npc != null) {
-                    IUser temp = new User.User(true);
+                    IUser temp = new User(true);
                     temp.UserID = npc.ID;
                     temp.Player = npc;
                     enemy = temp;
@@ -505,7 +503,7 @@ namespace Commands {
         private static void SendDeadOrUnconciousMessage(IUser player, IUser enemy, bool dead = false) {
             player.Player.ClearTarget();
             string status = dead == true ? "Killed" : "KnockedUnconcious";
-			IMessage message = new ClientHandling.Message();
+			IMessage message = new Message();
 			message.InstigatorID = player.UserID;
 			message.InstigatorType = player.Player.IsNPC == false ? ObjectType.Player : ObjectType.Npc;
 			message.TargetID = enemy.UserID;
@@ -514,8 +512,7 @@ namespace Commands {
 			message.Self = ParseMessage(GetMessage("Combat", status, MessageType.Self), player, enemy);
             message.Target = ParseMessage(GetMessage("Combat", status, MessageType.Target), player, enemy);
 			message.Room = ParseMessage(GetMessage("Combat", status, MessageType.Room), player, enemy);
-
-			Rooms.Room.GetRoom(player.Player.Location).InformPlayersInRoom(message, new List<string>() { player.UserID, enemy.UserID });
+            Room.GetRoom(player.Player.Location).InformPlayersInRoom(message, new List<string>() { player.UserID, enemy.UserID });
 			if (dead) {
 				SetKiller(enemy, player);
 			}
@@ -539,27 +536,27 @@ namespace Commands {
         //these will actually be skill moves
 		private static void Cleave(IUser player, List<string> commands) {//this will need a check in the future to be used with only bladed weapons
 			IUser enemy = null;
-			IMessage message = new ClientHandling.Message();
+			IMessage message = new Message();
 			message.InstigatorID = player.UserID;
 			message.InstigatorType = player.Player.IsNPC == false ? ObjectType.Player : ObjectType.Npc;
 
             if (commands.Count > 2) {
 
-                foreach (IUser foe in MySockets.Server.GetAUserByFirstName(commands[2])) {
+                foreach (IUser foe in Server.GetAUserByFirstName(commands[2])) {
                     if (foe.Player.Location == player.Player.Location) {
                         enemy = foe;
                     }
                 }
             }
             else {//did not specify a name let's kill the first player we find unconcious in our same location
-                enemy = MySockets.Server.GetCurrentUserList().Where(u => u.Player.Location == player.Player.Location && String.Compare(u.Player.ActionState.ToString(), "unconcious", true) == 0).SingleOrDefault();
+                enemy = Server.GetCurrentUserList().Where(u => u.Player.Location == player.Player.Location && String.Compare(u.Player.ActionState.ToString(), "unconcious", true) == 0).SingleOrDefault();
             }
 
             if (enemy == null) {
                 //ok it's not a player lets look through the NPC list
                 foreach (IActor npc in Character.NPCUtils.GetAnNPCByName(commands[2], player.Player.Location)) {
                     if (npc.ActionState == CharacterActionState.Unconcious) {
-                        IUser foe = new User.User(true);
+                        IUser foe = new User(true);
                         foe.UserID = npc.ID;
                         foe.Player = npc;
                         enemy = foe;
@@ -573,7 +570,7 @@ namespace Commands {
 				
 			}
 			else {
-				IRoom room = Rooms.Room.GetRoom(player.Player.Location);
+				IRoom room = Room.GetRoom(player.Player.Location);
 				message.TargetID = enemy.UserID;
 				message.TargetType = enemy.Player.IsNPC == false ? ObjectType.Player : ObjectType.Npc;
 
@@ -590,7 +587,7 @@ namespace Commands {
 					}
 					enemy.Player.SetAttributeValue("Hitpoints", -100);
 					//SetDead(player, enemy);
-					Character.NPC npc = enemy.Player as Character.NPC;
+					NPC npc = enemy.Player as NPC;
 					if (npc != null) {
 						if (npc.IsDead()) {
 							npc.Fsm.ChangeState(AI.Rot.GetState(), npc);
@@ -639,19 +636,13 @@ namespace Commands {
         public enum MessageType { Self, Target, Room };
 
         public static string GetMessage(string collection, string type, MessageType to) {
-            MongoUtils.MongoData.ConnectToDatabase();
-            MongoDatabase db = MongoUtils.MongoData.GetDatabase("Messages");
-            MongoCollection table = db.GetCollection(collection.CamelCaseWord());
-            IMongoQuery query = Query.EQ("_id", type.CamelCaseWord());
-
-            var result = table.FindOneAs<BsonDocument>(query).AsBsonDocument;
+            var messages = MongoUtils.MongoData.GetCollection<BsonDocument>("Messages", collection.CamelCaseWord());
+            var result = MongoUtils.MongoData.RetrieveObjectAsync<BsonDocument>(messages, m => m["_id"] == type.CamelCaseWord()).Result;
 
             //this allows the message to have multiple different versions and we'll just pick one at random to give it more variance
             //and feel more immersive.
             BsonArray msg = result["Messages"][0][(int)to].AsBsonArray;
-
             int choice = Extensions.RandomNumber.GetRandomNumber().NextNumber(0, msg.Count);
- 
             BsonDocument message = msg[choice].AsBsonDocument;
 
             return message[0].AsString;
@@ -684,7 +675,7 @@ namespace Commands {
 
 		private static bool BreakDoor(IUser player, List<string> commands){
 			IDoor door = FindDoor(player.Player.Location, commands);
-			IMessage message = new ClientHandling.Message();
+			IMessage message = new Message();
 			message.InstigatorID = player.UserID;
 			message.InstigatorType = player.Player.IsNPC == false ? ObjectType.Player : ObjectType.Npc;
 
@@ -704,7 +695,7 @@ namespace Commands {
 				door.UpdateDoorStatus();
 				message.Self = messages[0].FontColor(Utils.FontForeColor.RED);
 				message.Room = String.Format(messages[1], player.Player.FirstName);
-                Rooms.Room.GetRoom(player.Player.Location).InformPlayersInRoom(message, new List<string>() { player.UserID });
+                Room.GetRoom(player.Player.Location).InformPlayersInRoom(message, new List<string>() { player.UserID });
 			}
 			return true;
 		}

@@ -28,7 +28,7 @@ namespace Items {
         public IItem RetrieveItem(string id) {
             if ((IsOpenable && Opened) || !IsOpenable) {
                 if (Contents.Contains(id)) {
-                    IItem temp = Items.GetByID(id);
+                    IItem temp = Items.GetByID(id).Result;
                     CurrentWeight -= temp.Weight;
                     Contents.Remove(id);
                     Save();
@@ -44,7 +44,7 @@ namespace Items {
 
         public bool StoreItem(string id) {
             bool added = false;
-            IItem temp = Items.GetByID(id);
+            IItem temp = Items.GetByID(id).Result;
 
             //containers can't be encumbered they can only hold so much
             if ((IsOpenable && Opened) || !IsOpenable) {
@@ -115,7 +115,7 @@ namespace Items {
                 sb.AppendLine(Name + " contents:");
                 if (GetContents().Count > 0) {
                     foreach (string itemID in GetContents()) {
-                        IItem tempItem = Items.GetByID(itemID);
+                        IItem tempItem = Items.GetByID(itemID).Result;
                         sb.AppendLine(tempItem.Name);
                     }
 

@@ -3,11 +3,10 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using Rooms;
-using User;
 using MongoDB.Driver;
 using MongoDB.Bson;
 using MongoDB.Driver.Builders;
+using Interfaces;
 
 //Todo:
 //Need to figure out a clever way in which to see what state a character is that prevents him from accomplishing the action
@@ -20,7 +19,7 @@ namespace Commands{
 		 private static List<string> punctuation = new List<string>(new string[] { ",", ";", "\'", "\"", ":", "|", "\\", "!", "@", "#", "$", "%", "^", "&", "*", "(", ")", "[", "]", "{", "}", "=", "+", "-", "_" });
 		 private static List<string> uselessWords = new List<string>(new string[] { "and", "or", "if", "for", "yet", "nor", "but", "because", "so", "the", "to", "then", "that"});
 
-		 static public void ParseCommands(User.User player) {
+		 static public void ParseCommands(IUser player) {
 			 List<string> commands = ParseCommandLine(player.InBufferPeek);
              bool commandFound = false;
              
@@ -66,8 +65,8 @@ namespace Commands{
              commands[0] = player.InBuffer; //remove command from queue
 		 }
 
-         static public void ExecuteCommand(Character.Iactor actor, string command, string message = null) {
-             User.User player = new User.User(true);
+         static public void ExecuteCommand(IActor actor, string command, string message = null) {
+             IUser player = new Sockets.User(true);
              player.UserID = actor.ID;
              player.Player = actor;
              bool commandFound = false;
@@ -87,7 +86,7 @@ namespace Commands{
              }
          }
 
-         static public void ExecuteCommandUser(User.User actor, string command, string message = null) {
+         static public void ExecuteCommandUser(IUser actor, string command, string message = null) {
              bool commandFound = false;
 
              if (CombatCommands.ContainsKey(command.ToUpper())) { //check to see if player provided a combat related command

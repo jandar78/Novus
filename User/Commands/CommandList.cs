@@ -3,10 +3,15 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Interfaces;
+using Sockets;
 
 namespace Commands {
 	public partial class CommandParser {
-        private delegate void CommandDelegate(User.User player, List<string> command); //we just call this guy from now on
+
+        //this may be deprecated in the future and instead rely on executing the commands by calling C# scripts in the DB
+        
+        private delegate void CommandDelegate(IUser player, List<string> command); //we just call this guy from now on
 
         private static Dictionary<string, CommandDelegate> MovementCommands;
         private static Dictionary<string, CommandDelegate> VisualCommands;

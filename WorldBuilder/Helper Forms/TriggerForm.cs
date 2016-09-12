@@ -8,19 +8,20 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using MongoDB.Bson;
+using Interfaces;
 
 namespace WorldBuilder {
     public partial class TriggerForm : Form {
-        public BsonDocument Trigger { get; set; }
+        public ITrigger Trigger { get; set; }
 
-        public TriggerForm(BsonDocument trigger = null) {
+        public TriggerForm(ITrigger trigger = null) {
             InitializeComponent();
             if (trigger != null) {
-                triggerValue.Text = trigger["Trigger"].AsString;
-                chanceToTriggerValue.Text = trigger["ChanceToTrigger"].ToString();
-                scriptIdValue.Text = trigger["ScriptID"].AsString;
+                trigger.TriggerOn.ForEach(t => { triggerValue.Text += t + "\n"; });
+                chanceToTriggerValue.Text = trigger.ChanceToTrigger.ToString();
+                scriptIdValue.Text = trigger.Id;
 
-                foreach (BsonValue msg in trigger["Overrides"].AsBsonArray) {
+                foreach (BsonValue msg in trigger.MessageOverrides) {
                     if (msg != "New...") {
                         messageOverrideValue.Items.Add(msg);
                     }
@@ -29,10 +30,10 @@ namespace WorldBuilder {
         }
 
         private void button1_Click(object sender, EventArgs e) {
-            BsonDocument doc = new BsonDocument();
-            doc.Add("Trigger", triggerValue.Text);
-            doc.Add("ChanceToTrigger", double.Parse(chanceToTriggerValue.Text));
-            doc.Add("ScriptID", scriptIdValue.Text);
+            ITrigger trigger = new Triggers.GeneralTrigger();
+            trigger.TriggerOn = triggerValue.Text.Split(new char[] { '\n' }, StringSplitOptions.RemoveEmptyEntries).ToList();
+            trigger.ChanceToTrigger = double.Parse(chanceToTriggerValue.Text);
+            trigger.Id = scriptIdValue.Text;
             
             BsonArray overrides = new BsonArray();
             foreach (string msg in messageOverrideValue.Items) {
@@ -41,9 +42,9 @@ namespace WorldBuilder {
                 }
             }
 
-            doc.Add("Overrides", overrides);
+            trigger.MessageOverrides = overrides;
 
-            Trigger = doc;
+            Trigger = trigger;
             DialogResult = System.Windows.Forms.DialogResult.OK;
         }
 

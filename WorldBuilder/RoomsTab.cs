@@ -12,49 +12,50 @@ using MongoDB.Driver;
 using MongoDB.Driver.Builders;
 using MongoDB.Bson.Serialization;
 using MongoDB.Driver.Linq;
-using Extensions;
 using System.Text.RegularExpressions;
 using Crainiate.Diagramming;
 using Crainiate.Diagramming.Forms;
 using Interfaces;
+using Messages;
+using Extensions;
+using Rooms;
 
 namespace WorldBuilder {
     public partial class Form1 : Form {
         private List<IExit> exitsInRoom;
         private List<IRoomModifier> modifiersInRoom;
 
-        private void roomRefresh_Click(object sender, EventArgs e) {
+        private async void roomRefresh_Click(object sender, EventArgs e) {
             this.roomsListValue.Items.Clear();
             
             if (ConnectedToDB) {
-				List<MongoCollection> roomCollections = MongoUtils.MongoData.GetCollections("Rooms");
-				foreach (MongoCollection collection in roomCollections) {
-					if (!collection.Name.Contains("system")) {
-						MongoCursor<BsonDocument> result = null;
-						if (string.IsNullOrEmpty(filterValue.Text)) {
-							result = collection.FindAllAs<BsonDocument>();
-						}
-						else {
-							if (filterTypeValue.Text == "_id") {
-								result = collection.FindAs<BsonDocument>(Query.EQ(filterTypeValue.Text, ObjectId.Parse(filterValue.Text)));
-							}
-							else {
-								result = collection.FindAs<BsonDocument>(Query.EQ(filterTypeValue.Text, filterValue.Text));
-							}
-						}
+				var roomCollections = MongoUtils.MongoData.GetCollections("Rooms");
+                foreach (var collection in roomCollections.Result) {
+                    if (collection["name"].AsString != "system") {
+                        var result = MongoUtils.MongoData.GetCollection<Room>("Rooms", collection["name"].AsString).AsQueryable().ToList();
 
-						foreach (BsonDocument doc in result) {
-							this.roomsListValue.Items.Add(doc["Title"].AsString + " (" + doc["_id"].AsString + ")");
-						}
-					}
-				}
+                        if (filterTypeValue.Text == "_id") {
+                            result = MongoUtils.MongoData.GetCollection<Room>("Rooms", collection["name"].AsString).AsQueryable().Where(r => r.Id == filterValue.Text).ToList();
+                        } 
+                        else if (string.IsNullOrEmpty(filterTypeValue.Text) || string.IsNullOrEmpty(filterValue.Text)) {
+                            result =  (await MongoUtils.MongoData.FindAll<Room>(MongoUtils.MongoData.GetCollection<Room>("Rooms", collection["name"].AsString))).ToList();
+                        } 
+                        else {
+                            result = MongoUtils.MongoData.GetCollection<Room>("Rooms", collection["name"].AsString).AsQueryable<Room>().Where(r => r.GetType().GetProperty(filterTypeValue.Text).GetValue(r).ToString() == filterValue.Text).ToList();
+                        }
+                        
+                        foreach (var room in result) {
+                            this.roomsListValue.Items.Add(room.Title + " (" + room.Id + ")");
+                        }
+                    }
+                }
             }
         }
 
         private void roomLoad_Click(object sender, EventArgs e) {
             if (!IsEmpty(roomIdValue.Text)) {
                 if (ConnectedToDB) {
-                    IRoom room = Rooms.Room.GetRoom(roomIdValue.Text);
+                    IRoom room = Room.GetRoom(roomIdValue.Text);
                     FillRoomControls(room);
                 }
             }
@@ -62,13 +63,13 @@ namespace WorldBuilder {
 
         private void FillRoomControls(IRoom inRoom) {
 			if (inRoom != null) {
-                Rooms.Room room = inRoom as Rooms.Room;
+                Room room = inRoom as Room;
 				roomIdValue.Text = room.Id.ToString();
 				roomTitleValue.Text = room.Title;
 				roomDescriptionValue.Text = room.Description;
 				room.GetRoomExits();
 				FillExits(room.RoomExits);
-				FillModifiers(Rooms.Room.GetModifiers(room.Id));
+				FillModifiers(Room.GetModifiers(room.Id));
 				FillMap(room);
 			}
 			else {
@@ -79,84 +80,85 @@ namespace WorldBuilder {
 			}
         }
 
-		private void FillMap(Rooms.Room room) {
-			AI.PathFinding.TreeNode startNode = new AI.PathFinding.TreeNode(room);
-			startNode.Parent = startNode;
-			AI.PathFinding.TreeTraverser traverser = new AI.PathFinding.TreeTraverser(startNode, "");
-			Stack<AI.PathFinding.TreeNode> traversedTree = traverser.GetTraversedNodes();
+		private async void FillMap(Room room) {
+           await Task.Run(() => {
+                AI.PathFinding.TreeNode startNode = new AI.PathFinding.TreeNode(room);
+                startNode.Parent = startNode;
+                AI.PathFinding.TreeTraverser traverser = new AI.PathFinding.TreeTraverser(startNode, "");
+                Stack<AI.PathFinding.TreeNode> traversedTree = traverser.GetTraversedNodes();
 
-			Crainiate.Diagramming.Model model = new Model();
-			
-			PointF position = new PointF(200, 400);
+                Crainiate.Diagramming.Model model = new Model();
 
-			Table roomNode = new Table();
-			roomNode.BackColor = Color.Green;
-			
+                PointF position = new PointF(200, 400);
 
-			foreach (AI.PathFinding.TreeNode treeNode in traversedTree.Reverse()) {
-				if (model.Shapes.ContainsKey(treeNode.ID)) {
-					position = model.Shapes[treeNode.ID].Location;
-				}
+                Table roomNode = new Table();
+                roomNode.BackColor = Color.Green;
 
-				roomNode.Location = position;
-				
-				roomNode.Heading = treeNode.ID;
-				roomNode.SubHeading = treeNode.Title;
-																
-				if (!model.Shapes.ContainsKey(treeNode.ID)) {
-					model.Shapes.Add(treeNode.ID, roomNode);
-				}
 
-				Arrow arrow = new Arrow();
-				arrow.DrawBackground = false;
-				arrow.Inset = 0;
+                foreach (AI.PathFinding.TreeNode treeNode in traversedTree.Reverse()) {
+                    if (model.Shapes.ContainsKey(treeNode.ID)) {
+                        position = model.Shapes[treeNode.ID].Location;
+                    }
 
-				foreach (var adjNode in treeNode.AdjacentNodes) {
-					RoomExits direction = (RoomExits)Enum.Parse(typeof(RoomExits), adjNode.Key);
+                    roomNode.Location = position;
 
-					Table adjShape = new Table();
-					adjShape.Heading = adjNode.Value.ID;
-					adjShape.SubHeading = adjNode.Value.Title;
-					adjShape.BackColor = Color.LightBlue;
+                    roomNode.Heading = treeNode.ID;
+                    roomNode.SubHeading = treeNode.Title;
 
-					switch (direction) {
-						case RoomExits.North:
-							adjShape.Location = new PointF(position.X, position.Y - 100);
-							break;
-						case RoomExits.South:
-							adjShape.Location = new PointF(position.X, position.Y + 100);
-							break;
-						case RoomExits.East:
-							adjShape.Location = new PointF(position.X + 150, position.Y);
-							break;
-						case RoomExits.West:
-							adjShape.Location = new PointF(position.X - 150, position.Y);
-							break;
-						case RoomExits.Up:
-							adjShape.Location = new PointF(position.X - 150, position.Y - 100);
-							break;
-						case RoomExits.Down:
-							adjShape.Location = new PointF(position.X + 150, position.Y + 100);
-							break;
-					}
+                    if (!model.Shapes.ContainsKey(treeNode.ID)) {
+                        model.Shapes.Add(treeNode.ID, roomNode);
+                    }
 
-					if (!model.Shapes.ContainsKey(adjNode.Value.ID)) {
-						model.Shapes.Add(adjNode.Value.ID, adjShape);
-					}
-					Connector line = new Connector(model.Shapes[treeNode.ID], model.Shapes[adjNode.Value.ID]);
-					line.End.Marker = arrow;
+                    Arrow arrow = new Arrow();
+                    arrow.DrawBackground = false;
+                    arrow.Inset = 0;
 
-					model.Lines.Add(model.Lines.CreateKey(), line);
+                    foreach (var adjNode in treeNode.AdjacentNodes) {
+                        RoomExits direction = (RoomExits)Enum.Parse(typeof(RoomExits), adjNode.Key);
 
-					adjShape = new Table();
-				}
+                        Table adjShape = new Table();
+                        adjShape.Heading = adjNode.Value.ID;
+                        adjShape.SubHeading = adjNode.Value.Title;
+                        adjShape.BackColor = Color.LightBlue;
 
-				roomNode = new Table();
-			}
+                        switch (direction) {
+                            case RoomExits.North:
+                                adjShape.Location = new PointF(position.X, position.Y - 100);
+                                break;
+                            case RoomExits.South:
+                                adjShape.Location = new PointF(position.X, position.Y + 100);
+                                break;
+                            case RoomExits.East:
+                                adjShape.Location = new PointF(position.X + 150, position.Y);
+                                break;
+                            case RoomExits.West:
+                                adjShape.Location = new PointF(position.X - 150, position.Y);
+                                break;
+                            case RoomExits.Up:
+                                adjShape.Location = new PointF(position.X - 150, position.Y - 100);
+                                break;
+                            case RoomExits.Down:
+                                adjShape.Location = new PointF(position.X + 150, position.Y + 100);
+                                break;
+                        }
 
-			mapDiagram.SetModel(model);
-			mapDiagram.Refresh();
+                        if (!model.Shapes.ContainsKey(adjNode.Value.ID)) {
+                            model.Shapes.Add(adjNode.Value.ID, adjShape);
+                        }
+                        Connector line = new Connector(model.Shapes[treeNode.ID], model.Shapes[adjNode.Value.ID]);
+                        line.End.Marker = arrow;
 
+                        model.Lines.Add(model.Lines.CreateKey(), line);
+
+                        adjShape = new Table();
+                    }
+
+                    roomNode = new Table();
+                }
+
+                mapDiagram.SetModel(model);
+                mapDiagram.Invoke((MethodInvoker)delegate { mapDiagram.Refresh(); });
+            });
 		}
 
 
@@ -167,7 +169,7 @@ namespace WorldBuilder {
             }
         }
 
-        private void FillExits(List<IExit> exits) {
+        private void FillExits(List<Exits> exits) {
             roomExitsValue.Items.Clear();
             exitsInRoom = new List<IExit>();
             foreach (IExit exit in exits) {
@@ -178,7 +180,7 @@ namespace WorldBuilder {
 
         private void roomsListValue_DoubleClick(object sender, EventArgs e) {
             IRoom room = LoadRoomInformation();
-            displayInGameValue.Text = ClientHandling.MessageBuffer.Format(DisplayAsSeenInGame(room));
+            displayInGameValue.Text = MessageBuffer.Format(DisplayAsSeenInGame(room));
         }
 
         private string DisplayAsSeenInGame(IRoom room) {
@@ -193,7 +195,7 @@ namespace WorldBuilder {
         private IRoom LoadRoomInformation() {
             var roomIdToParse = roomsListValue.SelectedItem.ToString();
             roomIdToParse = roomIdToParse.Substring(roomIdToParse.IndexOf('(') + 1).Replace(")", "");
-            IRoom room = Rooms.Room.GetRoom(roomIdToParse);
+            IRoom room = Room.GetRoom(roomIdToParse);
             FillRoomControls(room);
             return room;
         }
@@ -203,7 +205,7 @@ namespace WorldBuilder {
 
                 //let's build the description the player will see
                 room.GetRoomExits();
-                List<IExit> exitList = room.RoomExits;
+                var exitList = room.RoomExits;
 
                 sb.AppendLine(("- " + room.Title + " -\t\t\t").ToUpper());
                 //TODO: add a "Descriptive" flag, that we will use to determine if we need to display the room description.
@@ -267,9 +269,9 @@ namespace WorldBuilder {
         private string HintCheck(string roomId) {
             StringBuilder sb = new StringBuilder();
             //let's display the room hints if the player passes the check
-            foreach (Rooms.RoomModifier mod in Rooms.Room.GetModifiers(roomId)) {
-                foreach (Dictionary<string, string> dic in mod.Hints) {
-                    sb.AppendLine(dic["Display"]);
+            foreach (RoomModifier mod in Room.GetModifiers(roomId)) {
+                foreach (Dictionary<string, object> dic in mod.Hints) {
+                    sb.AppendLine((string)dic["Display"]);
                 }
             }
             return sb.ToString();
@@ -291,8 +293,8 @@ namespace WorldBuilder {
 
         private string GetNewRoomId() {
             int id = 0;
-            var roomCollection = MongoUtils.MongoData.GetCollection("Rooms", GetZoneCode(roomIdValue.Text));
-            var maxRoomNumber = roomCollection.AsQueryable<BsonDocument>().Max(r => ParseRoomID(r.AsBsonDocument["_id"].AsString));
+            var roomCollection = MongoUtils.MongoData.GetCollection<Room>("Rooms", GetZoneCode(roomIdValue.Text));
+            var maxRoomNumber = roomCollection.AsQueryable<Room>().Max(r => ParseRoomID(r.Id));
             id = maxRoomNumber++;
 
 			//this may be something we implement in the future right now they can still modify the room ID before saving or should be able to at least

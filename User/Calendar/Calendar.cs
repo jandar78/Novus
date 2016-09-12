@@ -8,7 +8,8 @@ using MongoDB.Bson;
 using MongoDB.Driver.Builders;
 using MongoUtils;
 using Extensions;
-using ClientHandling;
+using Interfaces;
+using Rooms;
 
 namespace Calendar {
 	public static class Calendar {
@@ -36,17 +37,16 @@ namespace Calendar {
 		}
 
 		public static BsonDocument GetTime() {
-              return MongoUtils.MongoData.GetCollection("World", "Globals").FindOneAs<BsonDocument>(Query.EQ("_id", "Time"));
+              return MongoUtils.MongoData.RetrieveObject<BsonDocument>(MongoUtils.MongoData.GetCollection<BsonDocument>("World", "Globals") , t => t["_id"] == "Time");
 		}
 
 		public static bool IsNight() {
-			//yeah I know, it's long all in one mongoCall. Does the job though
-              return MongoUtils.MongoData.GetCollection("World", "Globals").FindOneAs<BsonDocument>(Query.EQ("_id", "Time"))["TimeOfDay"].AsString.ToUpper() == "NIGHT";
+			return MongoUtils.MongoData.RetrieveObject<BsonDocument>(MongoUtils.MongoData.GetCollection<BsonDocument>("World", "Globals"), t => t["_id"] == "Time")["TimeOfDay"].AsString.ToUpper() == "NIGHT";
 		}
 
         public static void UpdateClock() {
-            MongoCollection calendar = MongoUtils.MongoData.GetCollection("World", "Calendar");
-            BsonDocument time = calendar.FindOneAs<BsonDocument>(Query.EQ("_id", "Time"));
+            var calendar = MongoUtils.MongoData.GetCollection<BsonDocument>("World", "Calendar");
+            BsonDocument time = MongoUtils.MongoData.RetrieveObject<BsonDocument>(calendar, t => t["_id"] == "Time");
             time["Second"] = time["Second"].AsInt32 + 28;
 
             if (time["Second"].AsInt32 >= 60) {
@@ -121,10 +121,10 @@ namespace Calendar {
 			if (Enum.IsDefined(typeof(DayNight), dayTicks) && oldTime != ((DayNight)dayTicks).ToString()) {
 				time["TimeOfDay"] = ((DayNight)dayTicks).ToString();
 
-                    Rooms.Room room = null;
-                    foreach (User.User u in MySockets.Server.GetCurrentUserList()) {
-                        room = Rooms.Room.GetRoom(u.Player.Location);
-                        if (room.IsOutdoors == true && u.CurrentState == User.User.UserState.TALKING) {
+                    IRoom room = null;
+                    foreach (Sockets.User u in Sockets.Server.GetCurrentUserList()) {
+                        room = Room.GetRoom(u.Player.Location);
+                        if (room.IsOutdoors == true && u.CurrentState == UserState.TALKING) {
                             u.MessageHandler(time[((DayNight)dayTicks).ToString()].AsString != "" ? time[((DayNight)dayTicks).ToString()].AsString : "");
                         }
                     }
@@ -133,21 +133,19 @@ namespace Calendar {
 		}
 
 		private static void UpdateCalendar(BsonDocument calendar) {
-              MongoUtils.MongoData.GetCollection("World", "Globals").Save(calendar, WriteConcern.Acknowledged);
+             MongoUtils.MongoData.Save<BsonDocument>(MongoUtils.MongoData.GetCollection<BsonDocument>("World", "Globals"), c => c["_id"] == "Calendar", calendar);
 		}
 
 		private static BsonDocument GetCalendarData() {
-              MongoCollection calendarCollection = MongoUtils.MongoData.GetCollection("World", "Globals");
-	   	    IMongoQuery query = Query.EQ("_id", "Calendar");
-		    BsonDocument result = calendarCollection.FindOneAs<BsonDocument>(query);
-		    return result;
+            var calendarCollection = MongoUtils.MongoData.GetCollection<BsonDocument>("World", "Globals");
+		    return MongoUtils.MongoData.RetrieveObject<BsonDocument>(calendarCollection, c => c["_id"] == "Calendar");
 		}
 
 
 		//this method needs to be broken down a bit more
 		//i'm going to comment the hell out of this because it's confusing even to me
 		public static void ApplyWeather(List<string> zone){
-              BsonDocument weather = MongoUtils.MongoData.GetCollection("World", "Globals").FindOneAs<BsonDocument>(Query.EQ("_id", "Weather"));
+              BsonDocument weather = MongoUtils.MongoData.RetrieveObject<BsonDocument>(MongoUtils.MongoData.GetCollection<BsonDocument>("World", "Globals"), w => w["_id"] == "Weather");
 			   
 			//if the time for the wheather to change has elapsed let's change it
 			if (HasTimeElapsed(DateTime.Parse(weather["StartTime"].AsString), weather["Duration"].AsInt32)){
@@ -156,7 +154,7 @@ namespace Calendar {
 			    //is still going through the auto script process
 			    weather["StartTime"] = DateTime.Now.ToString();
 			    weather["Duration"] = Extensions.RandomNumber.GetRandomNumber().NextNumber(0,5);
-                MongoUtils.MongoData.GetCollection("World", "Globals").Save(weather);
+                MongoUtils.MongoData.Save<BsonDocument>(MongoUtils.MongoData.GetCollection<BsonDocument>("World", "Globals"), c => c["_id"] == "Weather", weather);
 			    		
 			    //choose a new type of weather pattern
                    Weather weatherEnum = Weather.Clear;
@@ -183,8 +181,8 @@ namespace Calendar {
 			    weather["CurrentMessage"] = (pattern != null ? pattern["Message"].AsString : "");
 			    weather["CurrentType"] = weatherEnum.ToString().ToUpper();
 			    weather["CurrentIntensity"] = intensity;
-                   MongoUtils.MongoData.GetCollection("World", "Globals").Save(weather);
-		     }
+                MongoUtils.MongoData.Save<BsonDocument>(MongoUtils.MongoData.GetCollection<BsonDocument>("World", "Globals"), c => c["_id"] == "Weather", weather);
+            }
 		}
 
           private static void ApplyWeatherPattern(BsonDocument weather, Weather weatherEnum, BsonArray intensityArray, int intensity, BsonDocument pattern, List<string> zones) {
@@ -266,25 +264,25 @@ namespace Calendar {
             int step = 0;
 
             Func<BsonArray, Tuple<string, int>, string, string, bool> result = delegate (BsonArray sequence, Tuple<string, int> tuple, string type, string weatherMsg) {
-            Rooms.Room room = null;
+            IRoom room = null;
             //the sequence has ended nothing left to do here
             if (step >= sequence.Count) {
                     foreach (string zone in zones) { //loop through each zone
                         for (int low = 0; low <= 999; low++) { //apply to it to rooms in zone Todo: get the number of rooms in the zone and use that as the low, high numbers
-                            room = Rooms.Room.GetRoom(zone + low);
-                            room.Weather = type;
-                            room.WeatherMessage = weatherMsg;
+                            room = Room.GetRoom(zone + low);
+                            ((Room)room).Weather = type;
+                            ((Room)room).WeatherMessage = weatherMsg;
                         }
                     }
 					return false;
 				}
 
-				Message message = new Message();
+				IMessage message = new Message();
                 foreach (string zone in zones) {
                     for (int low = 0; low <= 999; low++) {//Todo: get low/high numbers from room count in zone from database
-                        room = Rooms.Room.GetRoom(zone + low);
+                        room = Room.GetRoom(zone + low);
 						message.InstigatorID = room.Id;
-						message.InstigatorType = Message.ObjectType.Room;
+						message.InstigatorType = ObjectType.Room;
 
 						if (room.IsOutdoors) {
                             //ok if the tuple is not null then we are going to process it first. As of now it is just one single message with a wait time

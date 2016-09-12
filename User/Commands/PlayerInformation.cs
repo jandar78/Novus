@@ -3,19 +3,19 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using Rooms;
-using User;
 using MongoDB.Driver;
 using MongoDB.Bson;
 using MongoDB.Driver.Builders;
 using Extensions;
-using ClientHandling;
+using Interfaces;
+using Sockets;
+using Rooms;
 
 namespace Commands {
 	public partial class CommandParser {
 
 		//TODO: this needs more work done and also need to figure out a nice way to display it to the user
-		private static void DisplayStats(User.User player, List<string> commands) {
+		private static void DisplayStats(IUser player, List<string> commands) {
             Character.Character character = player.Player as Character.Character;
             if (character != null) {
                 StringBuilder sb = new StringBuilder();
@@ -27,7 +27,7 @@ namespace Commands {
                 sb.AppendLine("XP: " + (long)character.Experience);
                 sb.AppendLine("Next Level XP required: " + (long)character.NextLevelExperience + " (Needed: " + (long)(character.NextLevelExperience - character.Experience) + ")");
                 sb.AppendLine("\n[Attributes]");
-                foreach (KeyValuePair<string, Character.Attribute> attrib in player.Player.GetAttributes()) {
+                foreach (KeyValuePair<string, IAttributes> attrib in player.Player.GetAttributes()) {
                     sb.AppendLine(string.Format("{0,-12}: {1}/{2,-3}    Rank: {3}",attrib.Key.CamelCaseWord(), attrib.Value.Value, attrib.Value.Max, attrib.Value.Rank));
                 }
 
@@ -41,17 +41,17 @@ namespace Commands {
             }
 		}
 
-        private static void Inventory(User.User player, List<string> commands){
-            List<Items.Iitem> inventoryList = player.Player.Inventory.GetInventoryAsItemList();
+        private static void Inventory(IUser player, List<string> commands){
+            List<IItem> inventoryList = player.Player.Inventory.GetInventoryAsItemList();
             StringBuilder sb = new StringBuilder();
 
             Dictionary<string, int> grouping = new Dictionary<string, int>();
 
             //let's group repeat items for easier display this may be a candidate for a helper method
-            foreach (Items.Iitem item in inventoryList) {
-                Items.Icontainer container = item as Items.Icontainer;
+            foreach (IItem item in inventoryList) {
+                IContainer container = item as IContainer;
                 if (!grouping.ContainsKey(item.Name)) {
-                    if (!item.ItemType.ContainsKey(Items.ItemsType.CONTAINER)) {
+                    if (!item.ItemType.ContainsKey(ItemsType.CONTAINER)) {
                         grouping.Add(item.Name, 1);
                     }
                     else{
@@ -60,7 +60,7 @@ namespace Commands {
                     }
                 }
                 else {
-                    if (!item.ItemType.ContainsKey(Items.ItemsType.CONTAINER)) {
+                    if (!item.ItemType.ContainsKey(ItemsType.CONTAINER)) {
                         grouping[item.Name] += 1;
                     }
                     else {
@@ -84,13 +84,13 @@ namespace Commands {
             player.MessageHandler(sb.ToString());
         }
 
-        private static void Equipment(User.User player, List<string> commands) {
-            Dictionary<Items.Wearable, Items.Iitem> equipmentList = player.Player.Equipment.GetEquipment();
+        private static void Equipment(IUser player, List<string> commands) {
+            Dictionary<Wearable, IItem> equipmentList = player.Player.Equipment.GetEquipment();
             StringBuilder sb = new StringBuilder();
 
             if (equipmentList.Count > 0) {
                 sb.AppendLine("You are equipping:");
-                foreach (KeyValuePair<Items.Wearable, Items.Iitem> pair in equipmentList) {
+                foreach (KeyValuePair<Wearable, IItem> pair in equipmentList) {
                     sb.AppendLine("[" + pair.Key.ToString().Replace("_", " ").CamelCaseWord() + "] " + pair.Value.Name);
                 }
                 sb.AppendLine("\n\r");
@@ -102,7 +102,7 @@ namespace Commands {
             player.MessageHandler(sb.ToString());
         }
 
-        private static void LevelUp(User.User player, List<string> commands) {
+        private static void LevelUp(IUser player, List<string> commands) {
             Character.Character temp = player.Player as Character.Character;
             //if we leveled up we should have gotten points to spend assigned before we eve get here
             if (temp != null && (temp.PointsToSpend > 0 || temp.IsLevelUp)) {
@@ -110,15 +110,15 @@ namespace Commands {
                     player.Player.Level += 1;
                     temp.Leveled = false;
                 }
-                player.CurrentState = User.User.UserState.LEVEL_UP;
+                player.CurrentState = UserState.LEVEL_UP;
             }
             else {
                 player.MessageHandler("You do not have enough Experience, or points to spend to perform this action.");
             }
         }
 
-		private static void Emote(User.User player, List<string> commands) {
-			Message message = new Message();
+		private static void Emote(IUser player, List<string> commands) {
+			IMessage message = new Message();
 						
 			string temp = "";
 			if (commands[0].Trim().Length > 6) {
@@ -132,16 +132,16 @@ namespace Commands {
                 message.Self = player.Player.FirstName + " " + temp + (temp.EndsWith(".") == false ? "." : "");
             }
 
-            Room room = Room.GetRoom(player.Player.Location);
+            IRoom room = Room.GetRoom(player.Player.Location);
 			message.Room = (room.IsDark == true ? "Someone" : player.Player.FirstName) + " " + temp + (temp.EndsWith(".") == false ? "." : "");
 			message.InstigatorID = player.Player.ID;
-			message.InstigatorType = player.Player.IsNPC == false ? Message.ObjectType.Player : Message.ObjectType.Npc;
+			message.InstigatorType = player.Player.IsNPC == false ? ObjectType.Player : ObjectType.Npc;
 			player.MessageHandler(message.Self);
             room.InformPlayersInRoom(message, new List<string>(){ player.UserID });
 		}
 
-		private static void Say(User.User player, List<string> commands) {
-			Message message = new Message();
+		private static void Say(IUser player, List<string> commands) {
+			IMessage message = new Message();
 						
 			string temp ="";
             if (commands[0].Length > 4)	temp = commands[0].Substring(4).Trim();
@@ -151,15 +151,15 @@ namespace Commands {
                     return;
                 }
             }
-            Room room = Room.GetRoom(player.Player.Location);
+            IRoom room = Room.GetRoom(player.Player.Location);
 
 			message.Self = "You say \"" + temp + "\"";
 			message.Room = (room.IsDark == true ? "Someone" : player.Player.FirstName) + " says \"" + temp + "\"";
 			message.InstigatorID = player.Player.ID;
-			message.InstigatorType = player.Player.IsNPC == false ? Message.ObjectType.Player : Message.ObjectType.Npc;
+			message.InstigatorType = player.Player.IsNPC == false ? ObjectType.Player : ObjectType.Npc;
 
 			if (player.Player.IsNPC) {
-				message.InstigatorType = Message.ObjectType.Npc;
+				message.InstigatorType = ObjectType.Npc;
 				player.MessageHandler(message);
 
 			}
@@ -170,8 +170,8 @@ namespace Commands {
 			room.InformPlayersInRoom(message, new List<string>(){ player.UserID }); 
 		}
 
-		private static void SayTo(User.User player, List<string> commands) {
-			Message message = new Message();
+		private static void SayTo(IUser player, List<string> commands) {
+			IMessage message = new Message();
 			
 			string temp = "";
 			if (commands[0].Length > 5)
@@ -191,15 +191,15 @@ namespace Commands {
 				int.TryParse(position[position.Count() - 1], out playerPosition);
 				HasDotOperator = true;
 			}
-			Room room = Rooms.Room.GetRoom(player.Player.Location);
-			User.User toPlayer = null;
-			List<User.User> toPlayerList = new List<User.User>();
+			IRoom room = Room.GetRoom(player.Player.Location);
+			IUser toPlayer = null;
+			List<IUser> toPlayerList = new List<IUser>();
 			//we need some special logic here, first we'll try by first name only and see if we get a hit.  If there's more than one person named the same
 			//then we'll see if the last name was included in the commands. And try again.  If not we'll check for the dot operator and all if else fails tell them
 			//to be a bit more specific about who they are trying to directly speak to.
 			string[] nameBreakDown = commands[0].ToLower().Split(' ');
-			foreach (string id in room.GetObjectsInRoom(Room.RoomObjects.Players, 100)) {
-				toPlayerList.Add(MySockets.Server.GetAUser(id));
+			foreach (string id in room.GetObjectsInRoom(RoomObjects.Players, 100)) {
+				toPlayerList.Add(Server.GetAUser(id));
 			}
 			
 			if (toPlayerList.Where(p => p.Player.FirstName.ToLower() == nameBreakDown[1]).Count() > 1) { //let's narrow it down by including a last name (if provided)
@@ -224,7 +224,7 @@ namespace Commands {
 
 			if (toPlayer == null) { //we are looking for an npc at this point
 				toPlayerList.Clear();
-				foreach (string id in room.GetObjectsInRoom(Room.RoomObjects.Npcs, 100)) {
+				foreach (string id in room.GetObjectsInRoom(RoomObjects.Npcs, 100)) {
 					toPlayerList.Add(Character.NPCUtils.GetUserAsNPCFromList(new List<string>() { id }));
 				}
 				if (toPlayerList.Where(p => p.Player.FirstName.ToLower() == nameBreakDown[1]).Count() > 1) { //let's narrow it down by including a last name (if provided)
@@ -265,9 +265,9 @@ namespace Commands {
 				message.Room = (room.IsDark == true ? "Someone" : player.Player.FirstName) + " says to " + (room.IsDark == true ? "Someone" : toPlayer.Player.FirstName) + " \"" + temp + "\"";
 
 				message.InstigatorID = player.Player.ID;
-				message.InstigatorType = player.Player.IsNPC ? Message.ObjectType.Npc : Message.ObjectType.Player;
+				message.InstigatorType = player.Player.IsNPC ? ObjectType.Npc : ObjectType.Player;
 				message.TargetID = toPlayer.UserID;
-				message.TargetType = player.Player.IsNPC ? Message.ObjectType.Npc : Message.ObjectType.Player;
+				message.TargetType = player.Player.IsNPC ? ObjectType.Npc : ObjectType.Player;
 
 				if (player.Player.IsNPC) {
 					player.MessageHandler(message);
@@ -289,23 +289,23 @@ namespace Commands {
 
 		//a whisper is a private message but with a chance that other players may hear what was said, other player has to be in the same room
 		//TODO: need to add the ability for others to listen in on the whisper if they have the skill
-		private static void Whisper(User.User player, List<string> commands){
-			Message message = new Message();
+		private static void Whisper(IUser player, List<string> commands){
+			IMessage message = new Message();
 			message.InstigatorID = player.Player.ID;
-			message.InstigatorType = player.Player.IsNPC == false ? Message.ObjectType.Player : Message.ObjectType.Npc;
+			message.InstigatorType = player.Player.IsNPC == false ? ObjectType.Player : ObjectType.Npc;
 
-			List<User.User> toPlayerList = new List<User.User>();
-            Room room = Room.GetRoom(player.Player.Location);
+			List<IUser> toPlayerList = new List<IUser>();
+            IRoom room = Room.GetRoom(player.Player.Location);
 			if (commands.Count > 2){
 				if (commands[2].ToUpper() == "SELF") {
 					message.Self = "You turn your head towards your own shoulder and whisper quietly to yourself.";
 					message.Room = (room.IsDark == true ? "Someone" : player.Player.FirstName) + " whispers into " + player.Player.Gender == "MALE" ? "his" : "her" + " own shoulder.";
 				}
 
-				toPlayerList = MySockets.Server.GetAUserByFirstName(commands[2]).Where(p => p.Player.Location == player.Player.Location).ToList();
+				toPlayerList = Server.GetAUserByFirstName(commands[2]).Where(p => p.Player.Location == player.Player.Location).ToList();
 			}	
 
-			User.User toPlayer = null;
+			IUser toPlayer = null;
 
 			if (toPlayerList.Count < 1) {
 				player.MessageHandler("You whisper to no one. Creepy.");
@@ -330,7 +330,7 @@ namespace Commands {
 			}
 			else {
 				message.TargetID = toPlayer.Player.ID;
-				message.TargetType = player.Player.IsNPC ? Message.ObjectType.Npc : Message.ObjectType.Player;
+				message.TargetType = player.Player.IsNPC ? ObjectType.Npc : ObjectType.Player;
 
 				int startAt = commands[0].ToLower().IndexOf(toPlayer.Player.FirstName.ToLower() + " " + toPlayer.Player.LastName.ToLower());
 				if (startAt == -1 || startAt > 11) {
@@ -362,13 +362,13 @@ namespace Commands {
 		}
 
 		//a tell is a private message basically, location is not a factor
-		private static void Tell(User.User player, List<string> commands) {
-			Message message = new Message();
+		private static void Tell(IUser player, List<string> commands) {
+			IMessage message = new Message();
 			message.InstigatorID = player.Player.ID;
-			message.InstigatorType = player.Player.IsNPC ? Message.ObjectType.Npc : Message.ObjectType.Player;
+			message.InstigatorType = player.Player.IsNPC ? ObjectType.Npc : ObjectType.Player;
 
-			List<User.User> toPlayerList = MySockets.Server.GetAUserByFirstName(commands[2]).ToList();
-			User.User toPlayer = null;
+			List<IUser> toPlayerList = Server.GetAUserByFirstName(commands[2]).ToList();
+			IUser toPlayer = null;
 			
 			if (commands[2].ToUpper() == "SELF") {
 				message.Self = "You go to tell yourself something when you realize you already know it.";
@@ -395,7 +395,7 @@ namespace Commands {
 			}
 			else {
 				message.TargetID = toPlayer.Player.ID;
-				message.InstigatorType = toPlayer.Player.IsNPC ? Message.ObjectType.Npc : Message.ObjectType.Player;
+				message.InstigatorType = toPlayer.Player.IsNPC ? ObjectType.Npc : ObjectType.Player;
 
 				int startAt = commands[0].ToLower().IndexOf(toPlayer.Player.FirstName.ToLower() + " " + toPlayer.Player.LastName.ToLower());
 				if (startAt == -1 || startAt > 11) {
@@ -431,12 +431,12 @@ namespace Commands {
 			}
 		}
 
-		private static void Who(User.User player, List<string> commands) {
+		private static void Who(IUser player, List<string> commands) {
 			StringBuilder sb = new StringBuilder();
 			sb.AppendLine("PlayerName");
 			sb.AppendLine("----------");
-			MySockets.Server.GetCurrentUserList()
-				.Where(u => u.CurrentState == User.User.UserState.TALKING)
+			Server.GetCurrentUserList()
+				.Where(u => u.CurrentState == UserState.TALKING)
 				.OrderBy(u => u.Player.FirstName)
 				.ToList()
 				.ForEach(u => sb.AppendLine(u.Player.FirstName + " " + u.Player.LastName));
@@ -444,18 +444,17 @@ namespace Commands {
 			player.MessageHandler(sb.ToString());
 		}
 
-		private static void Help(User.User player, List<string> commands) {
+		private static void Help(IUser player, List<string> commands) {
 			StringBuilder sb = new StringBuilder();
-            MongoCollection helpCollection = MongoUtils.MongoData.GetCollection("Commands", "Help");
 
             if (commands.Count < 3 || commands.Contains("all")) { //display just the names
-                MongoCursor cursor = helpCollection.FindAllAs<BsonDocument>();
+                var cursor = MongoUtils.MongoData.RetrieveObjects<BsonDocument>("Commands", "Help", null);
                 foreach (BsonDocument doc in cursor) {
                     sb.AppendLine(doc["_id"].ToString());
                 }
             }
             else { //user specified a specific command so we will display the explanation and example
-                BsonDocument doc = helpCollection.FindOneAs<BsonDocument>(Query.Matches("_id", commands[2].ToUpper()));
+                var doc = MongoUtils.MongoData.RetrieveObject<BsonDocument>("Commands", "Help", b => b["_id"] == commands[2].ToUpper());
                 sb.AppendLine(doc["_id"].ToString());
                 sb.AppendLine(doc["explanation"].AsString);
                 sb.AppendLine(doc["Example"].AsString);
@@ -464,18 +463,18 @@ namespace Commands {
 			player.MessageHandler(sb.ToString());
 		}
 
-        public static void ReportBug(User.User player, List<string> commands) {
+        public static async void ReportBug(IUser player, List<string> commands) {
             MongoUtils.MongoData.ConnectToDatabase();
-            MongoDatabase db = MongoUtils.MongoData.GetDatabase("Logs");
-            MongoCollection col = db.GetCollection("Bugs");
-            BsonDocument doc = new BsonDocument();
+            var bugCollection = MongoUtils.MongoData.GetCollection<BsonDocument>("Logs", "Bugs");
 
-            doc.Add("ReportedBy", BsonValue.Create(player.UserID));
-            doc.Add("DateTime", BsonValue.Create(DateTime.Now.ToUniversalTime()));
-            doc.Add("Resolved", BsonValue.Create(false));
-            doc.Add("Issue", BsonValue.Create(commands[0].Substring("bug".Length + 1)));
+            BsonDocument doc = new BsonDocument{
+                { "ReportedBy", BsonValue.Create(player.UserID) },
+                { "DateTime", BsonValue.Create(DateTime.Now.ToUniversalTime()) },
+                { "Resolved", BsonValue.Create(false) },
+                { "Issue", BsonValue.Create(commands[0].Substring("bug".Length + 1)) }
+            };
 
-            col.Save(doc);
+            await bugCollection.InsertOneAsync(doc);
 
             if (player.Player != null) { //could be an internal bug being reported
                 player.MessageHandler("Your bug has been reported, thank you.");

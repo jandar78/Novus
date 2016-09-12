@@ -10,9 +10,9 @@ namespace Items {
 
         public Wearable EquippedOn { get; set; }
 
-        public decimal MaxDefense { get; set; }
+        public double MaxDefense { get; set; }
 
-        public decimal CurrentDefense { get; set; }
+        public double CurrentDefense { get; set; }
 
         public Dictionary<string, double> TargetDefenseEffects { get; set; }
 

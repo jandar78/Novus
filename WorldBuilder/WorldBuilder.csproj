@@ -254,9 +254,9 @@
     <None Include="App.config" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\Interfaces\Interfaces.csproj">
-      <Project>{2de36f1e-82c8-4004-bd8d-2861e9cdeada}</Project>
-      <Name>Interfaces</Name>
+    <ProjectReference Include="..\Messages\Messages.csproj">
+      <Project>{6b9ffaa7-8b43-4f13-87c4-cef9b6e95c3f}</Project>
+      <Name>Messages</Name>
     </ProjectReference>
     <ProjectReference Include="..\MongoWrapper\MongoWrapper.csproj">
       <Project>{4b12be0d-5ae3-4c79-b6e7-7dddd2c5a4ba}</Project>
@@ -265,6 +265,10 @@
     <ProjectReference Include="..\User\Core.csproj">
       <Project>{eca43097-56b3-45c9-93c2-c6ada9f0d8a4}</Project>
       <Name>Core</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\Utils\Utils.csproj">
+      <Project>{ea6f1d8a-1702-4ff4-a9aa-20ea80cc395e}</Project>
+      <Name>Utils</Name>
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
