@@ -1,8 +1,6 @@
-﻿using System;
+﻿using MongoDB.Bson;
+using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Interfaces
 {
@@ -10,14 +8,14 @@ namespace Interfaces
 
     public interface IUser {
         bool HourFormat24 { get; set; }
-        string UserID { get; set; }
+        ObjectId UserID { get; set; }
         DateTime LastDisconnected { get; set; }
         string GroupName { get; set; }
         IActor Player { get; set; }
         UserState CurrentState { get; set; }
         bool LoginCompleted { get; set; }
-        List<string> FriendsList { get; set; }
-        string LogID { get; set; }
+        List<ObjectId> FriendsList { get; set; }
+        ObjectId LogID { get; set; }
         string OutBuffer { get; set; }
         string InBuffer { get; set; }
         string InBufferPeek { get; }

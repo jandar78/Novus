@@ -1,21 +1,18 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using MongoDB.Bson;
+using System;
 
 namespace Interfaces {
     public interface INpc {
         void Update();
         void CalculateXP();
-        void IncreaseXPReward(string id, double damage);
+        void IncreaseXPReward(ObjectId id, double damage);
 		void DecreaseXPReward(double amount);
         void ParseMessage(IMessage message);
         IFsm Fsm { get; set; }
         DateTime NextAiAction { get; set; }
         string AiState { get; set; }
-        string PreviousState { get; set; }
-        string GlobalState { get; set; }
+        string PreviousAiState { get; set; }
+        string AiGlobalState { get; set; }
         long XP { get; set; }
 
     }

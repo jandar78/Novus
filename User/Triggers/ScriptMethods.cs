@@ -14,6 +14,7 @@ using System.Collections;
 using NCalc;
 using Interfaces;
 using Rooms;
+using MongoDB.Bson;
 
 namespace Triggers {
 	public class ScriptMethods {
@@ -35,13 +36,13 @@ namespace Triggers {
 		//and if needed then classes can register their own additional functions with Lua
 
 		[LuaAccessible]
-		public static object GetPlayer(string playerID) {
+		public static object GetPlayer(ObjectId playerID) {
 			object o = null;
 			o = Sockets.Server.GetAUser(playerID).Player;
 			return o;
 		}
 
-		public IUser GetUser(string playerID) {
+		public IUser GetUser(ObjectId playerID) {
 			return Sockets.Server.GetAUser(playerID);
 		}
 
@@ -230,7 +231,7 @@ namespace Triggers {
 		}
 
 		[LuaAccessible]
-		public static void SendMessage(string playerID, string message) {
+		public static void SendMessage(ObjectId playerID, string message) {
 			IUser player = Sockets.Server.GetAUser(playerID);
 			player.MessageHandler(message);
 		}
@@ -344,8 +345,8 @@ namespace Triggers {
 
 			foreach (string attributeName in attributeList) {
 				if (!string.IsNullOrEmpty(attributeName)) {
-					if (player.GetAttributes().ContainsKey(attributeName)) {
-						temp = temp.Replace(attributeName, player.GetAttributeValue("attributeName").ToString());
+					if (player.GetAttributes().Any(a => a.Name == attributeName.CamelCaseWord())) {
+						temp = temp.Replace(attributeName, player.GetAttributeValue(attributeName).ToString());
 					}
 					else if (player.GetSubAttributes().ContainsKey(attributeName)) {
 						temp = temp.Replace(attributeName, player.GetSubAttributes()[attributeName].ToString());

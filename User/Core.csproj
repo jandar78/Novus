@@ -213,6 +213,11 @@
     <Compile Include="Rooms\Exits.cs" />
     <Compile Include="Rooms\Room.cs" />
     <Compile Include="Rooms\RoomModifier.cs" />
+    <Compile Include="Scripts\CreateCharacter.cs" />
+    <Compile Include="Scripts\IScript.cs" />
+    <Compile Include="Scripts\LevelUp.cs" />
+    <Compile Include="Scripts\Login.cs" />
+    <Compile Include="Scripts\ScriptBase.cs" />
     <Compile Include="Triggers\IScript.cs" />
     <Compile Include="Triggers\Script.cs" />
     <Compile Include="Triggers\ScriptFactory.cs" />

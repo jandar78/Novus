@@ -157,8 +157,8 @@ namespace Commands {
 
             foreach (string attributeName in attributeList) {
                 if (!string.IsNullOrEmpty(attributeName)) {
-                    if (player.GetAttributes().ContainsKey(attributeName)) {
-                        temp = temp.Replace(attributeName, player.GetAttributeValue("attributeName").ToString());
+                    if (player.GetAttributes().Any(a => a.Name == attributeName.CamelCaseWord())) {
+                        temp = temp.Replace(attributeName, player.GetAttributeValue(attributeName).ToString());
                     }
                     else if (player.GetSubAttributes().ContainsKey(attributeName)) {
                         temp = temp.Replace(attributeName, player.GetSubAttributes()[attributeName].ToString());
@@ -227,9 +227,9 @@ namespace Commands {
 			//ex: HitSword, HitClub, MissAxe, MissUnarmed could even get really specific HitRustyShortSword, MissLegendaryDaggerOfBlindness
 			//Make a method to figure out the type by having a lookup table in the DB that points to a weapon type string
 			IMessage message = new Message();
-			message.InstigatorID = player.UserID;
+			message.InstigatorID = player.UserID.ToString();
 			message.InstigatorType = player.Player.IsNPC == false ? ObjectType.Player : ObjectType.Npc;
-			message.TargetID = enemy.UserID;
+			message.TargetID = enemy.UserID.ToString();
 			message.TargetType = enemy.Player.IsNPC == false ? ObjectType.Player : ObjectType.Npc;
 
 			if (damage < 0) {
@@ -264,7 +264,7 @@ namespace Commands {
 				enemy.MessageHandler(message.Target);
 			}
 			
-			room.InformPlayersInRoom(message, new List<string>(new string[] { player.UserID, enemy.UserID }));
+			room.InformPlayersInRoom(message, new List<ObjectId>() { player.UserID, enemy.UserID });
 		}
 
         private static double CalculateDamage(IUser player, IUser enemy, bool offHand, out double defense, out double attack) {
@@ -299,7 +299,7 @@ namespace Commands {
                 //ok it's not a player lets look through the NPC list
                 foreach (INpc npc in Character.NPCUtils.GetAnNPCByName(name, location)) {
                     IUser foe = new User(true);
-                    foe.UserID = ((NPC)npc).ID;
+                    foe.UserID = ((NPC)npc).Id;
                     foe.Player = npc as IActor;
                     enemy = foe;
                     break;
@@ -344,7 +344,7 @@ namespace Commands {
 
                 if (npc != null) {
                     IUser temp = new User(true);
-                    temp.UserID = npc.ID;
+                    temp.UserID = npc.Id;
                     temp.Player = npc;
                     enemy = temp;
                 }
@@ -367,7 +367,7 @@ namespace Commands {
                 player.MessageHandler(ParseMessage(GetMessage("Combat", "TargetNotFound", MessageType.Self), player, enemy));
                 player.Player.InCombat = false;
                 player.Player.LastTarget = player.Player.CurrentTarget; //set the current target to the last target the player had
-                player.Player.CurrentTarget = null;
+                player.Player.CurrentTarget = ObjectId.Empty;
 
                 if (player.Player.IsNPC) {
                     player.Player.Save(); //need to update the npc status in the DB
@@ -379,7 +379,7 @@ namespace Commands {
             if (targetFound && enemy.Player.Location != player.Player.Location) {
                 player.MessageHandler(ParseMessage(GetMessage("Combat", "TargetNotInLocation", MessageType.Self), player, enemy));
                 player.Player.InCombat = false;
-                player.Player.UpdateTarget(null);
+                player.Player.UpdateTarget(ObjectId.Empty);
                 targetFound = false;
             }
 
@@ -387,7 +387,7 @@ namespace Commands {
             if (targetFound && enemy.Player.IsDead()) {
                 player.MessageHandler(ParseMessage(GetMessage("Combat", "TargetFoundDead", MessageType.Self), player, enemy));
                 player.Player.InCombat = false;
-                player.Player.UpdateTarget(null);
+                player.Player.UpdateTarget(ObjectId.Empty);
                 targetFound = false;
             }
 
@@ -504,15 +504,15 @@ namespace Commands {
             player.Player.ClearTarget();
             string status = dead == true ? "Killed" : "KnockedUnconcious";
 			IMessage message = new Message();
-			message.InstigatorID = player.UserID;
+			message.InstigatorID = player.UserID.ToString();
 			message.InstigatorType = player.Player.IsNPC == false ? ObjectType.Player : ObjectType.Npc;
-			message.TargetID = enemy.UserID;
+			message.TargetID = enemy.UserID.ToString();
 			message.TargetType = enemy.Player.IsNPC == false ? ObjectType.Player : ObjectType.Npc;
 
 			message.Self = ParseMessage(GetMessage("Combat", status, MessageType.Self), player, enemy);
             message.Target = ParseMessage(GetMessage("Combat", status, MessageType.Target), player, enemy);
 			message.Room = ParseMessage(GetMessage("Combat", status, MessageType.Room), player, enemy);
-            Room.GetRoom(player.Player.Location).InformPlayersInRoom(message, new List<string>() { player.UserID, enemy.UserID });
+            Room.GetRoom(player.Player.Location).InformPlayersInRoom(message, new List<ObjectId>() { player.UserID, enemy.UserID });
 			if (dead) {
 				SetKiller(enemy, player);
 			}
@@ -537,7 +537,7 @@ namespace Commands {
 		private static void Cleave(IUser player, List<string> commands) {//this will need a check in the future to be used with only bladed weapons
 			IUser enemy = null;
 			IMessage message = new Message();
-			message.InstigatorID = player.UserID;
+			message.InstigatorID = player.UserID.ToString();
 			message.InstigatorType = player.Player.IsNPC == false ? ObjectType.Player : ObjectType.Npc;
 
             if (commands.Count > 2) {
@@ -557,7 +557,7 @@ namespace Commands {
                 foreach (IActor npc in Character.NPCUtils.GetAnNPCByName(commands[2], player.Player.Location)) {
                     if (npc.ActionState == CharacterActionState.Unconcious) {
                         IUser foe = new User(true);
-                        foe.UserID = npc.ID;
+                        foe.UserID = npc.Id;
                         foe.Player = npc;
                         enemy = foe;
                         break;
@@ -571,19 +571,19 @@ namespace Commands {
 			}
 			else {
 				IRoom room = Room.GetRoom(player.Player.Location);
-				message.TargetID = enemy.UserID;
+				message.TargetID = enemy.UserID.ToString();
 				message.TargetType = enemy.Player.IsNPC == false ? ObjectType.Player : ObjectType.Npc;
 
 				if (String.Compare(enemy.Player.ActionState.ToString(), "unconcious", true) == 0) {
 					if (commands.Count > 3 && commands[3].ToLower() == "slowly") {  //a slow death for your opponent, bask in it.
-						message.Self = String.Format("You slowly drive your blade through {0}'s chest and twist it a few times as {1} lays on the ground unconcious.", enemy.Player.FirstName, enemy.Player.Gender == "Male" ? "he" : "she");
-						message.Target = String.Format("{0} slowly drives {1} blade through your chest and twists it a few times as you lay on the ground unconcious.", player.Player.FirstName, player.Player.Gender == "Male" ? "his" : "her");
-						message.Room = String.Format("{0} slowly drives {1} blade through {2}'s chest and twists it a few times as {3} lay on the ground unconcious.", player.Player.FirstName, player.Player.Gender == "Male" ? "his" : "her", enemy.Player.FirstName, enemy.Player.Gender == "Male" ? "he" : "she");
+						message.Self = String.Format("You slowly drive your blade through {0}'s chest and twist it a few times as {1} lays on the ground unconcious.", enemy.Player.FirstName, enemy.Player.GenderPossesive.ToLower());
+						message.Target = String.Format("{0} slowly drives {1} blade through your chest and twists it a few times as you lay on the ground unconcious.", player.Player.FirstName, player.Player.Gender == Genders.Male ? "his" : "her");
+						message.Room = String.Format("{0} slowly drives {1} blade through {2}'s chest and twists it a few times as {3} lay on the ground unconcious.", player.Player.FirstName, player.Player.Gender == Genders.Male ? "his" : "her", enemy.Player.FirstName, enemy.Player.GenderPossesive.ToLower());
 					}
 					else {
-						message.Self = String.Format("You cleave {0} as {1} lays on the ground unconcious.", enemy.Player.FirstName, enemy.Player.Gender == "Male" ? "he" : "she");
+						message.Self = String.Format("You cleave {0} as {1} lays on the ground unconcious.", enemy.Player.FirstName, enemy.Player.Gender == Genders.Male ? "he" : "she");
 						message.Target = String.Format("{0} cleaved you as you lay on the ground unconcious.", player.Player.FirstName);
-						message.Room = String.Format("{0} cleaved {1} as {2} lay on the ground unconcious.", player.Player.FirstName, enemy.Player.FirstName, enemy.Player.Gender == "Male" ? "he" : "she");
+						message.Room = String.Format("{0} cleaved {1} as {2} lay on the ground unconcious.", player.Player.FirstName, enemy.Player.FirstName, enemy.Player.Gender == Genders.Male ? "he" : "she");
 					}
 					enemy.Player.SetAttributeValue("Hitpoints", -100);
 					//SetDead(player, enemy);
@@ -595,7 +595,7 @@ namespace Commands {
 					}
 				}
 				else {
-					message.Self = String.Format("You can't cleave {0}, {1} not unconcious.", enemy.Player.FirstName, enemy.Player.Gender == "Male" ? "he's" : "she's");
+					message.Self = String.Format("You can't cleave {0}, {1} not unconcious.", enemy.Player.FirstName, enemy.Player.GenderPossesive.ToLower() + "'s");
 				}
 				if (player.Player.IsNPC) {
 					player.MessageHandler(message);
@@ -610,7 +610,7 @@ namespace Commands {
 					enemy.MessageHandler(message.Target);
 				}
 
-				room.InformPlayersInRoom(message, new List<string>() { player.UserID, enemy.UserID });
+				room.InformPlayersInRoom(message, new List<ObjectId>() { player.UserID, enemy.UserID });
 			}
 		}
 		#endregion
@@ -626,8 +626,8 @@ namespace Commands {
             
             if (target != null){
                 message = message.Replace("{target}", target.Player.FirstName)
-                                 .Replace("{him-her}", target.Player.Gender == "Male" ? "him" : "her")
-                                 .Replace("{he-she}", target.Player.Gender == "Male" ? "he" : "she");
+                                 .Replace("{him-her}", target.Player.Gender == Genders.Male ? "him" : "her")
+                                 .Replace("{he-she}", target.Player.GenderPossesive.ToLower());
             }
 
             return message;
@@ -676,7 +676,7 @@ namespace Commands {
 		private static bool BreakDoor(IUser player, List<string> commands){
 			IDoor door = FindDoor(player.Player.Location, commands);
 			IMessage message = new Message();
-			message.InstigatorID = player.UserID;
+			message.InstigatorID = player.UserID.ToString();
 			message.InstigatorType = player.Player.IsNPC == false ? ObjectType.Player : ObjectType.Npc;
 
 			if (door == null) {
@@ -695,7 +695,7 @@ namespace Commands {
 				door.UpdateDoorStatus();
 				message.Self = messages[0].FontColor(Utils.FontForeColor.RED);
 				message.Room = String.Format(messages[1], player.Player.FirstName);
-                Room.GetRoom(player.Player.Location).InformPlayersInRoom(message, new List<string>() { player.UserID });
+                Room.GetRoom(player.Player.Location).InformPlayersInRoom(message, new List<ObjectId>() { player.UserID });
 			}
 			return true;
 		}

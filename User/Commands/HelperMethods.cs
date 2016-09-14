@@ -16,12 +16,12 @@ namespace Commands {
     public partial class CommandParser {
 
         //called from the LOOK command
-        private static string DisplayPlayersInRoom(IRoom room, string ignoreId) {
+        private static string DisplayPlayersInRoom(IRoom room, ObjectId ignoreId) {
             StringBuilder sb = new StringBuilder();
 
             if (!room.IsDark) {
-                foreach (string id in room.GetObjectsInRoom(RoomObjects.Players)) {
-                    if (id != ignoreId) {
+                foreach (var id in room.GetObjectsInRoom(RoomObjects.Players)) {
+                    if (!id.Equals(ignoreId)) {
                         IUser otherUser = Server.GetAUser(id);
                         if (otherUser != null && otherUser.CurrentState == UserState.TALKING) {
                             if (otherUser.Player.ActionState != CharacterActionState.Hiding && otherUser.Player.ActionState != CharacterActionState.Sneaking){  //(string.IsNullOrEmpty(PassesHideCheck(otherUser, ignoreId, out spot))) { //player should do a spot check this should not be a given
@@ -32,7 +32,7 @@ namespace Commands {
                 }
                 Dictionary<string, int> npcGroups = new Dictionary<string, int>();
 
-                foreach (string id in room.GetObjectsInRoom(RoomObjects.Npcs)) {
+                foreach (var id in room.GetObjectsInRoom(RoomObjects.Npcs)) {
                     var npc = Character.NPCUtils.GetAnNPCByID(id);
 
                     if (!npcGroups.ContainsKey(npc.FirstName + "$" + npc.LastName + "$" + npc.StanceState)) {
@@ -50,8 +50,8 @@ namespace Commands {
             }
             else {
                 int count = 0;
-                foreach (string id in room.GetObjectsInRoom(RoomObjects.Players)) {
-                    if (id != ignoreId) {
+                foreach (var id in room.GetObjectsInRoom(RoomObjects.Players)) {
+                    if (!id.Equals(ignoreId)) {
                         IUser otherUser = Server.GetAUser(id);
                         if (otherUser != null && otherUser.CurrentState == UserState.TALKING) {
                             if (otherUser.Player.ActionState != CharacterActionState.Hiding && otherUser.Player.ActionState != CharacterActionState.Sneaking) {  //player should do a spot check this should not be a given
@@ -76,12 +76,12 @@ namespace Commands {
        private static string DisplayItemsInRoom(IRoom room) {
             StringBuilder sb = new StringBuilder();
 
-            List<string> itemsInRoom = room.GetObjectsInRoom(RoomObjects.Items);
+            List<ObjectId> itemsInRoom = room.GetObjectsInRoom(RoomObjects.Items);
 
             Dictionary<string, int> itemGroups = new Dictionary<string, int>();
 
             if (!room.IsDark) {
-                foreach (string id in itemsInRoom) {
+                foreach (var id in itemsInRoom) {
 
                     IItem item = Items.Items.GetByID(id).Result;
                     if (item != null) {
@@ -131,7 +131,7 @@ namespace Commands {
             }
             else {
                 int count = 0;
-                foreach (string id in itemsInRoom) {
+                foreach (var id in itemsInRoom) {
                     IItem item = Items.Items.GetByID(id).Result;
                     if (item != null) {
                         count++;
@@ -167,7 +167,7 @@ namespace Commands {
         private static void ApplyRoomModifier(IUser player) {
             StringBuilder sb = new StringBuilder();
             IMessage message = new Message();
-            message.InstigatorID = player.UserID;
+            message.InstigatorID = player.UserID.ToString();
             message.InstigatorType = player.Player.IsNPC == false ? ObjectType.Player : ObjectType.Npc;
             //Todo:  Check the player bonuses to see if they are immune or have resistance to the modifier
             foreach (var modifier in Room.GetModifierEffects(player.Player.Location)) {
@@ -187,7 +187,7 @@ namespace Commands {
                            player.Player.Gender.ToString() == "Male" ? "he" : "she", positiveValue));
 
                 message.Room = "\r" + sb.ToString();
-                Room.GetRoom(player.Player.Location).InformPlayersInRoom(message, new List<string>() { player.UserID });
+                Room.GetRoom(player.Player.Location).InformPlayersInRoom(message, new List<ObjectId>() { player.UserID });
                 if (player.Player.IsNPC) {
                     player.MessageHandler(message);
                 } else {
@@ -199,29 +199,29 @@ namespace Commands {
 
        
         //could be an item or an npc, we'll figure it out
-        private static string GetObjectInPosition(int position, string name, string location) {
-            string result = "";
+        private static ObjectId GetObjectInPosition(int position, string name, string location) {
+            ObjectId result = ObjectId.Empty;
             string[] parsedName = name.Split('.');
             
             result = GetNPCInPosition(position, name, location, parsedName);
-            if (string.IsNullOrEmpty(result)) {
+            if (result == ObjectId.Empty) {
                result = GetItemInPosition(position, name, location, parsedName);
             }
 
             return result;
         }
 
-        private static string GetItemInPosition(int position, string name, string location, string[] parsedName) {
-            string result = "";
+        private static ObjectId GetItemInPosition(int position, string name, string location, string[] parsedName) {
+            ObjectId result = ObjectId.Empty;
 
             MongoUtils.MongoData.ConnectToDatabase();
             var itemCollection = MongoUtils.MongoData.GetCollection<Items.Items>("World","Items" );
-            List<string> itemIds = Room.GetRoom(location).GetObjectsInRoom(RoomObjects.Items);
+            List<ObjectId> itemIds = Room.GetRoom(location).GetObjectsInRoom(RoomObjects.Items);
 
             int count = 1;
 
-            foreach (string ids in itemIds) {
-                var item = MongoUtils.MongoData.RetrieveObject<Items.Items>(itemCollection, i => i.Id == ObjectId.Parse(ids));
+            foreach (var ids in itemIds) {
+                var item = MongoUtils.MongoData.RetrieveObject<Items.Items>(itemCollection, i => i.Id == ids);
                 if (string.Equals(item.Name, parsedName[0], StringComparison.InvariantCultureIgnoreCase) && count == position) {
                     result = ids;
                     break;
@@ -235,15 +235,15 @@ namespace Commands {
             return result;
         }
 
-        private static string GetNPCInPosition(int position, string name, string location, string[] parsedName) {
-            string result = "";
+        private static ObjectId GetNPCInPosition(int position, string name, string location, string[] parsedName) {
+            ObjectId result = ObjectId.Empty;
             var npcs = MongoUtils.MongoData.GetCollection<NPC>("Characters", "NPCCharacters");
-            List<string> npcIds = Room.GetRoom(location).GetObjectsInRoom(RoomObjects.Npcs);
+            List<ObjectId> npcIds = Room.GetRoom(location).GetObjectsInRoom(RoomObjects.Npcs);
 
             int count = 1;
 
-            foreach (string ids in npcIds) {
-                var npc = MongoUtils.MongoData.RetrieveObject<NPC>(npcs, n => n.ID == ids);
+            foreach (var ids in npcIds) {
+                var npc = MongoUtils.MongoData.RetrieveObject<NPC>(npcs, n => n.Id == ids);
                 if (string.Equals(npc.FirstName, parsedName[0], StringComparison.InvariantCultureIgnoreCase) && count == position) {
                     result = ids;
                     break;

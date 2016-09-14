@@ -5,6 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Interfaces;
 using Rooms;
+using MongoDB.Bson;
 
 namespace AI.PathFinding {
 	public class TreeNode {

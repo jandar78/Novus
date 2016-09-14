@@ -36,11 +36,11 @@ namespace Character{
         #endregion Public Members
 
         #region Protected Members
-        protected Dictionary<string, IAttributes> Attributes;
+        public List<Attribute> Attributes;
         protected Dictionary<string, double> SubAttributes;
         protected HashSet<Languages> KnownLanguages; //this will hold all the languages the player can understand
         protected double _levelModifier;
-        protected StatBonuses Bonuses;
+        public StatBonuses Bonuses;
         
         #region Stances
         protected CharacterStanceState _stanceState;
@@ -55,15 +55,6 @@ namespace Character{
         protected int _points;
         #endregion Misc
 
-        #region Bodily descriptions
-        protected Genders _gender;
-        protected EyeColors _eyeColor;
-        protected HairColors _hairColor;
-        protected SkinColors _skinColor;
-        protected SkinType _skinType;
-        protected BodyBuild _build;
-        protected CharacterRace _race;
-        #endregion Bodily descriptions
         #endregion Protected Members
 
         #region Private members
@@ -71,7 +62,7 @@ namespace Character{
         #endregion Private members
 
         #region  Properties
-        public string UserID { get; set; }
+        public ObjectId UserID { get; set; }
 
         public string Password {
             get;
@@ -107,14 +98,14 @@ namespace Character{
 		#region Constructors
 
         public Character() {
-            _class = CharacterClass.Explorer;
-            _race = CharacterRace.Human;
-            _gender = Genders.Female;
-            _skinColor = SkinColors.Fair;
-            _skinType = Interfaces.SkinType.Flesh;
-            _hairColor = HairColors.Black;
-            _eyeColor = EyeColors.Brown;
-            _build = BodyBuild.Medium;
+            Class = CharacterClass.Explorer;
+            Race = CharacterRace.Human;
+            Gender = Genders.Female;
+            SkinColor = SkinColors.Fair;
+            SkinType = Interfaces.SkinType.Flesh;
+            HairColor = HairColors.Black;
+            EyeColor = EyeColors.Brown;
+            Build = BodyBuild.Medium;
 
             _koCount = new Tuple<int, DateTime>(0, DateTime.Now);
             _actionState = CharacterActionState.None;
@@ -130,7 +121,7 @@ namespace Character{
             Age = 17;   //Do we want an age? And are we going to advance it every in game year?  We'll need a birthdate for this.
             Weight = 180; //pounds or kilos?
             Height = 70;  //inches or centimeters?
-            Location = "A1";
+            Location = "A1000";
             InCombat = false;
             LastCombatTime = DateTime.MinValue.ToUniversalTime();
             IsNPC = false;
@@ -145,14 +136,14 @@ namespace Character{
             Equipment = new Equipment();
             Bonuses = new StatBonuses();
             
-            Attributes = new Dictionary<string, IAttributes>();
+            Attributes = new List<Attribute>();
 
-            Attributes.Add("Hitpoints", new Attribute(150, "Hitpoints", 150, 0.1, 1));
-            Attributes.Add("Dexterity", new Attribute(10, "Dexterity", 5, 0, 1));
-            Attributes.Add("Strength", new Attribute(10, "Strength", 5, 0, 1));
-            Attributes.Add("Intelligence", new Attribute(10, "Intelligence", 5, 0, 1));
-            Attributes.Add("Endurance", new Attribute(10, "Endurance", 5, 0, 1));
-            Attributes.Add("Charisma", new Attribute(10, "Charisma", 5, 0, 1));
+            Attributes.Add(new Attribute(150, "Hitpoints", 150, 0.1, 1));
+            Attributes.Add(new Attribute(10, "Dexterity", 5, 0, 1));
+            Attributes.Add(new Attribute(10, "Strength", 5, 0, 1));
+            Attributes.Add(new Attribute(10, "Intelligence", 5, 0, 1));
+            Attributes.Add(new Attribute(10, "Endurance", 5, 0, 1));
+            Attributes.Add(new Attribute(10, "Charisma", 5, 0, 1));
 
             SubAttributes = new Dictionary<string, double>();
 
@@ -168,14 +159,14 @@ namespace Character{
         /// </summary>
         /// <param name="copy"></param>
         public Character(Character copy) { //copy constructor
-            _class = copy._class;
-            _race = copy._race;
-            _gender = copy._gender;
-            _skinColor = copy._skinColor;
-            _skinType = copy._skinType;
-            _hairColor = copy._hairColor;
-            _eyeColor = copy._eyeColor;
-            _build = copy._build;
+            Class = copy.Class;
+            Race = copy.Race;
+            Gender = copy.Gender;
+            SkinColor = copy.SkinColor;
+            SkinType = copy.SkinType;
+            HairColor = copy.HairColor;
+            EyeColor = copy.EyeColor;
+            Build = copy.Build;
             _koCount = new Tuple<int, DateTime>(0, DateTime.Now);
             _actionState = CharacterActionState.None;
             _stanceState = CharacterStanceState.Standing;
@@ -192,7 +183,7 @@ namespace Character{
             Age = copy.Age;   //Do we want an age? And are we going to advance it every in game year?  Players could be 400+ years old rather quick.
             Weight = copy.Weight; //pounds or kilos?
             Height = copy.Height;  //inches or centimeters?
-            Location = "A1";
+            Location = "A1000";
             InCombat = false;
             LastCombatTime = DateTime.MinValue.ToUniversalTime();
             IsNPC = false;
@@ -204,10 +195,10 @@ namespace Character{
             MainHand = "WIELD_RIGHT";
 
 
-            Attributes = new Dictionary<string, IAttributes>();
+            Attributes = new List<Attribute>();
 
-            foreach (KeyValuePair<string, IAttributes> attrib in copy.Attributes){
-                Attributes.Add(attrib.Key, attrib.Value);
+            foreach (var attrib in copy.Attributes){
+                Attributes.Add(attrib);
             }
             
             SubAttributes = new Dictionary<string, double>();
@@ -223,14 +214,14 @@ namespace Character{
         }
 
 		public Character(CharacterRace race, CharacterClass characterClass, Genders gender, Languages language, SkinColors skinColor, SkinType skinType, HairColors hairColor, EyeColors eyeColor, BodyBuild build) {
-			_class = characterClass;
-			_race = race;
-			_gender = gender;
-            _skinColor = skinColor;
-            _skinType = skinType;
-            _hairColor = hairColor;
-            _eyeColor = eyeColor;
-            _build = build;
+			Class = characterClass;
+			Race = race;
+			Gender = gender;
+            SkinColor = skinColor;
+            SkinType = skinType;
+            HairColor = hairColor;
+            EyeColor = eyeColor;
+            Build = build;
 
 			_koCount = new Tuple<int, DateTime>(0, DateTime.Now);
 			_actionState = CharacterActionState.None;
@@ -246,7 +237,7 @@ namespace Character{
 			Age = 17;   //Do we want an age? And are we going to advance it every in game year?
 			Weight = 180.0d; //pounds or kilos?
 			Height = 70.0d;  //inches or centimeters?
-			Location = "A1";
+			Location = "A1000";
 			InCombat = false;
 			LastCombatTime = DateTime.MinValue.ToUniversalTime();
             IsNPC = false;
@@ -261,17 +252,17 @@ namespace Character{
 			Equipment = new Equipment();
             Bonuses = new StatBonuses();
 
-			Inventory.playerID = ID;
-			Equipment.playerID = ID;
+			Inventory.playerID = Id;
+			Equipment.playerID = Id;
 
-			Attributes = new Dictionary<string, IAttributes>();
+			Attributes = new List<Attribute>();
 
-			Attributes.Add("Hitpoints", new Attribute(150, "Hitpoints", 150, 0.1, 1));
-			Attributes.Add("Dexterity", new Attribute(10, "Dexterity", 5, 0, 1));
-			Attributes.Add("Strength", new Attribute(10, "Strength", 5, 0, 1));
-			Attributes.Add("Intelligence", new Attribute(10, "Intelligence", 5, 0, 1));
-			Attributes.Add("Endurance", new Attribute(10, "Endurance", 5, 0, 1));
-			Attributes.Add("Charisma", new Attribute(10, "Charisma", 5, 0, 1));
+			Attributes.Add(new Attribute(150, "Hitpoints", 150, 0.1, 1));
+			Attributes.Add(new Attribute(10, "Dexterity", 5, 0, 1));
+			Attributes.Add(new Attribute(10, "Strength", 5, 0, 1));
+			Attributes.Add(new Attribute(10, "Intelligence", 5, 0, 1));
+			Attributes.Add( new Attribute(10, "Endurance", 5, 0, 1));
+			Attributes.Add(new Attribute(10, "Charisma", 5, 0, 1));
 
 			SubAttributes = new Dictionary<string, double>();
 
@@ -283,13 +274,13 @@ namespace Character{
 		}
 		#endregion Constructors
 
-		public void Save() {
-            if (this.ID == null) {
-                this.ID = new MongoDB.Bson.ObjectId().ToString();
+		public async void Save() {
+            if (this.Id == null) {
+                this.Id = new MongoDB.Bson.ObjectId();
             }; //new character
 			var characterCollection = MongoUtils.MongoData.GetCollection<Character>("Characters", "PlayerCharacter");
 
-            MongoUtils.MongoData.InsertAsync<Character>(characterCollection, this); //upsert
+            await MongoUtils.MongoData.SaveAsync<Character>(characterCollection, c => c.Id == Id, this); //upsert
 
             //IMongoQuery search = Query.EQ("_id", ObjectId.Parse(this.ID));
             //var playerCharacter = await MongoUtils.MongoData.RetrieveObjectAsync<Character>(characterCollection, c => c.ID == this.ID);
@@ -444,21 +435,21 @@ namespace Character{
             
 		}
 	
-		public async void Load(string id) {
+		public async void Load(ObjectId id) {
 			var characterCollection = MongoUtils.MongoData.GetCollection<Character>("Characters", "PlayerCharacter");
-			var found = await MongoUtils.MongoData.RetrieveObjectAsync<Character>(characterCollection, c => c.ID == this.ID);
+			var found = await MongoUtils.MongoData.RetrieveObjectAsync<Character>(characterCollection, c => c.Id == this.Id);
 
-			ID = found.ID;
+			Id = found.Id;
 			FirstName = found.FirstName.CamelCaseWord();
 			LastName = found.LastName.CamelCaseWord();
-			_class = (CharacterClass)Enum.Parse(typeof(CharacterClass), found.Class.CamelCaseWord());
-            _race = (CharacterRace)Enum.Parse(typeof(CharacterRace), found.Race.CamelCaseWord());
-            _gender = (Genders)Enum.Parse(typeof(Genders), found.Gender.CamelCaseWord());
-            _skinType = (SkinType)Enum.Parse(typeof(SkinType), found.SkinType.CamelCaseWord());
-            _skinColor = (SkinColors)Enum.Parse(typeof(SkinColors), found.SkinColor.CamelCaseWord());
-            _skinType = (SkinType)Enum.Parse(typeof(SkinType), found.SkinType.CamelCaseWord());
-            _hairColor = (HairColors)Enum.Parse(typeof(HairColors), found.HairColor.CamelCaseWord());
-            _eyeColor = (EyeColors)Enum.Parse(typeof(EyeColors), found.EyeColor.CamelCaseWord());
+            Build = found.Build;
+            Class = found.Class;
+            Race = found.Race;
+            Gender = found.Gender;
+            SkinType = found.SkinType;
+            SkinColor = found.SkinColor;
+            HairColor = found.HairColor;
+            EyeColor = found.EyeColor;
             Height = found.Height;
             Weight = found.Weight;
             _stanceState = found.StanceState;
@@ -525,8 +516,8 @@ namespace Character{
    //             Bonuses.LoadFromBson(bonusesList);
    //         }
 
-			Inventory.playerID = ID;
-			Equipment.playerID = ID;
+			Inventory.playerID = Id;
+			Equipment.playerID = Id;
 
 		}
 
@@ -537,18 +528,18 @@ namespace Character{
 
             if ((Math.Round((double)inches / 100, 1) * 10) < 10) inches = (int)(Math.Round((double)inches / 100, 1) * 10);
             
-            sb.Append(FirstName + " " + LastName + " is a " + Gender.ToLower() + " " + Race.ToLower() + " " + Class.ToLower() + ".  ");
-            sb.Append(GenderPossesive + " has " + HairColor + " colored hair, with " + EyeColor + " eyes."
-                    + GenderPossesive + " skin is " + SkinColor.ToLower() + " " + SkinType.ToLower());
-            sb.Append(" with a " + Build.ToLower() + " build, weighing " + Weight + " pounds and measuring " + Math.Round(Height / 12, 0) + " feet " + inches + " inches.");
+            sb.Append(FirstName + " " + LastName + " is a " + Gender.ToString().ToLower() + " " + Race.ToString().ToLower() + " " + Class.ToString().ToLower() + ".  ");
+            sb.Append(GenderPossesive + " has " + HairColor.ToString().ToLower() + " colored hair, with " + EyeColor.ToString().ToLower() + " eyes."
+                    + GenderPossesive + " skin is " + SkinColor.ToString().ToLower() + " " + SkinType.ToString().ToLower());
+            sb.Append(" with a " + Build.ToString().ToLower() + " build, weighing " + Weight + " pounds and measuring " + Math.Round(Height / 12, 0) + " feet " + inches + " inches.");
             
             return sb.ToString();
         }
 
-        public async void RewardXP(string id, long xpGained) {
+        public async void RewardXP(ObjectId id, long xpGained) {
             var npcs = MongoUtils.MongoData.GetCollection<NPC>("Characters", "NPCCharacters");
-            var npc = await MongoUtils.MongoData.RetrieveObjectAsync<NPC>(npcs, n => n.ID == ObjectId.Parse(id).ToString()); // Query.EQ("_id", ObjectId.Parse(id)));
-            IUser temp = Sockets.Server.GetAUser(ID);
+            var npc = await MongoUtils.MongoData.RetrieveObjectAsync<NPC>(npcs, n => n.Id == id); // Query.EQ("_id", ObjectId.Parse(id)));
+            IUser temp = Sockets.Server.GetAUser(Id);
 			if (string.IsNullOrEmpty(temp.GroupName)) {
 				temp.MessageHandler(string.Format("You gain {0:0.##} XP from {1}", xpGained, npc.FirstName.CamelCaseWord()));
 				Experience += xpGained;
@@ -564,14 +555,14 @@ namespace Character{
                 tempChar.NextLevelExperience += (long)(tempChar.NextLevelExperience * 1.25);
                 IncreasePoints();
                 //increase all the attributes to max, small perk of leveling up.  Maybe a global setting?
-                foreach (KeyValuePair<string, IAttributes> attrib in temp.Player.GetAttributes()) {
-                    attrib.Value.Value = attrib.Value.Max;
+                foreach (var attrib in temp.Player.GetAttributes()) {
+                    attrib.Value = attrib.Max;
                 }
             }
         }
 
         #region General
-        public string ID {
+        public ObjectId Id {
             get;
             set;
         }
@@ -593,10 +584,8 @@ namespace Character{
         #endregion General
 
         #region Descriptive
-        public string Gender {
-            get {
-                return _gender.ToString().CamelCaseWord();
-            }
+        public Genders Gender {
+            get; set;
         }
 
         public string MainHand {
@@ -607,20 +596,18 @@ namespace Character{
        
         public string GenderPossesive {
             get {
-                if (Gender == "Male") {
+                if (Gender == Genders.Male) {
                     return "He";
                 }
-                else if (Gender == "Female") {
+                else if (Gender == Genders.Female) {
                     return "She";
                 }
                 else return "It";
             }
         }
 
-        public string Build {
-            get {
-                return _build.ToString().CamelCaseWord();
-            }
+        public BodyBuild Build {
+            get; set;
         }
 
         public int Age {
@@ -660,7 +647,7 @@ namespace Character{
 			}
 		}
 
-		public string KillerID {
+		public ObjectId KillerID {
 			get;
 			set;
 		}
@@ -676,16 +663,12 @@ namespace Character{
 			set;
 		}
 
-        public string Class {
-            get {
-                return _class.ToString().CamelCaseWord();
-            }
+        public CharacterClass Class {
+            get; set;
         }
 
-        public string Race {
-            get {
-                return _race.ToString().CamelCaseWord();
-            }
+        public CharacterRace Race {
+            get; set;
         }
 
         public string Description {
@@ -693,28 +676,20 @@ namespace Character{
             set;
         }
 
-        public string EyeColor {
-            get {
-                return _eyeColor.ToString().CamelCaseWord();
-            }
+        public EyeColors EyeColor {
+            get; set;
         }
 
-        public string SkinColor {
-            get {
-                return _skinColor.ToString().CamelCaseWord();
-            }
+        public SkinColors SkinColor {
+            get; set;
         }
 
-        public string SkinType {
-            get {
-                return _skinType.ToString().CamelCaseWord();
-            }
+        public SkinType SkinType {
+            get; set;
         }
 
-        public string HairColor {
-            get {
-                return _hairColor.ToString().CamelCaseWord();
-            }
+        public HairColors HairColor {
+            get; set;
         }
         #endregion Descriptive
 
@@ -735,11 +710,17 @@ namespace Character{
             get {
                 return _stanceState;
             }
+            set {
+                _stanceState = value;
+            }
         }
 
         public CharacterActionState ActionState {
             get {
                 return _actionState;
+            }
+            set {
+                _actionState = value;
             }
         }
         #endregion Stances
@@ -778,7 +759,7 @@ namespace Character{
         public bool CheckUnconscious {
             get {
                 bool result = false;
-                double health = Attributes["Hitpoints"].Value;
+                double health = Attributes.Where(a => a.Name == "Hitpoints").Single().Value;
 
                 if (health > DeathLimit && health <= 0) {
                     result = true;
@@ -788,7 +769,7 @@ namespace Character{
                     }
                     //ok he got knocked out 3 times in less than 10 minutes he's dead now
                     else if (_koCount.Item1 == 3 && (_koCount.Item2 - DateTime.Now).Minutes < 10) {
-                        Attributes["Hitpoints"].ApplyNegative(100);
+                        Attributes.Where(a => a.Name == "Hitpoints").Single().ApplyNegative(100);
                     }
                     //well at this point we'll reset his knockout counter and reset the timer since he hasn't been knocked out in at least 10 minutes
                     else {
@@ -827,12 +808,12 @@ namespace Character{
             }
         }
 
-        public string CurrentTarget {
+        public ObjectId CurrentTarget {
             get;
             set;
         }
 
-        public string LastTarget {
+        public ObjectId LastTarget {
             get;
             set;
         }
@@ -911,22 +892,22 @@ namespace Character{
         public void ClearTarget() {
             InCombat = false;
             LastTarget = CurrentTarget;
-            CurrentTarget = "";
+            CurrentTarget = ObjectId.Empty;
         }
 
-        public void UpdateTarget(string targetID) {
-            LastTarget = CurrentTarget ?? null;
+        public void UpdateTarget(ObjectId targetID) {
+            LastTarget = CurrentTarget.Equals(ObjectId.Empty) ? ObjectId.Empty : CurrentTarget;
             CurrentTarget = targetID;
         }
 
         public void ApplyRegen(string attribute) {
-            bool applied = this.Attributes[attribute].ApplyRegen();
+             bool applied = this.Attributes.Where(a => a.Name == attribute.CamelCaseWord()).Single().ApplyRegen();
             //if we recovered health let's no longer be dead or unconcious
             if (applied && String.Compare(attribute, "hitpoints", true) == 0) {
-                if (Attributes[attribute.CamelCaseWord()].Value > -10 && Attributes[attribute.CamelCaseWord()].Value <= 0) {
+                if (Attributes.Where(a => a.Name == attribute.CamelCaseWord()).Single().Value > -10 && Attributes.Where(a => a.Name == attribute.CamelCaseWord()).Single().Value <= 0) {
                     this.SetActionState(CharacterActionState.Unconcious);
                 }
-                else if (Attributes[attribute].Value > 0) {
+                else if (Attributes.Where(a => a.Name == attribute.CamelCaseWord()).Single().Value > 0) {
                     this.SetActionState(CharacterActionState.None);
                     this.SetStanceState(CharacterStanceState.Prone);
                 }
@@ -934,52 +915,52 @@ namespace Character{
         }
 
         public void ApplyEffectOnAttribute(string name, double value) {
-            if (this.Attributes.ContainsKey(name.CamelCaseWord())) {
-                this.Attributes[name.CamelCaseWord()].ApplyEffect(value);
+            if (this.Attributes.Any(a => a.Name == name.CamelCaseWord())) {
+                this.Attributes.Where(a => a.Name == name.CamelCaseWord()).Single().ApplyEffect(value);
             }
         }
 
-        public double GetAttributeMax(string attribute) {
-            if (this.Attributes.ContainsKey(attribute.CamelCaseWord())) {
-                return this.Attributes[attribute.CamelCaseWord()].Max;
-            }
-            return 0;
-        }
-
-        public double GetAttributeValue(string attribute) {
-            if (this.Attributes.ContainsKey(attribute.CamelCaseWord())) {
-                return this.Attributes[attribute.CamelCaseWord()].Value;
+        public double GetAttributeMax(string name) {
+            if (this.Attributes.Any(a => a.Name == name.CamelCaseWord())) {
+                return this.Attributes.Where(a => a.Name == name.CamelCaseWord()).Single().Max;
             }
             return 0;
         }
 
-        public int GetAttributeRank(string attribute) {
-            if (this.Attributes.ContainsKey(attribute.CamelCaseWord())) {
-                return this.Attributes[attribute.CamelCaseWord()].Rank;
+        public double GetAttributeValue(string name) {
+            if (this.Attributes.Any(a => a.Name == name.CamelCaseWord())) {
+               return this.Attributes.Where(a => a.Name == name.CamelCaseWord()).Single().Value;
+            }
+            return 0;
+        }
+
+        public int GetAttributeRank(string name) {
+            if (this.Attributes.Any(a => a.Name == name.CamelCaseWord())) {
+               return this.Attributes.Where(a => a.Name == name.CamelCaseWord()).Single().Rank;
             }
             return 0;
         }
 
         public void SetAttributeValue(string name, double value) {
-            if (this.Attributes.ContainsKey(name.CamelCaseWord())) {
-                this.Attributes[name.CamelCaseWord()].Value = value;
+            if (this.Attributes.Any(a => a.Name == name.CamelCaseWord())) {
+                this.Attributes.Where(a => a.Name == name.CamelCaseWord()).Single().Value = value;
             }
             CalculateSubAttributes();
         }
 
         public void SetMaxAttributeValue(string name, double value) {
-            if (this.Attributes.ContainsKey(name.CamelCaseWord())) {
-                this.Attributes[name.CamelCaseWord()].Max = value;
+            if (this.Attributes.Any(a => a.Name == name.CamelCaseWord())) {
+                this.Attributes.Where(a => a.Name == name.CamelCaseWord()).Single().Max = value;
             }
         }
 
         public void SeAttributeRegenRate(string name, double value) {
-            if (this.Attributes.ContainsKey(name.CamelCaseWord())) {
-                this.Attributes[name.CamelCaseWord()].RegenRate = value;
+            if (this.Attributes.Any(a => a.Name == name.CamelCaseWord())) {
+                this.Attributes.Where(a => a.Name == name.CamelCaseWord()).Single().RegenRate = value;
             }
         }
 
-        public Dictionary<string, IAttributes> GetAttributes() {
+        public List<Attribute> GetAttributes() {
             return this.Attributes;
         }
 
@@ -1075,9 +1056,9 @@ namespace Character{
 			return looted;
         }
 
-		public bool CanLoot(string looterID) {
+		public bool CanLoot(ObjectId looterID) {
 			bool youCanLootMe = true;
-			if (!string.Equals(looterID, ((IActor)this).KillerID, StringComparison.InvariantCultureIgnoreCase)) {
+			if (looterID.Equals(((IActor)this).KillerID.Pid)) {
 				if (DateTime.UtcNow < ((IActor)this).TimeOfDeath.AddSeconds(30)) {
 					youCanLootMe = false;
 				}

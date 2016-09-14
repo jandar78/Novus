@@ -10,9 +10,6 @@ using MongoDB.Bson;
 
 namespace Scripts {
     public class CreateCharacter {
-        private static IMongoCollection<BsonDocument> _generalCollection;
-        private static IMongoCollection<BsonDocument> _scriptCollection;
-
         private static List<TempChar> usersCreatingChars = new List<TempChar>();
 
         public static CreateCharacter creationScript = null;
@@ -25,18 +22,12 @@ namespace Scripts {
             usersCreatingChars.Add(new TempChar(user));
         }
 
-        private CreateCharacter() {
-            _generalCollection = MongoUtils.MongoData.GetCollection<BsonDocument>("Characters", "General");
-            
-            _scriptCollection = MongoUtils.MongoData.GetCollection<BsonDocument>("Scripts", "CreateCharacter");
-
-        }
-        public UserState InsertResponse(string response, string userId) {
+        public UserState InsertResponse(string response, ObjectId userId) {
             UserState state = UserState.CREATING_CHARACTER;
 
             if (string.IsNullOrEmpty(response)) return state;
 
-            TempChar specificUser = usersCreatingChars.Where(u => u.user.UserID == userId).SingleOrDefault();
+            TempChar specificUser = usersCreatingChars.Where(u => u.user.UserID.Equals(userId)).SingleOrDefault();
 
             //Get the confirmation from the previous selection
             if (specificUser.confirmStep != CreateCharSteps.NONE) {
@@ -291,7 +282,7 @@ namespace Scripts {
                     case CreateCharSteps.WEIGHT: {
                             double temp = 0;
                             double.TryParse(response, out temp);
-                            var doc = MongoUtils.MongoData.RetrieveObject<BsonDocument>(_generalCollection, w => w["_id"] == "BodyWeight");
+                            var doc = MongoUtils.MongoData.RetrieveObject<BsonDocument>(MongoUtils.MongoData.GetCollection<BsonDocument>("Characters", "General"), w => w["_id"] == "BodyWeight");
                             BsonArray arr = doc["Genders"].AsBsonArray;
                             BsonArray arr2 = arr.Where(a => a["type"].AsString == specificUser.Gender.ToString().CamelCaseWord()).SingleOrDefault()["Weights"].AsBsonArray;
                             doc = arr2.Where(a => a.AsBsonDocument["name"] == specificUser.Build.ToString().CamelCaseWord()).SingleOrDefault().AsBsonDocument;
@@ -313,7 +304,7 @@ namespace Scripts {
                             double temp = 0;
                             double.TryParse(response, out temp);
                             //get the min and max height for each race from DB and validate
-                            BsonDocument doc = MongoUtils.MongoData.RetrieveObject<BsonDocument>(_generalCollection, h => h["_id"] == "Heights");
+                            BsonDocument doc = MongoUtils.MongoData.RetrieveObject<BsonDocument>(MongoUtils.MongoData.GetCollection<BsonDocument>("Characters", "General"), h => h["_id"] == "Heights");
                             BsonArray arr = doc["Types"].AsBsonArray;
                             double min = 0.0d, max = 0.0d;
 
@@ -345,7 +336,7 @@ namespace Scripts {
             return state;
         }
 
-        public string ExecuteScript(string userId) {
+        public string ExecuteScript(ObjectId userId) {
             string message = null;
             TempChar specificUser = usersCreatingChars.Where(u => u.user.UserID == userId).SingleOrDefault();
 
@@ -447,8 +438,8 @@ namespace Scripts {
                         newChar.Height = specificUser.Height;
                         newChar.Password = specificUser.Password;
                         newChar.Save(); //this creates the ID
-                        specificUser.user.Player.ID = newChar.ID;
-                        specificUser.user.UserID = specificUser.user.Player.ID;
+                        specificUser.user.Player.Id = newChar.Id;
+                        specificUser.user.UserID = specificUser.user.Player.Id;
 
                         specificUser.user.Player.Load(specificUser.user.UserID);
                         AssignStatPoints(specificUser.user.Player);
@@ -518,7 +509,7 @@ namespace Scripts {
         internal void AdjustClassPoints(IActor specificUser, BsonDocument document) {
             var classes = document["Classes"].AsBsonArray;
             foreach (BsonDocument doc in classes) {
-                if (doc["Name"].AsString == specificUser.Class) {
+                if ((CharacterClass)Enum.Parse(typeof(CharacterClass),doc["Name"].AsString) == specificUser.Class) {
                     specificUser.ApplyEffectOnAttribute("Strength", doc["Strength"].AsDouble);
                     specificUser.ApplyEffectOnAttribute("Dexterity", doc["Dexterity"].AsDouble);
                     specificUser.ApplyEffectOnAttribute("Endurance", doc["Endurance"].AsDouble);
@@ -533,7 +524,7 @@ namespace Scripts {
         internal void AdjustRacePoints(IActor specificUser, BsonDocument document) {
             var races = document["Races"].AsBsonArray;
             foreach (BsonDocument doc in races) {
-                if (doc["Name"].AsString == specificUser.Race) {
+                if ((CharacterRace)Enum.Parse(typeof(CharacterRace), doc["Name"].AsString) == specificUser.Race) {
                     specificUser.ApplyEffectOnAttribute("Strength", doc["Strength"].AsDouble);
                     specificUser.ApplyEffectOnAttribute("Dexterity", doc["Dexterity"].AsDouble);
                     specificUser.ApplyEffectOnAttribute("Endurance", doc["Endurance"].AsDouble);
@@ -547,12 +538,12 @@ namespace Scripts {
 
         internal void IncreaseAttributeMaxToValues(IActor specificUser) {
             foreach (var attrib in specificUser.GetAttributes()) {
-                attrib.Value.Max = attrib.Value.Value;
+                attrib.Max = attrib.Value;
             }
         }
 
-        internal bool ValidatePlayerPassword(string userID, string response) {
-            string temp = usersCreatingChars.Where(u => u.user.UserID == userID).Select(u => u.Password).SingleOrDefault();
+        internal bool ValidatePlayerPassword(ObjectId userID, string response) {
+            string temp = usersCreatingChars.Where(u => u.user.UserID.Equals(userID)).Select(u => u.Password).SingleOrDefault();
             if (String.Compare(temp, response, false) == 0) {
                 return true;
             }
@@ -560,8 +551,8 @@ namespace Scripts {
             return false;
         }
 
-        internal bool ValidatePlayerName(string userID, string response) {
-            string temp = usersCreatingChars.Where(u => u.user.UserID == userID).Select(u => u.FirstName).SingleOrDefault();
+        internal bool ValidatePlayerName(ObjectId userID, string response) {
+            string temp = usersCreatingChars.Where(u => u.user.UserID.Equals(userID)).Select(u => u.FirstName).SingleOrDefault();
 
             var found = MongoUtils.MongoData.RetrieveObject<Character.Character>(MongoUtils.MongoData.GetCollection<Character.Character>("Characters", "PlayerCharacter"), c => c.FirstName.ToLower() == temp.ToLower() && c.LastName.ToLower() == response.ToLower());
 
@@ -687,7 +678,7 @@ namespace Scripts {
 
         internal string AskForWeight(Genders gender, BodyBuild build) {
             //will probably want to do some logic for the weight ranges and calculate them on the fly based on build, height and race?
-            BsonDocument doc = MongoUtils.MongoData.RetrieveObject<BsonDocument>(_generalCollection, g => g["_id"] == "BodyWeight");
+            BsonDocument doc = MongoUtils.MongoData.RetrieveObject<BsonDocument>(MongoUtils.MongoData.GetCollection<BsonDocument>("Characters", "General"), g => g["_id"] == "BodyWeight");
             BsonArray arr = doc["Genders"].AsBsonArray;
             BsonArray arr2 = arr.Where(a => a["type"].AsString == gender.ToString().CamelCaseWord()).SingleOrDefault()["Weights"].AsBsonArray;
             doc = arr2.Where(a => a.AsBsonDocument["name"] == build.ToString().CamelCaseWord()).SingleOrDefault().AsBsonDocument;
@@ -699,7 +690,7 @@ namespace Scripts {
 
         internal string AskForHeight(CharacterRace race) {
             //will probably want to do some logic for the weight ranges and calculate them on the fly based on build, height and race?
-            BsonDocument doc = MongoUtils.MongoData.RetrieveObject<BsonDocument>(_generalCollection, r => r["_id"] == "Heights");
+            BsonDocument doc = MongoUtils.MongoData.RetrieveObject<BsonDocument>(MongoUtils.MongoData.GetCollection<BsonDocument>("Characters", "General"), r => r["_id"] == "Heights");
             BsonArray arr = doc["Types"].AsBsonArray;
             double min = 0.0d, max = 0.0d;
 

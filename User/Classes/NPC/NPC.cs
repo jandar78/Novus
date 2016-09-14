@@ -2,18 +2,16 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
 using MongoDB.Bson;
 using MongoDB.Driver;
-using MongoDB.Driver.Builders;
-using System.Collections.Concurrent;
 using Extensions;
 using Triggers;
+using Character;
 
 namespace Interfaces {
 	public class NPC : IActor, INpc {
 		#region private things
-		private Dictionary<string, double> damageTracker;
+		public Dictionary<ObjectId, double> XpTracker;
 		private IInventory _inventory;
 		private IEquipment _equipment;
         private List<IQuest> _quests;
@@ -53,11 +51,11 @@ namespace Interfaces {
 		#endregion Public Members
 
 		#region Protected Members
-		protected Dictionary<string, IAttributes> Attributes;
+		public List<Character.Attribute> Attributes { get; set; }
 		protected Dictionary<string, double> SubAttributes;
 		protected HashSet<Languages> KnownLanguages; //this will hold all the languages the player can understand
 		protected double _levelModifier;
-		private IStatBonuses Bonuses;
+		public StatBonuses Bonuses { get; set; }
 
 		#region Stances
 		protected CharacterStanceState _stanceState;
@@ -93,7 +91,7 @@ namespace Interfaces {
 			set;
 		}
 
-        public string UserID {
+        public ObjectId UserID {
             get;
             set;
         }
@@ -124,8 +122,7 @@ namespace Interfaces {
 			}
 		}
 
-
-		public string ID {
+		public ObjectId Id {
 			get;
 			set;
 		}
@@ -158,9 +155,9 @@ namespace Interfaces {
 
         public string AiState { get; set; }
 
-        public string PreviousState { get; set; }
+        public string PreviousAiState { get; set; }
 
-        public string GlobalState { get; set; }
+        public string AiGlobalState { get; set; }
 
         public string Title {
 			get;
@@ -197,10 +194,8 @@ namespace Interfaces {
 		#endregion Properties
 
 		#region Descriptive
-		public string Gender {
-			get {
-				return _gender.ToString().CamelCaseWord();
-			}
+		public Genders Gender {
+            get; set;
 		}
 
 		public string MainHand {
@@ -211,10 +206,10 @@ namespace Interfaces {
 
 		public string GenderPossesive {
 			get {
-				if (Gender == "Male") {
+				if (Gender == Genders.Male) {
 					return "He";
 				}
-				else if (Gender == "Female") {
+				else if (Gender == Genders.Female) {
 					return "She";
 				}
 				else
@@ -222,10 +217,8 @@ namespace Interfaces {
 			}
 		}
 
-		public string Build {
-			get {
-				return _build.ToString().CamelCaseWord();
-			}
+		public BodyBuild Build {
+            get; set;
 		}
 
 		public int Age {
@@ -253,16 +246,12 @@ namespace Interfaces {
 			set;
 		}
 
-		public string Class {
-			get {
-				return _class.ToString().CamelCaseWord();
-			}
+		public CharacterClass Class {
+            get; set;
 		}
 
-		public string Race {
-			get {
-				return _race.ToString().CamelCaseWord();
-			}
+		public CharacterRace Race {
+            get; set;
 		}
 
 		public string Description {
@@ -270,28 +259,20 @@ namespace Interfaces {
 			set;
 		}
 
-		public string EyeColor {
-			get {
-				return _eyeColor.ToString().CamelCaseWord();
-			}
+		public EyeColors EyeColor {
+            get; set;
 		}
 
-		public string SkinColor {
-			get {
-				return _skinColor.ToString().CamelCaseWord();
-			}
+		public SkinColors SkinColor {
+            get; set;
 		}
 
-		public string SkinType {
-			get {
-				return _skinType.ToString().CamelCaseWord();
-			}
+		public SkinType SkinType {
+            get; set;
 		}
 
-		public string HairColor {
-			get {
-				return _hairColor.ToString().CamelCaseWord();
-			}
+		public HairColors HairColor {
+            get; set;
 		}
 		#endregion Descriptive
 
@@ -312,13 +293,19 @@ namespace Interfaces {
 			get {
 				return _stanceState;
 			}
+            set {
+                _stanceState = value;
+            }
 		}
 
 		public CharacterActionState ActionState {
 			get {
 				return _actionState;
 			}
-		}
+            set {
+                _actionState = value;
+            }
+        }
 		#endregion Stances
 
 		#region Leveling
@@ -352,7 +339,7 @@ namespace Interfaces {
 		#endregion Leveling
 
 		#region Combat
-		public string KillerID {
+		public ObjectId KillerID {
 			get;
 			set;
 		}
@@ -365,7 +352,7 @@ namespace Interfaces {
 		public bool CheckUnconscious {
 			get {
 				bool result = false;
-				double health = Attributes["Hitpoints"].Value;
+				double health = Attributes.Where(a => a.Name == "Hitpoints").Single().Value;
 
 				if (health > DeathLimit && health <= 0) {
 					result = true;
@@ -375,7 +362,7 @@ namespace Interfaces {
 					}
 					//ok he got knocked out 3 times in less than 10 minutes he's dead now
 					else if (_koCount.Item1 == 3 && (_koCount.Item2 - DateTime.Now).Minutes < 10) {
-						Attributes["Hitpoints"].ApplyNegative(100);
+						Attributes.Where(a => a.Name == "Hitpoints").Single().ApplyNegative(100);
 					}
 					//well at this point we'll reset his knockout counter and reset the timer since he hasn't been knocked out in at least 10 minutes
 					else {
@@ -414,12 +401,12 @@ namespace Interfaces {
 			}
 		}
 
-		public string CurrentTarget {
+		public ObjectId CurrentTarget {
 			get;
 			set;
 		}
 
-		public string LastTarget {
+		public ObjectId LastTarget {
 			get;
 			set;
 		}
@@ -436,6 +423,7 @@ namespace Interfaces {
 		#endregion Combat
 
 		public NPC() {
+      
 		}
 
 		public NPC(CharacterRace race, CharacterClass characterClass, Genders gender, Languages language, SkinColors skinColor, SkinType skinType, HairColors hairColor, EyeColors eyeColor, BodyBuild build) {
@@ -444,14 +432,14 @@ namespace Interfaces {
 			Fsm = AI.FSM.GetInstance();
 			Fsm.state = Fsm.GetStateFromName("Wander");
 
-			_class = characterClass;
-			_race = race;
-			_gender = gender;
-			_skinColor = skinColor;
-			_skinType = skinType;
-			_hairColor = hairColor;
-			_eyeColor = eyeColor;
-			_build = build;
+			Class = characterClass;
+			Race = race;
+			Gender = gender;
+			SkinColor = skinColor;
+			SkinType = skinType;
+			HairColor = hairColor;
+			EyeColor = eyeColor;
+			Build = build;
 
 			_koCount = new Tuple<int, DateTime>(0, DateTime.Now);
 			_actionState = CharacterActionState.None;
@@ -462,7 +450,7 @@ namespace Interfaces {
 			KnownLanguages.Add(_primaryLanguage);
 
 			Inventory = new Inventory();
-			damageTracker = new Dictionary<string, double>();
+			XpTracker = new Dictionary<ObjectId, double>();
 			Triggers = new List<ITrigger>();
 			Bonuses = new StatBonuses();
 			Quests = new List<IQuest>();
@@ -473,7 +461,7 @@ namespace Interfaces {
 			Age = 17;   //Do we want an age? And are we going to advance it every in game year?  Players could be 400+ years old rather quick.
 			Weight = 180.0d; //pounds or kilos?
 			Height = 70.0d;  //inches or centimeters?
-			Location = "A0";
+			Location = "A1000";
 			InCombat = false;
 			LastCombatTime = DateTime.MinValue.ToUniversalTime();
 			IsNPC = true;
@@ -488,17 +476,17 @@ namespace Interfaces {
 			Inventory = new Inventory();
 			Equipment = new Equipment();
 
-			Inventory.playerID = this.ID;
-			Equipment.playerID = this.ID;
+			Inventory.playerID = Id;
+			Equipment.playerID = Id;
 
-			Attributes = new Dictionary<string, IAttributes>();
+			Attributes = new List<Character.Attribute>();
 
-			Attributes.Add("Hitpoints", new Attribute(200.0d, "Hitpoints", 200.0d, 0.2d, 1));
-			Attributes.Add("Dexterity", new Attribute(10.0d, "Dexterity", 10.0d, 0.0d, 1));
-			Attributes.Add("Strength", new Attribute(10.0d, "Strength", 10.0d, 0.0d, 1));
-			Attributes.Add("Intelligence", new Attribute(10.0d, "Intelligence", 10.0d, 0.0d, 1));
-			Attributes.Add("Endurance", new Attribute(10.0d, "Endurance", 10.0d, 0.0d, 1));
-			Attributes.Add("Charisma", new Attribute(10.0d, "Charisma", 10.0d, 0.0d, 1));
+			Attributes.Add(new Character.Attribute(200.0d, "Hitpoints", 200.0d, 0.2d, 1));
+			Attributes.Add(new Character.Attribute(10.0d, "Dexterity", 10.0d, 0.0d, 1));
+			Attributes.Add(new Character.Attribute(10.0d, "Strength", 10.0d, 0.0d, 1));
+			Attributes.Add(new Character.Attribute(10.0d, "Intelligence", 10.0d, 0.0d, 1));
+			Attributes.Add(new Character.Attribute(10.0d, "Endurance", 10.0d, 0.0d, 1));
+			Attributes.Add(new Character.Attribute(10.0d, "Charisma", 10.0d, 0.0d, 1));
 
 			SubAttributes = new Dictionary<string, double>();
 
@@ -509,13 +497,13 @@ namespace Interfaces {
 			SubAttributes.Add("Leadership", 10.0d);
 		}
 
-        public void Save() {
-            if (this.ID == null) {
-                this.ID = new MongoDB.Bson.ObjectId().ToString();
+        public async void Save() {
+            if (Id == null) {
+                Id = new MongoDB.Bson.ObjectId();
             }; //new character
             var characterCollection = MongoUtils.MongoData.GetCollection<NPC>("Characters", "NPCCharacters");
 
-            MongoUtils.MongoData.InsertAsync<NPC>(characterCollection, this);  //upsert
+            await MongoUtils.MongoData.SaveAsync<NPC>(characterCollection, n => n.Id == Id, this);  //upsert
 
             //if (npcCharacter == null) {
             //    //this is the NPC's first save, create everything from scratch
@@ -701,21 +689,20 @@ namespace Interfaces {
         }
 		
 
-		public async void Load(string id) {
+		public async void Load(ObjectId id) {
 			var characterCollection = MongoUtils.MongoData.GetCollection<NPC>("Characters", "NPCCharacters");
-			var found = await MongoUtils.MongoData.RetrieveObjectAsync<NPC>(characterCollection, n => n.ID == id);
+			var found = await MongoUtils.MongoData.RetrieveObjectAsync<NPC>(characterCollection, n => n.Id == id);
             
-			ID = found.ID;
+			Id = found.Id;
 			FirstName = found.FirstName.CamelCaseWord();
 			LastName = found.LastName.CamelCaseWord();
-			_class = (CharacterClass)Enum.Parse(typeof(CharacterClass), found.Class.CamelCaseWord());
-			_race = (CharacterRace)Enum.Parse(typeof(CharacterRace), found.Race.CamelCaseWord());
-			_gender = (Genders)Enum.Parse(typeof(Genders), found.Gender.CamelCaseWord());
-			_skinType = (SkinType)Enum.Parse(typeof(SkinType), found.SkinType.CamelCaseWord());
-			_skinColor = (SkinColors)Enum.Parse(typeof(SkinColors), found.SkinColor.CamelCaseWord());
-			_skinType = (SkinType)Enum.Parse(typeof(SkinType), found.SkinType.CamelCaseWord());
-			_hairColor = (HairColors)Enum.Parse(typeof(HairColors), found.HairColor.CamelCaseWord());
-			_eyeColor = (EyeColors)Enum.Parse(typeof(EyeColors), found.EyeColor.CamelCaseWord());
+            _class = found.Class;
+            _race = found.Race;
+            _gender = found.Gender;
+            _skinType = found.SkinType;
+            _skinColor = found.SkinColor;
+            _hairColor = found.HairColor;
+            _eyeColor = found.EyeColor;
 			_stanceState = found.StanceState;
 			_actionState = found.ActionState;
 			Description = found.Description;
@@ -730,8 +717,8 @@ namespace Interfaces {
 			CurrentTarget = found.CurrentTarget;
 			LastTarget = found.LastTarget;
 			Fsm.state = Fsm.GetStateFromName(found.AiState);
-			Fsm.previousState = Fsm.GetStateFromName(found.PreviousState);
-			Fsm.globalState = Fsm.GetStateFromName(found.GlobalState);
+			Fsm.previousState = Fsm.GetStateFromName(found.PreviousAiState);
+			Fsm.globalState = Fsm.GetStateFromName(found.AiGlobalState);
 			Experience = found.Experience;
             Level = found.Level;
             Title = found.Title;
@@ -739,7 +726,7 @@ namespace Interfaces {
 
 			//if you just use var instead of casting it like this you will be in a world of pain and suffering when dealing with subdocuments.
 			Attributes = found.Attributes;
-			//XpTracker = found.XpTracker;
+			XpTracker = found.XpTracker;
 			Triggers = found.Triggers;
 			Quests = found.Quests;
 			Bonuses = found.Bonuses;
@@ -803,13 +790,13 @@ namespace Interfaces {
 			//	Bonuses.LoadFromBson(bonusesList);
 			//}
 
-			Inventory.playerID = ID;
-			Equipment.playerID = ID;
+			Inventory.playerID = Id;
+			Equipment.playerID = Id;
 		}
 
 		public void CalculateXP() {
 			if (this.IsDead()) {
-				foreach (KeyValuePair<string, double> pair in damageTracker) {
+				foreach (var pair in XpTracker) {
 					IUser player = Sockets.Server.GetAUser(pair.Key);
 					if (player != null) {
 						double rewardPercentage = ((pair.Value * -1) / GetAttributeMax("Hitpoints"));
@@ -833,34 +820,34 @@ namespace Interfaces {
 							xp = 0;
 						}
 
-						player.Player.RewardXP(ID, xp);
+						player.Player.RewardXP(Id, xp);
 					}
 				}
 			}
 		}
 
-		public void IncreaseXPReward(string id, double damage) {
+		public void IncreaseXPReward(ObjectId id, double damage) {
 			//we only want to deal with base hitpoints, knocking unconcious doesn't add to the XP reward
 			if (IsUnconcious()) {
 				damage += 100;
 			}
 
-			if (damageTracker.ContainsKey(id)) {
-				damageTracker[id] = damageTracker[id] + (damage * -1);
+			if (XpTracker.ContainsKey(id)) {
+                XpTracker[id] = XpTracker[id] + (damage * -1);
 			}
 			else {
-				damageTracker.Add(id, damage);
+                XpTracker.Add(id, damage);
 			}
 			Save();
 		}
 
 		public void DecreaseXPReward(double amount) {
-			double individualAmount = amount / (double)damageTracker.Count;
+			double individualAmount = amount / (double)XpTracker.Count;
 
-			var damageList = new Dictionary<string, double>(damageTracker);
+			var damageList = new Dictionary<ObjectId, double>(XpTracker);
 			//totalDecrease needs to be divided amongst all players who are in the XP List
-			foreach (KeyValuePair<string, double> pair in damageList) {
-				damageTracker[pair.Key] = pair.Value + (individualAmount);
+			foreach (var pair in damageList) {
+                XpTracker[pair.Key] = pair.Value + (individualAmount);
 			}
 
 			Save();
@@ -868,7 +855,7 @@ namespace Interfaces {
 
 		public void ParseMessage(IMessage message) {
 			//send the message to the AI logic 
-			if (message.InstigatorID != this.ID) {
+			if (!ObjectId.Parse(message.InstigatorID).Equals(this.Id)) {
 				//does the AI need to do something based on this
 				Fsm.InterpretMessage(message, this);
 
@@ -878,7 +865,7 @@ namespace Interfaces {
 
 				if (parser.TriggersToExecute.Count > 0) {
 					foreach (ITrigger trigger in parser.TriggersToExecute) {
-						trigger.HandleEvent(null, new TriggerEventArgs(this.ID, TriggerEventArgs.IDType.Npc, message.InstigatorID, (TriggerEventArgs.IDType)Enum.Parse(typeof(TriggerEventArgs.IDType), message.InstigatorType.ToString())));
+						trigger.HandleEvent(null, new TriggerEventArgs(this.Id, TriggerEventArgs.IDType.Npc, ObjectId.Parse(message.InstigatorID), (TriggerEventArgs.IDType)Enum.Parse(typeof(TriggerEventArgs.IDType), message.InstigatorType.ToString())));
 					}
 				}
 
@@ -953,24 +940,24 @@ namespace Interfaces {
 		public void ClearTarget() {
 			InCombat = false;
 			LastTarget = CurrentTarget;
-			CurrentTarget = "";
+			CurrentTarget = ObjectId.Empty;
 		}
 
-		public void UpdateTarget(string targetID) {
-			LastTarget = CurrentTarget ?? null;
+		public void UpdateTarget(ObjectId targetID) {
+			LastTarget = CurrentTarget == ObjectId.Empty ? ObjectId.Empty : CurrentTarget;
 			CurrentTarget = targetID;
 		}
 
 		public void ApplyRegen(string attribute) {
-			bool applied = this.Attributes[attribute].ApplyRegen();
+			bool applied = this.Attributes.Where(a => a.Name == attribute.CamelCaseWord()).Single().ApplyRegen();
 			//if we recovered health lets no longer be dead or unconcious and decrease the XP reward to players.
 			if (applied && String.Compare(attribute, "hitpoints", true) == 0) {
-				DecreaseXPReward(this.Attributes[attribute].RegenRate * this.Attributes[attribute].Max);
+				DecreaseXPReward(this.Attributes.Where(a => a.Name == attribute.CamelCaseWord()).Single().RegenRate * this.Attributes.Where(a => a.Name == attribute.CamelCaseWord()).Single().Max);
 
-				if (Attributes[attribute.CamelCaseWord()].Value > -10 && Attributes[attribute.CamelCaseWord()].Value <= 0) {
+				if (Attributes.Where(a => a.Name == attribute.CamelCaseWord()).Single().Value > -10 && Attributes.Where(a => a.Name == attribute.CamelCaseWord()).Single().Value <= 0) {
 					this.SetActionState(CharacterActionState.Unconcious);
 				}
-				else if (Attributes[attribute].Value > 0) {
+				else if (Attributes.Where(a => a.Name == attribute.CamelCaseWord()).Single().Value > 0) {
 					this.SetActionState(CharacterActionState.Unconcious);
 					this.SetStanceState(CharacterStanceState.Prone);
 				}
@@ -978,52 +965,52 @@ namespace Interfaces {
 		}
 
 		public void ApplyEffectOnAttribute(string name, double value) {
-			if (this.Attributes.ContainsKey(name.CamelCaseWord())) {
-				this.Attributes[name.CamelCaseWord()].ApplyEffect(value);
+            if (this.Attributes.Any(a => a.Name == name.CamelCaseWord())) {
+                this.Attributes.Where(a => a.Name == name.CamelCaseWord()).Single().ApplyEffect(value);
 			}
 		}
 
-		public double GetAttributeMax(string attribute) {
-			if (this.Attributes.ContainsKey(attribute.CamelCaseWord())) {
-				return this.Attributes[attribute.CamelCaseWord()].Max;
-			}
-			return 0;
-		}
-
-		public double GetAttributeValue(string attribute) {
-			if (this.Attributes.ContainsKey(attribute.CamelCaseWord())) {
-				return this.Attributes[attribute.CamelCaseWord()].Value;
+		public double GetAttributeMax(string name) {
+            if (this.Attributes.Any(a => a.Name == name.CamelCaseWord())) {
+                return this.Attributes.Where(a => a.Name == name.CamelCaseWord()).Single().Max;
 			}
 			return 0;
 		}
 
-		public int GetAttributeRank(string attribute) {
-			if (this.Attributes.ContainsKey(attribute.CamelCaseWord())) {
-				return this.Attributes[attribute.CamelCaseWord()].Rank;
+		public double GetAttributeValue(string name) {
+            if (this.Attributes.Any(a => a.Name == name.CamelCaseWord())) {
+               return this.Attributes.Where(a => a.Name == name.CamelCaseWord()).Single().Value;
+			}
+			return 0;
+		}
+
+		public int GetAttributeRank(string name) {
+            if (this.Attributes.Any(a => a.Name == name.CamelCaseWord())) {
+                return this.Attributes.Where(a => a.Name == name.CamelCaseWord()).Single().Rank;
 			}
 			return 0;
 		}
 
 		public void SetAttributeValue(string name, double value) {
-			if (this.Attributes.ContainsKey(name.CamelCaseWord())) {
-				this.Attributes[name.CamelCaseWord()].Value = value;
+            if (this.Attributes.Any(a => a.Name == name.CamelCaseWord())) {
+                this.Attributes.Where(a => a.Name == name.CamelCaseWord()).Single().Value = value;
 			}
 			CalculateSubAttributes();
 		}
 
 		public void SetMaxAttributeValue(string name, double value) {
-			if (this.Attributes.ContainsKey(name.CamelCaseWord())) {
-				this.Attributes[name.CamelCaseWord()].Max = value;
+            if (this.Attributes.Any(a => a.Name == name.CamelCaseWord())) {
+                this.Attributes.Where(a => a.Name == name.CamelCaseWord()).Single().Max = value;
 			}
 		}
 
 		public void SeAttributeRegenRate(string name, double value) {
-			if (this.Attributes.ContainsKey(name.CamelCaseWord())) {
-				this.Attributes[name.CamelCaseWord()].RegenRate = value;
+            if (this.Attributes.Any(a => a.Name == name.CamelCaseWord())) {
+                this.Attributes.Where(a => a.Name == name.CamelCaseWord()).Single().RegenRate = value;
 			}
 		}
 
-        public Dictionary<string, IAttributes> GetAttributes() {
+        public List<Character.Attribute> GetAttributes() {
 			return this.Attributes;
 		}
 
@@ -1063,9 +1050,9 @@ namespace Interfaces {
 
 		public bool Loot(IUser looter, List<string> commands, bool byPassCheck = false) {
 			var message = new Message();
-			message.InstigatorID = looter.UserID;
+			message.InstigatorID = looter.UserID.ToString();
 			message.InstigatorType = looter.Player.IsNPC == false ? ObjectType.Player : ObjectType.Npc;
-			message.TargetID = this.ID;
+			message.TargetID = this.Id.ToString();
 			message.TargetType = this.IsNPC == false ? ObjectType.Player : ObjectType.Npc;
 
 			bool looted = false;
@@ -1076,7 +1063,7 @@ namespace Interfaces {
 				if (!byPassCheck) {
 					//Let's see if who's looting was the killer otherwise we check the time of death
 					//also check if looter is part of a group if so then the group will provide the loot logic.
-					if (!string.Equals(looter.UserID, ((IActor)this).KillerID, StringComparison.InvariantCultureIgnoreCase)) {
+					if (looter.UserID.Equals(((IActor)this).KillerID)) {
 						if (!CanLoot(looter.UserID)) {
 							//looter not the killer not in group and time to loot has not expired
 							looter.MessageHandler("You did not deal the killing blow and can not loot this corpse at this time.");
@@ -1146,23 +1133,25 @@ namespace Interfaces {
 				looter.MessageHandler(message.Self);
             }
 
-			Rooms.Room.GetRoom(looter.Player.Location).InformPlayersInRoom(message, new List<string>() { ID });
+			Rooms.Room.GetRoom(looter.Player.Location).InformPlayersInRoom(message, new List<ObjectId>() { Id });
 
 			return looted;
 		}
 
-		public bool CanLoot(string looterID) {
-			bool youCanLootMe = true;
-			if (DateTime.UtcNow < ((IActor)this).TimeOfDeath.AddSeconds(30)) {
-				youCanLootMe = false;
-			}
+		public bool CanLoot(ObjectId looterId) {
+            bool youCanLootMe = true;
+            if (looterId.Equals(((IActor)this).KillerID.Pid)) {
+                if (DateTime.UtcNow < ((IActor)this).TimeOfDeath.AddSeconds(30)) {
+                    youCanLootMe = false;
+                }
+            }
 
-			return youCanLootMe;
+            return youCanLootMe;
 		}
 
-		public void RewardXP(string id, long amount) {
-			throw new NotImplementedException();
-		}
+		public void RewardXP(ObjectId id, long amount) {
+            //NPC's get no XP reward
+        }
 
 		/// <summary>
 		/// Add a bonus for the passed in type.  Adding to an already existing type increases the amount/time.
@@ -1183,14 +1172,18 @@ namespace Interfaces {
 		/// <param name="name"></param>
 		/// <param name="bonus"></param>
 		public void RemoveBonus(BonusTypes type, string name, double bonus) {
-			Bonuses.Remove(type);
+            if (Bonuses != null) {
+                Bonuses.Remove(type);
+            }
 		}
 
 		/// <summary>
 		/// Removes any bonuses whose time has expired.
 		/// </summary>
 		public void CleanupBonuses() {
-			Bonuses.Cleanup();
+            if (Bonuses != null) {
+                Bonuses.Cleanup();
+            }
 		}
 
 		public double GetBonus(BonusTypes type) {

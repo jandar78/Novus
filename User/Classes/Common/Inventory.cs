@@ -15,7 +15,7 @@ using Interfaces;
 
 namespace Character {
     public class Inventory : IInventory{
-        public string playerID { get; set; }
+        public ObjectId playerID { get; set; }
 
         public HashSet<IItem> inventory { get; set; }
 
@@ -53,7 +53,7 @@ namespace Character {
             foreach (var dbItem in docs) {
                 IItem temp = inventory.Where(i => i.Id == dbItem.Id).SingleOrDefault();
                 if (temp == null) {
-                    inventory.Add(await Items.Items.GetByID(dbItem.Id.ToString()));
+                    inventory.Add(await Items.Items.GetByID(dbItem.Id));
                 }
             }
         }
@@ -90,7 +90,7 @@ namespace Character {
                 }
             }
 
-            foreach (KeyValuePair<string, int> pair in itemGroups) {
+            foreach (var pair in itemGroups) {
                 string[] temp = pair.Key.Split('$');
                 if (!string.Equals(temp[1], "NONE", StringComparison.InvariantCultureIgnoreCase)) {
                     if (temp[1].Contains("[Opened]") || temp[1].Contains("[Closed]")) {

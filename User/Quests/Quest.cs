@@ -29,7 +29,7 @@ namespace Quests {
 
     public class Quest : IQuest {
         private List<IQuestStep> _questSteps;
-        private Dictionary<string, int> _currentPlayerStep;
+        private Dictionary<ObjectId, int> _currentPlayerStep;
 
         public List<IQuestStep> QuestSteps {
             get {
@@ -43,10 +43,10 @@ namespace Quests {
 
 		//this needs to be stored on the NPC as a Dictionary<questID, Dictionary<string,int>>
 		//so that we can fill it up upon NPC load and save it to the DB as well.
-		public Dictionary<string, int> CurrentPlayerStep {
+		public Dictionary<ObjectId, int> CurrentPlayerStep {
 			get {
 				if (_currentPlayerStep == null) {
-					_currentPlayerStep = new Dictionary<string, int>();
+					_currentPlayerStep = new Dictionary<ObjectId, int>();
 				}
 
 				return _currentPlayerStep;
@@ -80,8 +80,8 @@ namespace Quests {
 
         public Quest() { }
 
-        public Quest(string questID, Dictionary<string, int> playerSteps) {
-			AutoProcessPlayer = new Queue<string>();
+        public Quest(string questID, Dictionary<ObjectId, int> playerSteps) {
+			AutoProcessPlayer = new Queue<ObjectId>();
 			QuestID = questID;
 			CurrentPlayerStep = playerSteps;
           //  LoadQuestSteps();
@@ -95,7 +95,7 @@ namespace Quests {
 			get; set;
 		}
 
-		public Queue<string> AutoProcessPlayer { get; set; }
+		public Queue<ObjectId> AutoProcessPlayer { get; set; }
 
 		/// <summary>
 		/// Only one player at a time can ever be doing this quest.
@@ -127,7 +127,7 @@ namespace Quests {
 			//}
    //     }
 
-        public int AddPlayerToQuest(string playerID, int stepNumber) {
+        public int AddPlayerToQuest(ObjectId playerID, int stepNumber) {
 			foreach (QuestStep step in QuestSteps.Where(s => s.Step > stepNumber)) {
                 if (step.AddPlayerToQuest(playerID)) {
 					if (CurrentPlayerStep.ContainsKey(playerID)) {
@@ -145,27 +145,27 @@ namespace Quests {
         }
 
 		public void AutoProcessQuestStep(IActor npc) {
-			string id = AutoProcessPlayer.Dequeue();
+			var id = AutoProcessPlayer.Dequeue();
 
 			IUser player = Sockets.Server.GetAUser(id);
 
 			if (player == null) {
-				player = Character.NPCUtils.GetUserAsNPCFromList(new List<string> { id });
+				player = Character.NPCUtils.GetUserAsNPCFromList(new List<ObjectId> { id });
 			}
 
 			int stepToProcess = CurrentPlayerStep[player.UserID];
-			TriggerEventArgs e = new TriggerEventArgs(npc.ID, TriggerEventArgs.IDType.Npc, player.UserID, player.Player.IsNPC ? TriggerEventArgs.IDType.Npc : TriggerEventArgs.IDType.Player);
+			TriggerEventArgs e = new TriggerEventArgs(npc.Id, TriggerEventArgs.IDType.Npc, player.UserID, player.Player.IsNPC ? TriggerEventArgs.IDType.Npc : TriggerEventArgs.IDType.Player);
 			QuestSteps[stepToProcess - 1].ProcessStep(null, e);
 		}
 
 		public void ProcessQuestStep(IMessage message, IActor npc) {
 			AI.MessageParser parser = null;
 			int currentStep = 0;
-			if (CurrentPlayerStep.ContainsKey(message.InstigatorID)) {
-				currentStep = CurrentPlayerStep[message.InstigatorID];
+			if (CurrentPlayerStep.ContainsKey(ObjectId.Parse(message.InstigatorID))) {
+				currentStep = CurrentPlayerStep[ObjectId.Parse(message.InstigatorID)];
 				if (currentStep >= QuestSteps.Count) {
 					currentStep = QuestSteps.Count - 1;
-					CurrentPlayerStep[message.InstigatorID] = currentStep;
+					CurrentPlayerStep[ObjectId.Parse(message.InstigatorID)] = currentStep;
 				}
 			}
 			//find the step that contains the trigger
@@ -176,13 +176,13 @@ namespace Quests {
 
 				foreach (ITrigger trigger in parser.TriggersToExecute) {
 					if (trigger.AutoProcess && currentStep == step.Step) {
-						AutoProcessPlayer.Enqueue(message.InstigatorID);
+						AutoProcessPlayer.Enqueue(ObjectId.Parse(message.InstigatorID));
 						((NPC)npc).Fsm.ChangeState(AI.Questing.GetState(), npc as NPC);
-						currentStep = AddPlayerToQuest(message.InstigatorID, currentStep);
+						currentStep = AddPlayerToQuest(ObjectId.Parse(message.InstigatorID), currentStep);
 						break;
 					}
 
-					if (!AllowOutOfOrder && currentStep != CurrentPlayerStep[message.InstigatorID] || currentStep > step.Step) {
+					if (!AllowOutOfOrder && currentStep != CurrentPlayerStep[ObjectId.Parse(message.InstigatorID)] || currentStep > step.Step) {
 						//we will not execute the trigger since they need to start this quest from the beginning
 						break;
 					}
@@ -191,8 +191,8 @@ namespace Quests {
 						break;
 					}
 
-					currentStep = AddPlayerToQuest(message.InstigatorID, currentStep);
-					TriggerEventArgs e = new TriggerEventArgs(npc.ID, TriggerEventArgs.IDType.Npc, message.InstigatorID, (TriggerEventArgs.IDType)Enum.Parse(typeof(TriggerEventArgs.IDType), message.InstigatorType.ToString()), message.Room);
+					currentStep = AddPlayerToQuest(ObjectId.Parse(message.InstigatorID), currentStep);
+					TriggerEventArgs e = new TriggerEventArgs(npc.Id, TriggerEventArgs.IDType.Npc, ObjectId.Parse(message.InstigatorID), (TriggerEventArgs.IDType)Enum.Parse(typeof(TriggerEventArgs.IDType), message.InstigatorType.ToString()), message.Room);
 					trigger.HandleEvent(null, e);
 				}
 			}
@@ -214,14 +214,14 @@ namespace Quests {
 	}
 
     internal class QuestStep : IQuestStep {
-        private HashSet<string> _playerIDList;
+        private HashSet<ObjectId> _playerIDList;
 
         public QuestStep() { }  
 
-        public HashSet<string> PlayerIDList {
+        public HashSet<ObjectId> PlayerIDList {
             get {
                 if (_playerIDList == null) {
-                    _playerIDList = new HashSet<string>();
+                    _playerIDList = new HashSet<ObjectId>();
                 }
 
                 return _playerIDList;
@@ -262,7 +262,7 @@ namespace Quests {
             Trigger.HandleEvent(sender, e);
         }
 
-        public bool AddPlayerToQuest(string playerID) {
+        public bool AddPlayerToQuest(ObjectId playerID) {
             return PlayerIDList.Add(playerID);
         }
     }

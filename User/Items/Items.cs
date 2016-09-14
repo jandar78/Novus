@@ -38,7 +38,7 @@ namespace Items {
         public string Location { get; set; }
         public bool IsMovable { get; set; }
         public BsonArray Trigger { get; set; }
-        public string Owner { get; set; }
+        public ObjectId Owner { get; set; }
 
         public event EventHandler<ItemEventArgs> Deteriorated;
         public event EventHandler<ItemEventArgs> Improved;
@@ -88,7 +88,7 @@ namespace Items {
             return itemName.ToString().Trim().CamelCaseString();
         }
 
-        public static List<IItem> GetByName(string name, string owner) {
+        public static List<IItem> GetByName(string name, ObjectId owner) {
             var collection = MongoUtils.MongoData.GetCollection<BsonDocument>("World","Items");
             name = name.CamelCaseString();
             //find any items in the location that match what the player typed
@@ -106,15 +106,15 @@ namespace Items {
             var doc = await MongoUtils.MongoData.RetrieveObjectsAsync<BsonDocument>(collection, i => i["ItemType"] == 5 && i["isLit"] == true);
 
             foreach (var item in doc) {
-                IItem lightSource = await GetByID(item["_id"].AsObjectId.ToString());
+                IItem lightSource = await GetByID(item["_id"].AsObjectId);
                 IIluminate light = lightSource as IIluminate;
                 light.Drain();
             }
         }
 
-        public async static Task<IItem> GetByID(string id) {
+        public async static Task<IItem> GetByID(ObjectId id) {
             var collection = MongoUtils.MongoData.GetCollection<Items>("World", "Items");
-            var item = await MongoUtils.MongoData.RetrieveObjectAsync<Items>(collection, i => i.Id == ObjectId.Parse(id));
+            var item = await MongoUtils.MongoData.RetrieveObjectAsync<Items>(collection, i => i.Id == id);
             IItem result = null;
             if (item != null) {
                 result = await ItemFactory.CreateItem(item.Id);
@@ -123,7 +123,7 @@ namespace Items {
             return result;
         }
 
-        public async static Task<IItem> GetByIDFromList(List<string> id) {
+        public async static Task<IItem> GetByIDFromList(List<ObjectId> id) {
             if (id.Count > 0) {
                 IItem result = await GetByID(id[0]);
                 return result;

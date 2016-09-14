@@ -4,26 +4,17 @@ using System.ComponentModel;
 using System.Data;
 using System.Drawing;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using System.Windows.Forms;
 using MongoDB.Bson;
 using MongoDB.Driver;
-using MongoDB.Driver.Builders;
-using MongoDB.Bson.Serialization;
-using NCalc;
 using System.Reflection;
-using Character;
-using Items;
-using System.Xml;
 using System.Collections;
-using LuaInterface;
 using Triggers;
-using Roslyn.Compilers;
 using Roslyn.Scripting.CSharp;
 using Interfaces;
 using Sockets;
 using Rooms;
+using LuaInterface;
 
 namespace WorldBuilder {
     public partial class Form1 : Form {

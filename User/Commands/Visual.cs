@@ -62,14 +62,14 @@ namespace Commands {
             foundIt = false;
             string message = null;
 
-            List<string> npcList = room.GetObjectsInRoom(RoomObjects.Npcs);
+            var npcList = room.GetObjectsInRoom(RoomObjects.Npcs);
 
             var npcCollection = MongoUtils.MongoData.GetCollection<NPC>("Characters", "NPCCharacters");
             IMongoQuery query = null;
 
-            foreach (string id in npcList) {
-                query = Query.EQ("_id", ObjectId.Parse(id));
-                var result = MongoUtils.MongoData.RetrieveObject<NPC>(npcCollection, n => n.ID == id);
+            foreach (var id in npcList) {
+                query = Query.EQ("_id", id);
+                var result = MongoUtils.MongoData.RetrieveObject<NPC>(npcCollection, n => n.Id.Equals(id));
 
                 string tempName = result.FirstName + " " + result.LastName;
 
@@ -81,8 +81,8 @@ namespace Commands {
                         int pos;
                         int.TryParse(position[position.Count() - 1], out pos);
                         if (pos != 0) {
-                            string idToParse = GetObjectInPosition(pos, commands[2], room.Id);                            
-                            result = MongoUtils.MongoData.RetrieveObject<NPC>(npcCollection, n => n.ID == idToParse);
+                            var idToParse = GetObjectInPosition(pos, commands[2], room.Id);                            
+                            result = MongoUtils.MongoData.RetrieveObject<NPC>(npcCollection, n => n.Id.Equals(idToParse));
                         }
                     }
 
@@ -100,8 +100,8 @@ namespace Commands {
         private static string FindAPlayer(List<string> commands, IRoom room, out bool foundIt) {
             foundIt = false;
             string message = null;
-            List<string> chars = room.GetObjectsInRoom(RoomObjects.Players);
-            foreach (string id in chars) {
+            var chars = room.GetObjectsInRoom(RoomObjects.Players);
+            foreach (var id in chars) {
                 Character.Character playerChar = Server.GetAUser(id).Player as Character.Character;
                 string tempName = playerChar.FirstName + " " + playerChar.LastName;
                 if (commands[2].ToLower().Contains(playerChar.FirstName.ToLower()) || commands[2].ToLower().Contains(playerChar.LastName.ToLower())) {
@@ -118,10 +118,10 @@ namespace Commands {
             foundIt = false;
             string message = null;
 
-            List<string> itemsInRoom = room.GetObjectsInRoom(RoomObjects.Items);
+            var itemsInRoom = room.GetObjectsInRoom(RoomObjects.Items);
    
-            foreach (string id in itemsInRoom) {
-                IItem item = Items.ItemFactory.CreateItem(ObjectId.Parse(id)).Result;
+            foreach (var id in itemsInRoom) {
+                IItem item = Items.ItemFactory.CreateItem(id).Result;
                 if (commands[2].ToLower().Contains(item.Name.ToLower())) {
                     message = item.Examine();
                     foundIt = true;
@@ -246,9 +246,8 @@ namespace Commands {
             bool itemFound = false;
             IRoom room = Room.GetRoom(player.Player.Location);
 
-            string location;
+            var location = "";
             if (string.Equals(commands[commands.Count - 1], "inventory", StringComparison.InvariantCultureIgnoreCase)) {
-                location = null;
                 commands.RemoveAt(commands.Count - 1); //get rid of "inventory" se we can parse an index specifier if there is one
             }
             else {
@@ -264,8 +263,8 @@ namespace Commands {
 
             int index = 1;
 
-            if (!string.IsNullOrEmpty(location)) {//player didn't specify it was in his inventory check room first
-                foreach (string itemID in room.GetObjectsInRoom(RoomObjects.Items)) {
+            if (location.Equals(ObjectId.Empty)) {//player didn't specify it was in his inventory check room first
+                foreach (var itemID in room.GetObjectsInRoom(RoomObjects.Items)) {
                     IItem inventoryItem = await Items.Items.GetByID(itemID);
                     inventoryItem = KeepOpening(itemNameToGet, inventoryItem, itemPosition, index);
 

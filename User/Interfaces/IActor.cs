@@ -30,7 +30,7 @@ namespace Interfaces
 
     public enum CombatStances { Neutral, Offensive, Defensive, Disrupted }
 
-    public enum Genders { Male, Female }
+    public enum Genders { Male, Female, Apache_Helicopter, None }
 
     public enum SkinType { Flesh, Fur, Leather, Scaly, Feathers }
     public enum HairColors { White, Red, Black, Brown, Blonde, Blue, Purple, Silver, Grey }
@@ -52,13 +52,13 @@ namespace Interfaces
         IInventory Inventory { get; set; }
         IEquipment Equipment { get; set; }
         #region General
-        string UserID { get; set; }
+        ObjectId UserID { get; set; }
         string Password { get; set; }
         long Experience { get; set; }
         long NextLevelExperience { get; set; }
         bool Leveled { get; set; }
         bool IsLevelUp { get; }
-        string ID { get; set; }
+        ObjectId Id { get; set; }
         string Location { get; set; }
         string LastLocation { get; set; }
         bool IsNPC { get; set; }
@@ -68,25 +68,25 @@ namespace Interfaces
         string FullHonors { get; }
         string Title { get; set; }
         string Description { get; set; }
-        string Gender { get; }
+        Genders Gender { get; set; }
         string GenderPossesive { get; }
-        string Build { get; }
+        BodyBuild Build { get; }
         int Age { get; set; }
         double Weight { get; set; }
         double Height { get; set; }
-        string Class { get; }
-        string Race { get; }
-        string EyeColor { get; }
-        string SkinColor { get;}
-        string SkinType { get; }
-        string HairColor { get;}
+        CharacterClass Class { get; set; }
+        CharacterRace Race { get; }
+        EyeColors EyeColor { get; set; }
+        SkinColors SkinColor { get; set; }
+        SkinType SkinType { get; set; }
+        HairColors HairColor { get; set; }
         #endregion General
 
         #region Stances
         string Action { get; }
         string Stance { get; }
-        CharacterStanceState StanceState { get; }
-        CharacterActionState ActionState { get; }
+        CharacterStanceState StanceState { get; set; }
+        CharacterActionState ActionState { get; set; }
         #endregion Stances
 
         #region Leveling
@@ -99,34 +99,34 @@ namespace Interfaces
         bool CheckUnconscious { get; }
         bool CheckDead { get; }
         double DeathLimit { get; }
-        string CurrentTarget { get; set; }
-        string LastTarget { get; set; }
+        ObjectId CurrentTarget { get; set; }
+        ObjectId LastTarget { get; set; }
         bool InCombat { get; set; }
         DateTime LastCombatTime { get; set; }
         DateTime TimeOfDeath { get; set; }
         string MainHand { get; set; }
-        string KillerID { get; set; }
+        ObjectId KillerID { get; set; }
         #endregion Combat
 
         #endregion Properties
 
         #region Public Methods
         void Save();
-        void Load(string id);
+        void Load(ObjectId id);
 
         void SetActionState(CharacterActionState state);
         void SetStanceState(CharacterStanceState state);
         void SetActionStateDouble(double state);
         void SetStanceStateDouble(double state);
 
-        void RewardXP(string id, long amount);
+        void RewardXP(ObjectId id, long amount);
         void IncreasePoints();
 
         #region Combat Methods
         bool IsUnconcious();
         bool IsDead();
         void ClearTarget();
-        void UpdateTarget(string targetID);
+        void UpdateTarget(ObjectId targetID);
 
         double GetBonus(BonusTypes type);
         void AddBonus(BonusTypes type, string name, double amount, int time = 0);
@@ -145,7 +145,7 @@ namespace Interfaces
         void SetMaxAttributeValue(string name, double value);
         void SeAttributeRegenRate(string name, double value);
 
-        Dictionary<string, IAttributes> GetAttributes();
+        List<Character.Attribute> GetAttributes();
         Dictionary<string, double> GetSubAttributes();
 
         void CalculateSubAttributes();
@@ -159,7 +159,7 @@ namespace Interfaces
         #endregion Public Methods
 
         bool Loot(IUser looter, List<string> commands, bool bypassCheck = false);
-        bool CanLoot(string looterID);
+        bool CanLoot(ObjectId looterId);
     }
 
 

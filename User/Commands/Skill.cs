@@ -61,7 +61,7 @@ namespace Commands {
 			}
 			else {
 				script.AddVariable(UserCommand, "UserCommand");
-				script.AddVariable(Player.Player.ID, "playerID");
+				script.AddVariable(Player.Player.Id, "playerID");
 			}
             
             //if they have a target or they passed one in let's add it to the script variables as well
@@ -78,7 +78,7 @@ namespace Commands {
 						script.AddVariable(Target.Player, "target");
 					}
 					else {
-						script.AddVariable(Target.Player.ID, "targetID");
+						script.AddVariable(Target.Player.Id, "targetID");
 					}
                 }
             }

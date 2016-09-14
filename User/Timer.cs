@@ -1,12 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using System.Timers;
-using MongoDB.Driver;
-using MongoDB.Driver.Builders;
-using MongoDB.Bson;
 
 namespace MudTime
 {
@@ -77,7 +70,7 @@ namespace MudTime
 			if (playerTicks % 10 == 0) {
 				foreach (var user in Sockets.Server.GetCurrentUserList()) {
 					foreach (var attrib in user.Player.GetAttributes()) {
-						user.Player.ApplyRegen(attrib.Key);
+						user.Player.ApplyRegen(attrib.Name);
 					}
 				}
 
@@ -113,8 +106,5 @@ namespace MudTime
 				Calendar.Calendar.ApplyWeather(zonesToAffect);				
 			}
 		}
-
-		
-
 	}
 }

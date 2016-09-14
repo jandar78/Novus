@@ -1,4 +1,5 @@
-﻿using System;
+﻿using MongoDB.Bson;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -6,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace Triggers {
     public class TriggerEventArgs: EventArgs {
-        public string Id {
+        public ObjectId Id {
             get; private set;
         }
 
@@ -20,14 +21,14 @@ namespace Triggers {
             private set;
         }
 
-		public string InstigatorID {
+		public ObjectId InstigatorID {
 			get;
 			set;
 		}
 
 		public IDType InstigatorType { get; set; }
 
-        public TriggerEventArgs(string id, IDType type, string instigatorID, IDType instigatorType, string message = null) {
+        public TriggerEventArgs(ObjectId id, IDType type, ObjectId instigatorID, IDType instigatorType, string message = null) {
             IdType = type;
             Id = id;
             Message = message;

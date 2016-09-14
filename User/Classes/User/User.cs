@@ -5,6 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Interfaces;
 using Factories;
+using MongoDB.Bson;
 
 namespace Sockets {
 
@@ -16,7 +17,7 @@ namespace Sockets {
             set;
         }
 
-		public string UserID {
+		public ObjectId UserID {
 			get;
 			set;
 		}
@@ -50,17 +51,17 @@ namespace Sockets {
 			set;
 		}
 
-		public List<string> FriendsList {
+		public List<ObjectId> FriendsList {
 			get;
 			set;
 		}
 
-		public string LogID {
+		public ObjectId LogID {
 			get {
-				return _userBuffer.LogId;
+				return ObjectId.Parse(_userBuffer.LogId);
 			}
 			set {
-				_userBuffer.LogId = value;
+				_userBuffer.LogId = value.ToString();
 			}
 		}
 
@@ -117,19 +118,19 @@ namespace Sockets {
                 CurrentState = UserState.JUST_CONNECTED;
                 _character = Factory.CreateCharacter(CharacterType.PLAYER);
                 _character.UserID = UserID;
-                _userBuffer = new Messages.MessageBuffer(UserID);
+                _userBuffer = new Messages.MessageBuffer(UserID.ToString());
                 LastDisconnected = DateTime.MinValue;
                 LoginCompleted = false;
             }
            
-			UserID = Guid.NewGuid().ToString();	
+			UserID = new ObjectId();	
 		}
 
         public User() {
             CurrentState = UserState.JUST_CONNECTED;
             _character = Factory.CreateCharacter(CharacterType.PLAYER);
             _character.UserID = UserID;
-            _userBuffer = new Messages.MessageBuffer(UserID);
+            _userBuffer = new Messages.MessageBuffer(UserID.ToString());
             LastDisconnected = DateTime.MinValue;
             LoginCompleted = false;
         }

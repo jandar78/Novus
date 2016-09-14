@@ -110,9 +110,9 @@ namespace WorldBuilder {
             idValue.Text = item.Id.ToString();
             nameValue.Text = item.Name;
             descriptionValue.Text = item.Description;
-            locationValue.Text = item.Location;
+            locationValue.Text = item.Location.ToString();
             //general stuff
-            ownerValue.Text = item.Owner;
+            ownerValue.Text = item.Owner.ToString();
             minLevelValue.Text = item.MinimumLevel.ToString();
             conditionValue.Text = item.CurrentCondition.ToString();
             maxConditionValue.Text = item.MaxCondition.ToString();
@@ -194,7 +194,7 @@ namespace WorldBuilder {
                     item.Id = ObjectId.Parse(idValue.Text);
                 }
 
-                item.Location = locationValue.Text;
+                item.Location =locationValue.Text;
 
                 //general stuff
                 if (!IsEmpty(nameValue.Text)) {
@@ -204,7 +204,7 @@ namespace WorldBuilder {
                     item.Description = descriptionValue.Text;
                 }
                 if (!IsEmpty(ownerValue.Text)) {
-                    item.Owner = ownerValue.Text;
+                    item.Owner = ObjectId.Parse(ownerValue.Text);
                 }
                 if (!IsEmpty(minLevelValue.Text)) {
                     item.MinimumLevel = int.Parse(minLevelValue.Text);
@@ -244,9 +244,9 @@ namespace WorldBuilder {
                     item.WeightLimit = double.Parse(weightLimitValue.Text);
                 }
 
-                List<String> contentsArray = new List<string>();
+                List<ObjectId> contentsArray = new List<ObjectId>();
                 foreach (string value in itemContentsValue.Items) {
-                    contentsArray.Add(value);
+                    contentsArray.Add(ObjectId.Parse(value));
                 }
                 if (contentsArray.Count > 0) {
                     item.Contents = contentsArray;
@@ -357,7 +357,7 @@ namespace WorldBuilder {
         private void locationValue_Leave(object sender, EventArgs e) {
             if (!string.IsNullOrEmpty(locationValue.Text)) {
                 try {
-                    var room = MongoUtils.MongoData.RetrieveObject<Room>(MongoUtils.MongoData.GetCollection<Room>("Rooms", locationValue.Text[0].ToString()), r => r.Id == locationValue.Text);
+                    var room = MongoUtils.MongoData.RetrieveObject<Room>(MongoUtils.MongoData.GetCollection<Room>("Rooms", locationValue.Text[0].ToString()), r => r.Id.Equals(ObjectId.Parse(locationValue.Text)));
                     if (room == null) {
                         DisplayValidationErrorBox("That is not a valid room location");
                     }

@@ -67,7 +67,7 @@ namespace Commands{
 
          static public void ExecuteCommand(IActor actor, string command, string message = null) {
              IUser player = new Sockets.User(true);
-             player.UserID = actor.ID;
+             player.UserID = actor.Id;
              player.Player = actor;
              bool commandFound = false;
 

@@ -39,7 +39,7 @@ namespace Character {
         }
         public string Name {
             get {
-                return this.ToString();
+                return _name;
             }
             set {
                 _name = value;
@@ -126,9 +126,9 @@ namespace Character {
 			}
 		}       
 
-		public Attribute():this (10, "General Attribute", 10, 0.2, 1) {}
+		public Attribute() { }
 
-		public Attribute(double amount, string name, double maxAmount, double regenRate, int rank) {
+		public Attribute(double amount = 10, string name = "General Attribute", double maxAmount = 10, double regenRate = 0.2, int rank = 1) {
 			Value = amount;
 			Name = name;
 			RegenRate = regenRate;

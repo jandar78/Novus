@@ -35,7 +35,7 @@ namespace WorldBuilder {
                         var result = MongoUtils.MongoData.GetCollection<Room>("Rooms", collection["name"].AsString).AsQueryable().ToList();
 
                         if (filterTypeValue.Text == "_id") {
-                            result = MongoUtils.MongoData.GetCollection<Room>("Rooms", collection["name"].AsString).AsQueryable().Where(r => r.Id == filterValue.Text).ToList();
+                            result = MongoUtils.MongoData.GetCollection<Room>("Rooms", collection["name"].AsString).AsQueryable().Where(r => r.Id.Equals(ObjectId.Parse(filterValue.Text))).ToList();
                         } 
                         else if (string.IsNullOrEmpty(filterTypeValue.Text) || string.IsNullOrEmpty(filterValue.Text)) {
                             result =  (await MongoUtils.MongoData.FindAll<Room>(MongoUtils.MongoData.GetCollection<Room>("Rooms", collection["name"].AsString))).ToList();
@@ -96,17 +96,17 @@ namespace WorldBuilder {
 
 
                 foreach (AI.PathFinding.TreeNode treeNode in traversedTree.Reverse()) {
-                    if (model.Shapes.ContainsKey(treeNode.ID)) {
-                        position = model.Shapes[treeNode.ID].Location;
+                    if (model.Shapes.ContainsKey(treeNode.ID.ToString())) {
+                        position = model.Shapes[treeNode.ID.ToString()].Location;
                     }
 
                     roomNode.Location = position;
 
-                    roomNode.Heading = treeNode.ID;
+                    roomNode.Heading = treeNode.ID.ToString();
                     roomNode.SubHeading = treeNode.Title;
 
-                    if (!model.Shapes.ContainsKey(treeNode.ID)) {
-                        model.Shapes.Add(treeNode.ID, roomNode);
+                    if (!model.Shapes.ContainsKey(treeNode.ID.ToString())) {
+                        model.Shapes.Add(treeNode.ID.ToString(), roomNode);
                     }
 
                     Arrow arrow = new Arrow();
@@ -117,7 +117,7 @@ namespace WorldBuilder {
                         RoomExits direction = (RoomExits)Enum.Parse(typeof(RoomExits), adjNode.Key);
 
                         Table adjShape = new Table();
-                        adjShape.Heading = adjNode.Value.ID;
+                        adjShape.Heading = adjNode.Value.ID.ToString();
                         adjShape.SubHeading = adjNode.Value.Title;
                         adjShape.BackColor = Color.LightBlue;
 
@@ -142,10 +142,10 @@ namespace WorldBuilder {
                                 break;
                         }
 
-                        if (!model.Shapes.ContainsKey(adjNode.Value.ID)) {
-                            model.Shapes.Add(adjNode.Value.ID, adjShape);
+                        if (!model.Shapes.ContainsKey(adjNode.Value.ID.ToString())) {
+                            model.Shapes.Add(adjNode.Value.ID.ToString(), adjShape);
                         }
-                        Connector line = new Connector(model.Shapes[treeNode.ID], model.Shapes[adjNode.Value.ID]);
+                        Connector line = new Connector(model.Shapes[treeNode.ID.ToString()], model.Shapes[adjNode.Value.ID.ToString()]);
                         line.End.Marker = arrow;
 
                         model.Lines.Add(model.Lines.CreateKey(), line);

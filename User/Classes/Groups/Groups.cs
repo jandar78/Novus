@@ -32,18 +32,18 @@ namespace Groups {
             return MongoUtils.MongoData.RetrieveObject<BsonDocument>(collection, m => m["_id"] == messageID)["Message"].AsString;
 		}
 
-		public void CreateGroup(string leaderID, string groupName) {
+		public void CreateGroup(ObjectId LeaderId, string groupName) {
 			string msgID = "GroupCreated";
 
-			if (!IsPlayerInGroup(leaderID)) {
+			if (!IsPlayerInGroup(LeaderId)) {
 				if (!GroupAlreadyExists(groupName)) {
 					try{
 						if (string.IsNullOrEmpty(groupName)) {
-							Server.GetAUser(leaderID).MessageHandler("You must provide a name for the group.");
+							Server.GetAUser(LeaderId).MessageHandler("You must provide a name for the group.");
 						}
 						else {
-							_groupList.Add(new Group(groupName, leaderID));
-							Server.GetAUser(leaderID).GroupName = groupName;
+							_groupList.Add(new Group(groupName, LeaderId));
+							Server.GetAUser(LeaderId).GroupName = groupName;
 						}
 					}
 					catch (Exception) { //you never know
@@ -58,7 +58,7 @@ namespace Groups {
 				msgID = "LeaderInOtherGroup";
 			}
 
-			Server.GetAUser(leaderID).MessageHandler(string.Format(GetMessageFromDB(msgID), groupName));
+			Server.GetAUser(LeaderId).MessageHandler(string.Format(GetMessageFromDB(msgID), groupName));
 		}
 
 		private bool GroupAlreadyExists(string groupName) {
@@ -73,19 +73,19 @@ namespace Groups {
 			return exists;
 		}
 
-		public void DisbandGroup(string leaderID, string groupName) {
+		public void DisbandGroup(ObjectId LeaderId, string groupName) {
 			Group group = GetGroup(groupName);
 			if (group != null) {
-				if (string.Equals(group.LeaderID, leaderID, StringComparison.InvariantCultureIgnoreCase)) {
-					group.Disband(GetMessageFromDB("DisbandGroup"));
+                if (LeaderId.Pid == group.LeaderId.Pid) {
+                    group.Disband(GetMessageFromDB("DisbandGroup"));
 					_groupList.Remove(group);
 				}
 				else {
-					Server.GetAUser(leaderID).MessageHandler("You can not disband the group. Only the leader can disband the group.");
+					Server.GetAUser(LeaderId).MessageHandler("You can not disband the group. Only the leader can disband the group.");
 				}
 			}
 			else {
-				Server.GetAUser(leaderID).MessageHandler("No group exist with that name to disband.");
+				Server.GetAUser(LeaderId).MessageHandler("No group exist with that name to disband.");
 			}
 		}
 
@@ -135,11 +135,11 @@ namespace Groups {
 			return groupFound;
 		}
 
-		public Group GetGroupByLeaderID(string leaderID) {
+		public Group GetGroupByLeaderId(ObjectId LeaderId) {
 			Group groupFound = null;
 			foreach (Group group in _groupList) {
-				if (string.Equals(group.LeaderID, leaderID, StringComparison.InvariantCultureIgnoreCase)) {
-					groupFound = group;
+                if (LeaderId.Pid == group.LeaderId.Pid) {
+                    groupFound = group;
 					break;
 				}
 			}
@@ -155,82 +155,82 @@ namespace Groups {
 			return group.ToString() ?? "";
 		}
 
-		public void ChangeLootingRule(string leaderID, string groupName, GroupLootRule newRule) {
+		public void ChangeLootingRule(ObjectId LeaderId, string groupName, GroupLootRule newRule) {
 			Group group = GetGroup(groupName);
 			if (group != null) {
-				if (string.Equals(leaderID, group.LeaderID, StringComparison.InvariantCultureIgnoreCase)) {
-					group.ChangeLootingRule(newRule);
+                if (LeaderId.Pid == group.LeaderId.Pid) {
+                    group.ChangeLootingRule(newRule);
 				}
 				else {
-					Server.GetAUser(leaderID).MessageHandler("Only the group leader can chnage group looting rules.");
+					Server.GetAUser(LeaderId).MessageHandler("Only the group leader can chnage group looting rules.");
 				}
 			}
 			else {
-				Server.GetAUser(leaderID).MessageHandler("No group with that name exists.");
+				Server.GetAUser(LeaderId).MessageHandler("No group with that name exists.");
 			}
 		}
 
-		public void ChangeJoiningRule(string leaderID, string groupName, GroupJoinRule newRule) {
+		public void ChangeJoiningRule(ObjectId LeaderId, string groupName, GroupJoinRule newRule) {
 			Group group = GetGroup(groupName);
 			if (group != null) {
-				if (string.Equals(leaderID, group.LeaderID, StringComparison.InvariantCultureIgnoreCase)) {
+				if (LeaderId.Pid == group.LeaderId.Pid) {
 					group.ChangeJoinRule(newRule);
 				}
 				else {
-					Server.GetAUser(leaderID).MessageHandler("Only the group leader can change group joining rules.");
+					Server.GetAUser(LeaderId).MessageHandler("Only the group leader can change group joining rules.");
 				}
 			}
 			else {
-				Server.GetAUser(leaderID).MessageHandler("No group with that name exists.");
+				Server.GetAUser(LeaderId).MessageHandler("No group with that name exists.");
 			}
 		}
 
-		public void RemovePlayerFromGroup(string leaderID, string playerName, string groupName) {
+		public void RemovePlayerFromGroup(ObjectId LeaderId, string playerName, string groupName) {
 			Group group = GetGroup(groupName);
 			if (group != null) {
-				if (string.Equals(leaderID, group.LeaderID, StringComparison.InvariantCultureIgnoreCase)) {
+				if (LeaderId.Pid == group.LeaderId.Pid) {
 					group.RemovePlayerFromGroup(Server.GetAUserByFullName(playerName).UserID);
 				}
 				else {
-					Server.GetAUser(leaderID).MessageHandler("Only the group leader can remove players from the group.");
+					Server.GetAUser(LeaderId).MessageHandler("Only the group leader can remove players from the group.");
 				}
 			}
 			else {
-				Server.GetAUser(leaderID).MessageHandler("No group with that name exists.");
+				Server.GetAUser(LeaderId).MessageHandler("No group with that name exists.");
 			}
 		}
 
-		public void AddPlayerToGroup(string leaderID, string groupName, string playerID) {
+		public void AddPlayerToGroup(ObjectId LeaderId, string groupName, ObjectId playerID) {
 			Group group = GetGroup(groupName);
 			if (group != null) {
-				if (string.Equals(leaderID, group.LeaderID, StringComparison.InvariantCultureIgnoreCase)) {
+				if (LeaderId.Pid == group.LeaderId.Pid) {
 					group.AddPlayerToGroup(playerID);
 				}
 				else {
-					Server.GetAUser(leaderID).MessageHandler("Only the group leader can add players to the group.");
+					Server.GetAUser(LeaderId).MessageHandler("Only the group leader can add players to the group.");
 				}
 			}
 			else {
-				Server.GetAUser(leaderID).MessageHandler("No group with that name exists.");
+				Server.GetAUser(LeaderId).MessageHandler("No group with that name exists.");
 			}
 		}
 
-		public void PromoteToLeader(string leaderID, string groupName, string newLeaderID) {
+		public void PromoteToLeader(ObjectId LeaderId, string groupName, ObjectId newLeaderId) {
 			Group group = GetGroup(groupName);
 			if (group != null) {
-				if (string.Equals(leaderID, group.LeaderID, StringComparison.InvariantCultureIgnoreCase)) {
-					group.PromoteToLeader(newLeaderID);
+				if (LeaderId.Pid == group.LeaderId.Pid) {
+					group.PromoteToLeader(newLeaderId);
 				}
 				else {
-					Server.GetAUser(leaderID).MessageHandler("Only the group leader can promote another player to group leader.");
+					Server.GetAUser(LeaderId).MessageHandler("Only the group leader can promote another player to group leader.");
 				}
 			}
 			else {
-				Server.GetAUser(leaderID).MessageHandler("No group with that name exists.");
+				Server.GetAUser(LeaderId).MessageHandler("No group with that name exists.");
 			}
 		}
 
-		private bool IsPlayerInGroup(string playerID, string groupName = null) {
+		private bool IsPlayerInGroup(ObjectId playerID, string groupName = null) {
 			bool playerIsInGroup = false;
 
 			if (string.IsNullOrEmpty(groupName)) {
@@ -248,7 +248,7 @@ namespace Groups {
 			return playerIsInGroup;
 		}
 
-		public void RequestGroupJoin(string playerID, string groupName) {
+		public void RequestGroupJoin(ObjectId playerID, string groupName) {
 			Group group = GetGroup(groupName);
 			if (group != null) {
 				if (group.GroupRuleForVisibility == GroupVisibilityRule.Public) {
@@ -257,7 +257,7 @@ namespace Groups {
 
 					}
 					else if (group.GroupRuleForJoining == GroupJoinRule.Friends_only) {
-						if (!Server.GetAUser(group.LeaderID).FriendsList.Contains(playerID)) {
+						if (!Server.GetAUser(group.LeaderId).FriendsList.Contains(playerID)) {
 							Server.GetAUser(playerID).MessageHandler("You are not a friend of the group leader. You can not join the group");
 						}
 						else {
@@ -277,37 +277,37 @@ namespace Groups {
 			}
 		}
 
-		public void GetPendingRequests(string leaderID, string groupName) {
+		public void GetPendingRequests(ObjectId LeaderId, string groupName) {
 			Group group = GetGroup(groupName);
 			if (group != null) {
-				if (string.Equals(leaderID, group.LeaderID)) {
-					group.GetPendingRequests();
+                if (LeaderId.Pid == group.LeaderId.Pid) {
+                    group.GetPendingRequests();
 				}
 				else {
-					Server.GetAUser(leaderID).MessageHandler("You are not the group leader and can not view pending requests.");
+					Server.GetAUser(LeaderId).MessageHandler("You are not the group leader and can not view pending requests.");
 				}
 			}
 			else {
-				Server.GetAUser(leaderID).MessageHandler("No group with that name exists.");
+				Server.GetAUser(LeaderId).MessageHandler("No group with that name exists.");
 			}
 		}
 
-		public void GetPendingInvitations(string leaderID, string groupName) {
+		public void GetPendingInvitations(ObjectId LeaderId, string groupName) {
 			Group group = GetGroup(groupName);
 			if (group != null) {
-				if (string.Equals(leaderID, group.LeaderID)) {
-					group.GetPendingInvitationRequests();
+                if (LeaderId.Pid == group.LeaderId.Pid) {
+                    group.GetPendingInvitationRequests();
 				}
 				else {
-					Server.GetAUser(leaderID).MessageHandler("You are not the group leader and can not view group invitations.");
+					Server.GetAUser(LeaderId).MessageHandler("You are not the group leader and can not view group invitations.");
 				}
 			}
 			else {
-				Server.GetAUser(leaderID).MessageHandler("No group with that name exists.");
+				Server.GetAUser(LeaderId).MessageHandler("No group with that name exists.");
 			}
 		}
 
-		public void DeclineInvite(string playerID, string groupName) {
+		public void DeclineInvite(ObjectId playerID, string groupName) {
 			string msg = null;
 			Group group = GetGroup(groupName);
 			if (group != null) {
@@ -325,34 +325,34 @@ namespace Groups {
 			Server.GetAUser(playerID).MessageHandler(msg);
 		}
 
-		public void InviteToGroup(string leaderID, string playerName, string groupName) {
+		public void InviteToGroup(ObjectId LeaderId, string playerName, string groupName) {
 			Group group = GetGroup(groupName);
 			if (group != null) {
-				if (string.Equals(leaderID, group.LeaderID)) {
-					group.InvitePlayer(playerName);
+                if (LeaderId.Pid == group.LeaderId.Pid) {
+                    group.InvitePlayer(playerName);
 				}
 				else {
-					Server.GetAUser(leaderID).MessageHandler("You are not the group leader and can not invite players to join the group.");
+					Server.GetAUser(LeaderId).MessageHandler("You are not the group leader and can not invite players to join the group.");
 				}
 			}
 			else {
-				Server.GetAUser(leaderID).MessageHandler("No group with that name exists.");
+				Server.GetAUser(LeaderId).MessageHandler("No group with that name exists.");
 			}
 		}
 
-		public void AcceptDenyJoinRequest(string leaderID, string playerName, bool accepted) {
-			Group group = GetGroupByLeaderID(leaderID);
+		public void AcceptDenyJoinRequest(ObjectId LeaderId, string playerName, bool accepted) {
+			Group group = GetGroupByLeaderId(LeaderId);
 			if (group != null) {
 				IUser player = Server.GetAUserByFullName(playerName);
 				if (player != null) {
 					group.ApproveDenyRequest(player.UserID, accepted);
 				}
 				else {
-					Server.GetAUser(leaderID).MessageHandler("No player with that name exists.");
+					Server.GetAUser(LeaderId).MessageHandler("No player with that name exists.");
 				}
 			}
 			else {
-				Server.GetAUser(leaderID).MessageHandler("No group with that name exists.");
+				Server.GetAUser(LeaderId).MessageHandler("No group with that name exists.");
 			}
 		}
 
@@ -363,14 +363,14 @@ namespace Groups {
 			}
 		}
 
-		public void Say(string message, string groupName, string playerID) {
+		public void Say(string message, string groupName, ObjectId playerID) {
 			Group group = GetGroup(groupName);
 			if (group != null && !string.IsNullOrEmpty(message)) {
 				group.SayToGroup(message, playerID);
 			}
 		}
 
-		public void Join(string playerID, string groupName) {
+		public void Join(ObjectId playerID, string groupName) {
 			Group group = GetGroup(groupName);
 			if (group != null) {
 				//player was sent an invitation by group leader at some point
@@ -382,7 +382,7 @@ namespace Groups {
 						group.AddPlayerToGroup(playerID);
 					}
 					else if (group.GroupRuleForJoining == GroupJoinRule.Friends_only) {
-						if (!Server.GetAUser(group.LeaderID).FriendsList.Contains(playerID)) {
+						if (!Server.GetAUser(group.LeaderId).FriendsList.Contains(playerID)) {
 							Server.GetAUser(playerID).MessageHandler("You are not a friend of the leader, you can not join the group.");
 						}
 						else {
@@ -399,11 +399,11 @@ namespace Groups {
 			}
 		}
 
-		public void Uninvite(string leaderID, string playerName, string groupName) {
+		public void Uninvite(ObjectId LeaderId, string playerName, string groupName) {
 			string msg = null;
 			Group group = GetGroup(groupName);
 			if (group != null) {
-				if (group.IsLeader(leaderID)) {
+				if (group.IsLeader(LeaderId)) {
 					group.RemovePendingInvitation(Server.GetAUserByFullName(playerName).UserID);
 					msg = "The group invitation for " + playerName + " has been removed.";
 				}
@@ -415,26 +415,26 @@ namespace Groups {
 				msg = "No group by that name exists.";
 			}
 
-			Server.GetAUserByFullName(leaderID).MessageHandler(msg);
+			Server.GetAUser(LeaderId).MessageHandler(msg);
 		}
 
-		public void AssignMasterLooter(string leaderID, string masterID, string groupName) {
+		public void AssignMasterLooter(ObjectId LeaderId, string masterID, string groupName) {
 			Group group = GetGroup(groupName);
-			group.AssignMasterLooter(leaderID, masterID);
+			group.AssignMasterLooter(LeaderId, masterID);
 		}
 
-		public void ChangeVisibilityRule(string leaderID, string groupName, GroupVisibilityRule newRule) {
+		public void ChangeVisibilityRule(ObjectId LeaderId, string groupName, GroupVisibilityRule newRule) {
 			Group group = GetGroup(groupName);
 			if (group != null) {
-				if (string.Equals(leaderID, group.LeaderID, StringComparison.InvariantCultureIgnoreCase)) {
+				if (LeaderId.Pid == group.LeaderId.Pid) {
 					group.ChangeVisibilityRule(newRule);
 				}
 				else {
-					Server.GetAUser(leaderID).MessageHandler("Only the group leader can change group visibility rules.");
+					Server.GetAUser(LeaderId).MessageHandler("Only the group leader can change group visibility rules.");
 				}
 			}
 			else {
-				Server.GetAUser(leaderID).MessageHandler("No group with that name exists.");
+				Server.GetAUser(LeaderId).MessageHandler("No group with that name exists.");
 			}
 		}
 	}

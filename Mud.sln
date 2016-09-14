@@ -3,15 +3,13 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 14
 VisualStudioVersion = 14.0.25420.1
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SocketProgram", "SocketProgram\SocketProgram.csproj", "{AECBB66A-201A-467F-9C30-FB23DDF77CF6}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Client", "SocketProgram\Client.csproj", "{AECBB66A-201A-467F-9C30-FB23DDF77CF6}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ServerConsole", "ServerConsole\ServerConsole.csproj", "{9553C65A-7FC4-401C-B03B-4DCA5C6CDB6B}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Logger", "Logger\Logger.csproj", "{9F4433D9-C6E6-4734-A70D-E19B0EBC7139}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MongoWrapper", "MongoWrapper\MongoWrapper.csproj", "{4B12BE0D-5AE3-4C79-B6E7-7DDDD2C5A4BA}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Scripts", "Scripts\Scripts.csproj", "{B41E7714-20B3-43AA-9B0E-DFDB6AA41520}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Core", "User\Core.csproj", "{ECA43097-56B3-45C9-93C2-C6ADA9F0D8A4}"
 EndProject
@@ -79,18 +77,6 @@ Global
 		{4B12BE0D-5AE3-4C79-B6E7-7DDDD2C5A4BA}.Release|x64.Build.0 = Release|x64
 		{4B12BE0D-5AE3-4C79-B6E7-7DDDD2C5A4BA}.Release|x86.ActiveCfg = Release|x86
 		{4B12BE0D-5AE3-4C79-B6E7-7DDDD2C5A4BA}.Release|x86.Build.0 = Release|x86
-		{B41E7714-20B3-43AA-9B0E-DFDB6AA41520}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{B41E7714-20B3-43AA-9B0E-DFDB6AA41520}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{B41E7714-20B3-43AA-9B0E-DFDB6AA41520}.Debug|x64.ActiveCfg = Debug|x64
-		{B41E7714-20B3-43AA-9B0E-DFDB6AA41520}.Debug|x64.Build.0 = Debug|x64
-		{B41E7714-20B3-43AA-9B0E-DFDB6AA41520}.Debug|x86.ActiveCfg = Debug|x86
-		{B41E7714-20B3-43AA-9B0E-DFDB6AA41520}.Debug|x86.Build.0 = Debug|x86
-		{B41E7714-20B3-43AA-9B0E-DFDB6AA41520}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{B41E7714-20B3-43AA-9B0E-DFDB6AA41520}.Release|Any CPU.Build.0 = Release|Any CPU
-		{B41E7714-20B3-43AA-9B0E-DFDB6AA41520}.Release|x64.ActiveCfg = Release|x64
-		{B41E7714-20B3-43AA-9B0E-DFDB6AA41520}.Release|x64.Build.0 = Release|x64
-		{B41E7714-20B3-43AA-9B0E-DFDB6AA41520}.Release|x86.ActiveCfg = Release|x86
-		{B41E7714-20B3-43AA-9B0E-DFDB6AA41520}.Release|x86.Build.0 = Release|x86
 		{ECA43097-56B3-45C9-93C2-C6ADA9F0D8A4}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{ECA43097-56B3-45C9-93C2-C6ADA9F0D8A4}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{ECA43097-56B3-45C9-93C2-C6ADA9F0D8A4}.Debug|x64.ActiveCfg = Debug|x64

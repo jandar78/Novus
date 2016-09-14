@@ -15,7 +15,7 @@ namespace Interfaces
 {
     public interface IInventory
     {
-        string playerID { get; set; }
+        ObjectId playerID { get; set; }
         HashSet<IItem> inventory { get; set; }
 
         IItem RemoveInventoryItem(IItem item, IEquipment equipment);
@@ -24,64 +24,5 @@ namespace Interfaces
         List<IItem> GetInventoryAsItemList();
         List<string> GetInventoryList();
         List<IItem> GetAllItemsToWear();        
-    }
-
-    public class Inventory : IInventory
-    {
-        public HashSet<IItem> inventory
-        {
-            get
-            {
-                throw new NotImplementedException();
-            }
-
-            set
-            {
-                throw new NotImplementedException();
-            }
-        }
-
-        public string playerID
-        {
-            get
-            {
-                throw new NotImplementedException();
-            }
-
-            set
-            {
-                throw new NotImplementedException();
-            }
-        }
-
-        public void AddItemToInventory(IItem item)
-        {
-            throw new NotImplementedException();
-        }
-
-        public List<IItem> GetAllItemsToWear()
-        {
-            throw new NotImplementedException();
-        }
-
-        public List<IItem> GetInventoryAsItemList()
-        {
-            throw new NotImplementedException();
-        }
-
-        public List<string> GetInventoryList()
-        {
-            throw new NotImplementedException();
-        }
-
-        public IItem RemoveInventoryItem(IItem item, IEquipment equipment)
-        {
-            throw new NotImplementedException();
-        }
-
-        public void UpdateInventoryFromDatabase()
-        {
-            throw new NotImplementedException();
-        }
     }
 }

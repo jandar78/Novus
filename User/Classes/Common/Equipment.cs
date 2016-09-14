@@ -16,7 +16,7 @@ using Interfaces;
 
 namespace Character {
     public class Equipment : IEquipment{
-        public string playerID { get; set; } 
+        public ObjectId playerID { get; set; } 
 
         public Dictionary<Wearable, IItem> equipped { get; set; }
 

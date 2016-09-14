@@ -6,6 +6,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Net.Sockets;
 using Interfaces;
+using MongoDB.Bson;
 
 namespace Sockets
 {
@@ -76,11 +77,15 @@ namespace Sockets
 		#endregion Constructors
 
 		#region Public Methods
-		public static Server GetServer() {
-			return _server ?? (_server = new Server("192.168.1.1", 8814));
+		public static Server GetServer(string ipAddress, int port) {
+			return _server ?? (_server = new Server(ipAddress, port));
 		}
 
-		public static List<IUser> GetCurrentUserList() {
+        public static Server GetServer() {
+            return _server;
+        }
+
+        public static List<IUser> GetCurrentUserList() {
 			List<IUser> userList = new List<IUser>();
 			Dictionary<Socket, IUser> tempList = new Dictionary<Socket, IUser>(clientSocketList); //this should prevent "Collection was modified" exception
 			foreach (KeyValuePair<Socket, IUser> user in tempList) {
@@ -90,11 +95,11 @@ namespace Sockets
 			return userList;
 		}
 
-		public static bool UpdateUserSocket(string userID) {
+		public static bool UpdateUserSocket(ObjectId userID) {
 			//this is messy but basically we are grabbing all the socket that have a value whos user ID is equal to the one passed in
 			//then we are going to update the value of the socket who's user is currently logging in with the user that is sitting in limbo
 			//and then we are going to get rid of the socket/user pair that are still in limbo
-			List<KeyValuePair<Socket, IUser>> check = clientSocketList.Where(u => u.Value.UserID == userID).ToList();
+			List<KeyValuePair<Socket, IUser>> check = clientSocketList.Where(u => u.Value.UserID.Equals(userID)).ToList();
 			KeyValuePair<Socket, IUser> newClient = check.Where(c => c.Value.CurrentState == UserState.LOGGING_IN).FirstOrDefault();
 			KeyValuePair<Socket, IUser> oldClient = check.Where(c => c.Value.CurrentState == UserState.LIMBO).FirstOrDefault();
 			if (!clientSocketList.TryUpdate(newClient.Key, oldClient.Value, newClient.Value)){
@@ -107,12 +112,12 @@ namespace Sockets
 			return true;
 		}
 
-		public static IUser GetAUserPlusState(string id, UserState state = UserState.TALKING) {
+		public static IUser GetAUserPlusState(ObjectId id, UserState state = UserState.TALKING) {
 			Dictionary<Socket, IUser> tempList = new Dictionary<Socket, IUser>(clientSocketList);
 			return tempList.Where(c => c.Value.UserID == id && c.Value.CurrentState == state).FirstOrDefault().Value;
 		}
 
-		public static IUser GetAUser(string id) {
+		public static IUser GetAUser(ObjectId id) {
             if (clientSocketList != null) {
                 Dictionary<Socket, IUser> tempList = new Dictionary<Socket, IUser>(clientSocketList);
                 return tempList.Where(c => c.Value.UserID == id).FirstOrDefault().Value;
@@ -121,7 +126,7 @@ namespace Sockets
             return null;
 		}
 
-        public static IUser GetAUserFromList(List<string> id) {
+        public static IUser GetAUserFromList(List<ObjectId> id) {
             if (id.Count > 0) {
                 return GetAUser(id[0]);
             }

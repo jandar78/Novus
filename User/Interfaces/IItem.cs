@@ -45,7 +45,7 @@ namespace Interfaces {
         void Save();
         string Examine();
         bool IsMovable { get; set; }
-        string Owner { get; set; } //set to the ID of the player/NPC or room currently holding the object, otherwise null
+        ObjectId Owner { get; set; } //set to the ID of the player/NPC or room currently holding the object, otherwise null
 
         event EventHandler<ItemEventArgs> Deteriorated;
         event EventHandler<ItemEventArgs> Improved;

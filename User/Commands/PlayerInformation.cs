@@ -27,12 +27,12 @@ namespace Commands {
                 sb.AppendLine("XP: " + (long)character.Experience);
                 sb.AppendLine("Next Level XP required: " + (long)character.NextLevelExperience + " (Needed: " + (long)(character.NextLevelExperience - character.Experience) + ")");
                 sb.AppendLine("\n[Attributes]");
-                foreach (KeyValuePair<string, IAttributes> attrib in player.Player.GetAttributes()) {
-                    sb.AppendLine(string.Format("{0,-12}: {1}/{2,-3}    Rank: {3}",attrib.Key.CamelCaseWord(), attrib.Value.Value, attrib.Value.Max, attrib.Value.Rank));
+                foreach (var attrib in player.Player.GetAttributes()) {
+                    sb.AppendLine(string.Format("{0,-12}: {1}/{2,-3}    Rank: {3}",attrib.Name.CamelCaseWord(), attrib.Value, attrib.Max, attrib.Rank));
                 }
 
                 sb.AppendLine("\n[Sub Attributes]");
-                foreach (KeyValuePair<string, double> attrib in player.Player.GetSubAttributes()) {
+                foreach (var attrib in player.Player.GetSubAttributes()) {
                     sb.AppendLine(attrib.Key.CamelCaseWord() + ": \t" + attrib.Value);
                 }
 
@@ -134,10 +134,10 @@ namespace Commands {
 
             IRoom room = Room.GetRoom(player.Player.Location);
 			message.Room = (room.IsDark == true ? "Someone" : player.Player.FirstName) + " " + temp + (temp.EndsWith(".") == false ? "." : "");
-			message.InstigatorID = player.Player.ID;
+			message.InstigatorID = player.Player.Id.ToString();
 			message.InstigatorType = player.Player.IsNPC == false ? ObjectType.Player : ObjectType.Npc;
 			player.MessageHandler(message.Self);
-            room.InformPlayersInRoom(message, new List<string>(){ player.UserID });
+            room.InformPlayersInRoom(message, new List<ObjectId>(){ player.UserID });
 		}
 
 		private static void Say(IUser player, List<string> commands) {
@@ -155,7 +155,7 @@ namespace Commands {
 
 			message.Self = "You say \"" + temp + "\"";
 			message.Room = (room.IsDark == true ? "Someone" : player.Player.FirstName) + " says \"" + temp + "\"";
-			message.InstigatorID = player.Player.ID;
+			message.InstigatorID = player.Player.Id.ToString();
 			message.InstigatorType = player.Player.IsNPC == false ? ObjectType.Player : ObjectType.Npc;
 
 			if (player.Player.IsNPC) {
@@ -167,7 +167,7 @@ namespace Commands {
 				player.MessageHandler(message.Self);
 			}
 
-			room.InformPlayersInRoom(message, new List<string>(){ player.UserID }); 
+			room.InformPlayersInRoom(message, new List<ObjectId>(){ player.UserID }); 
 		}
 
 		private static void SayTo(IUser player, List<string> commands) {
@@ -198,7 +198,7 @@ namespace Commands {
 			//then we'll see if the last name was included in the commands. And try again.  If not we'll check for the dot operator and all if else fails tell them
 			//to be a bit more specific about who they are trying to directly speak to.
 			string[] nameBreakDown = commands[0].ToLower().Split(' ');
-			foreach (string id in room.GetObjectsInRoom(RoomObjects.Players, 100)) {
+			foreach (var id in room.GetObjectsInRoom(RoomObjects.Players, 100)) {
 				toPlayerList.Add(Server.GetAUser(id));
 			}
 			
@@ -224,8 +224,8 @@ namespace Commands {
 
 			if (toPlayer == null) { //we are looking for an npc at this point
 				toPlayerList.Clear();
-				foreach (string id in room.GetObjectsInRoom(RoomObjects.Npcs, 100)) {
-					toPlayerList.Add(Character.NPCUtils.GetUserAsNPCFromList(new List<string>() { id }));
+				foreach (var id in room.GetObjectsInRoom(RoomObjects.Npcs, 100)) {
+					toPlayerList.Add(Character.NPCUtils.GetUserAsNPCFromList(new List<ObjectId>() { id }));
 				}
 				if (toPlayerList.Where(p => p.Player.FirstName.ToLower() == nameBreakDown[1]).Count() > 1) { //let's narrow it down by including a last name (if provided)
 					toPlayer = toPlayerList.Where(p => p.Player.FirstName.ToLower() == nameBreakDown[1]).Where(p => String.Compare(p.Player.LastName, nameBreakDown[2], true) == 0).SingleOrDefault();
@@ -264,9 +264,9 @@ namespace Commands {
 				message.Target = (room.IsDark == true ? "Someone" : player.Player.FirstName) + " says to you \"" + temp + "\"";
 				message.Room = (room.IsDark == true ? "Someone" : player.Player.FirstName) + " says to " + (room.IsDark == true ? "Someone" : toPlayer.Player.FirstName) + " \"" + temp + "\"";
 
-				message.InstigatorID = player.Player.ID;
+				message.InstigatorID = player.Player.Id.ToString();
 				message.InstigatorType = player.Player.IsNPC ? ObjectType.Npc : ObjectType.Player;
-				message.TargetID = toPlayer.UserID;
+				message.TargetID = toPlayer.UserID.ToString();
 				message.TargetType = player.Player.IsNPC ? ObjectType.Npc : ObjectType.Player;
 
 				if (player.Player.IsNPC) {
@@ -283,7 +283,7 @@ namespace Commands {
 					toPlayer.MessageHandler(message.Target);
 				}
 
-				room.InformPlayersInRoom(message, new List<string>() { player.UserID, toPlayer.UserID });
+				room.InformPlayersInRoom(message, new List<ObjectId>() { player.UserID, toPlayer.UserID });
 			}
 		}
 
@@ -291,7 +291,7 @@ namespace Commands {
 		//TODO: need to add the ability for others to listen in on the whisper if they have the skill
 		private static void Whisper(IUser player, List<string> commands){
 			IMessage message = new Message();
-			message.InstigatorID = player.Player.ID;
+			message.InstigatorID = player.Player.Id.ToString();
 			message.InstigatorType = player.Player.IsNPC == false ? ObjectType.Player : ObjectType.Npc;
 
 			List<IUser> toPlayerList = new List<IUser>();
@@ -329,7 +329,7 @@ namespace Commands {
 				message.Self = "You try and whisper to " + commands[2].CamelCaseWord() + " but they're not around.";
 			}
 			else {
-				message.TargetID = toPlayer.Player.ID;
+				message.TargetID = toPlayer.Player.Id.ToString();
 				message.TargetType = player.Player.IsNPC ? ObjectType.Npc : ObjectType.Player;
 
 				int startAt = commands[0].ToLower().IndexOf(toPlayer.Player.FirstName.ToLower() + " " + toPlayer.Player.LastName.ToLower());
@@ -357,14 +357,14 @@ namespace Commands {
 			else {
 				player.MessageHandler(message.Self);
 			}
-			room.InformPlayersInRoom(message, new List<string>(){ player.UserID, toPlayer != null ? toPlayer.UserID : ""});
+			room.InformPlayersInRoom(message, new List<ObjectId>(){ player.UserID, !toPlayer.Equals(ObjectId.Empty) ? toPlayer.UserID : ObjectId.Empty});
 			
 		}
 
 		//a tell is a private message basically, location is not a factor
 		private static void Tell(IUser player, List<string> commands) {
 			IMessage message = new Message();
-			message.InstigatorID = player.Player.ID;
+			message.InstigatorID = player.Player.Id.ToString();
 			message.InstigatorType = player.Player.IsNPC ? ObjectType.Npc : ObjectType.Player;
 
 			List<IUser> toPlayerList = Server.GetAUserByFirstName(commands[2]).ToList();
@@ -394,7 +394,7 @@ namespace Commands {
 				message.Self = "There is no one named " + commands[2].CamelCaseWord() + " to tell something.";
 			}
 			else {
-				message.TargetID = toPlayer.Player.ID;
+				message.TargetID = toPlayer.Player.Id.ToString();
 				message.InstigatorType = toPlayer.Player.IsNPC ? ObjectType.Npc : ObjectType.Player;
 
 				int startAt = commands[0].ToLower().IndexOf(toPlayer.Player.FirstName.ToLower() + " " + toPlayer.Player.LastName.ToLower());

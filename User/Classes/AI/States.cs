@@ -150,7 +150,7 @@ namespace AI {
             NextRoomInPath = result.Result[0];
         }
 
-        private async Task<List<String>> GetPath() {
+        private async Task<List<string>> GetPath() {
             return await _tree.TraverseTree();//should be the path to our endPoint.....I hope.		
         }
 	}
@@ -312,7 +312,7 @@ namespace AI {
             //person attacking us as the target
             //if that gets us nowhere, we need to then just kill the first non npc we find in our same location
             IRoom room = Room.GetRoom(actor.Location);
-            List<string> playersAtThisLocation = room.GetObjectsInRoom(RoomObjects.Players);
+            var playersAtThisLocation = room.GetObjectsInRoom(RoomObjects.Players);
 
             double minutesSinceLastCombat = (DateTime.Now.ToUniversalTime() - actor.LastCombatTime).TotalMinutes;
             //let's start by seeing if we had a last target and the last combat time has been less than 5 minutes ago, if so and he's here, it's payback time
@@ -415,7 +415,7 @@ namespace AI {
                 actor.Save();
 
                 var npcCollection = MongoUtils.MongoData.GetCollection<NPC>("Characters", "NPCCharacters");
-                var deleteResult = npcCollection.DeleteOne(new BsonDocument("_id", actor.ID));
+                var deleteResult = npcCollection.DeleteOne(new BsonDocument("_id", actor.Id));
             }
         }
 

@@ -95,7 +95,7 @@ namespace Items {
 		
         public void Drain() {
 			IMessage msg = new Message();
-			msg.InstigatorID = this.Id.ToString();
+			msg.InstigatorID = Id.ToString();
 			msg.InstigatorType = ObjectType.Item;
 
             currentCharge -= chargeDecayRate;
@@ -128,7 +128,7 @@ namespace Items {
 				temp.MessageHandler(msg.Self);
 			}
 
-			Room.GetRoom(temp.Player.Location).InformPlayersInRoom(msg, new List<string>() { temp.UserID });
+			Room.GetRoom(temp.Player.Location).InformPlayersInRoom(msg, new List<ObjectId>() { temp.UserID });
 			
             OnDrained(new ItemEventArgs(ItemEvent.DRAIN, this.Id));
             temp.Player.Inventory.GetInventoryAsItemList(); //this will force an update on the inventory items 

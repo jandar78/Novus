@@ -1,12 +1,12 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using MongoDB.Bson.Serialization;
+﻿using MongoDB.Bson.Serialization;
 using Interfaces;
+using Quests;
 using MongoDB.Bson.Serialization.Serializers;
+using System;
+using System.Collections.Generic;
 using MongoDB.Bson.Serialization.Options;
+using MongoDB.Bson;
+using Character;
 
 namespace MongoUtils { 
     public class ClassMapper {
@@ -20,8 +20,11 @@ namespace MongoUtils {
             RegisterRoomMapping();
             RegisterQuestStepMapping();
             RegisterQuestMapping();
+            RegisterAttributeMapping();
+            RegisterBonusesMapping();
             RegisterCharacterMapping();
             RegisterNPCMapping();
+
         }
 
         private static void RegisterCharacterMapping()
@@ -29,7 +32,8 @@ namespace MongoUtils {
             BsonClassMap.RegisterClassMap<Character.Character>(cm =>
             {
                 cm.AutoMap();
-                cm.MapIdMember(p => p.ID);
+                cm.MapIdMember(p => p.Id);
+                cm.MapMember(p => p.Bonuses).SetSerializer(new DictionaryInterfaceImplementerSerializer<Dictionary<BonusTypes, Bonus>>(DictionaryRepresentation.ArrayOfArrays));
             });       
         }
 
@@ -37,9 +41,12 @@ namespace MongoUtils {
             BsonClassMap.RegisterClassMap<NPC>(cm =>
             {
                 cm.AutoMap();
-                cm.MapIdMember(n => n.ID);
+                cm.MapIdMember(n => n.Id);
+                cm.MapMember(n => n.LastCombatTime).SetSerializer(new DateTimeSerializer(DateTimeKind.Utc));
+                cm.MapMember(n => n.NextAiAction).SetSerializer(new DateTimeSerializer(DateTimeKind.Utc));
+                cm.MapMember(n => n.XpTracker).SetSerializer(new DictionaryInterfaceImplementerSerializer<Dictionary<ObjectId, double>>(DictionaryRepresentation.ArrayOfDocuments));
+                cm.MapMember(n => n.Bonuses).SetSerializer(new DictionaryInterfaceImplementerSerializer<Dictionary<BonusTypes, Bonus>>(DictionaryRepresentation.ArrayOfArrays));
             });
-
         }
 
         private static void RegisterRoomMapping() {
@@ -119,6 +126,22 @@ namespace MongoUtils {
 
         private static void RegisterExitsMapping() {
             BsonClassMap.RegisterClassMap<Rooms.Exits>(cm => {
+                cm.AutoMap();
+            });
+        }
+
+        private static void RegisterAttributeMapping() {
+            BsonClassMap.RegisterClassMap<Character.Attribute>(cm => {
+                cm.AutoMap();
+            });
+        }
+
+        private static void RegisterBonusesMapping() {
+            BsonClassMap.RegisterClassMap<Character.Bonus>(cm => {
+                cm.AutoMap();
+            });
+
+            BsonClassMap.RegisterClassMap<Character.StatBonuses>(cm => {
                 cm.AutoMap();
             });
         }

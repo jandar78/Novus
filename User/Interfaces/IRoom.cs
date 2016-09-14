@@ -38,19 +38,19 @@ namespace Interfaces {
         bool IsOutdoors { get; }
         List<Exits> Exits { get; set; }
         List<Exits> RoomExits { get; set; }
-        List<string> players { get; set; }
-        List<string> npcs { get; set; }
-        List<string> items { get; set; }
+        List<ObjectId> players { get; set; }
+        List<ObjectId> npcs { get; set; }
+        List<ObjectId> items { get; set; }
         BsonArray Modifiers { get; set; }
         List<Triggers.GeneralTrigger> Triggers { get; set; }
         IExit GetRoomExit(RoomExits direction);
         void GetRoomExits();
-        List<string> GetObjectsInRoom(RoomObjects objectType, double percentage = 100);
-        List<string> GetObjectsInRoom(string objectType, double percentage = 100);
+        List<ObjectId> GetObjectsInRoom(RoomObjects objectType, double percentage = 100);
+        List<ObjectId> GetObjectsInRoom(string objectType, double percentage = 100);
         RoomTypes GetRoomType();
         void Save();
+        void InformPlayersInRoom(IMessage message, List<ObjectId> ignoreId);
         void InformPlayersInRoom(IMessage message, List<object> ignoreId);
-        void InformPlayersInRoom(IMessage message, List<string> ignoreId);
     }
 
     public interface IWeather {

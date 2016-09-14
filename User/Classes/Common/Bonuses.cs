@@ -2,12 +2,9 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
-using MongoUtils;
 using MongoDB.Bson;
 using MongoDB.Driver;
 using MongoDB.Driver.Builders;
-using MongoDB;
 using Interfaces;
 
 namespace Character {
@@ -17,10 +14,10 @@ namespace Character {
     /// </summary>
    public class StatBonuses : IStatBonuses {
         
-        public Dictionary<string, Tuple<double, DateTime>> _bonus {
+        public Dictionary<BonusTypes, Bonus> _bonus {
             get {
                 if (_bonus == null) {
-                    return new Dictionary<string, Tuple<double, DateTime>>();
+                    return new Dictionary<BonusTypes, Bonus>();
                 }
                 return _bonus;
             }
@@ -36,53 +33,25 @@ namespace Character {
         /// <param name="amount"></param>
         /// <param name="time"></param>
         public void Add(BonusTypes name, double amount, int time = 0) {
-            if (_bonus.ContainsKey(name.ToString())) {
-                _bonus[name.ToString()] = new Tuple<double, DateTime>(_bonus[name.ToString()].Item1 + amount, time == 0 ? DateTime.MaxValue : _bonus[name.ToString()].Item2.AddSeconds(time));
+            if (_bonus.ContainsKey(name)) {
+                _bonus[name].Amount += amount;
+                _bonus[name].Time = time == 0 ? DateTime.MaxValue : DateTime.Now.AddSeconds(time);
             }
             else {
-                _bonus.Add(name.ToString(), new Tuple<double, DateTime>(amount, time == 0 ? DateTime.MaxValue : DateTime.Now.AddSeconds(time)));
+                _bonus.Add(name, new Bonus() { Name = name.ToString(), Amount = amount, Time = time == 0 ? DateTime.MaxValue : DateTime.Now.AddSeconds(time) });
             }
         }
 
         public void Remove(BonusTypes name) {
-            if (_bonus.ContainsKey(name.ToString())) {
-                _bonus.Remove(name.ToString());
+            if (_bonus.ContainsKey(name)) {
+                _bonus.Remove(name);
             }
         }
 
-        public BsonArray GetBson() {
-            BsonArray bonuses = new BsonArray();
-
-            BsonDocument values = new BsonDocument(){
-                {"Name", ""},
-                {"Amount",""},
-                {"Time",""}
-            };
-
-            foreach (KeyValuePair<string, Tuple<double, DateTime>> item in _bonus) {
-                values["Name"] = item.Key;
-                values["Amount"] = (double)item.Value.Item1;
-                values["Time"] = (DateTime)item.Value.Item2;
-
-                bonuses.Add(values);
-            }
-                        
-            return bonuses;
-        }
-
-        public void LoadFromBson(BsonArray array) {
-            foreach (BsonDocument doc in array) {
-                if (doc.ElementCount > 0) {
-                    this.Add((BonusTypes)Enum.Parse(typeof(BonusTypes), doc["Name"].AsString), doc["Amount"].AsDouble, doc["Time"].AsInt32);
-                }
-            }
-
-        }
-
-        public double GetBonus(BonusTypes type) {
+         public double GetBonus(BonusTypes type) {
             double bonus = 0.0d;
-            if (_bonus.ContainsKey(type.ToString())) {
-                bonus = _bonus[type.ToString()].Item1;
+            if (_bonus.ContainsKey(type)) {
+                bonus = _bonus[type].Amount;
             }
 
             return bonus;
@@ -99,8 +68,8 @@ namespace Character {
             BsonArray array = null;
             IMongoQuery query = null;
             IMessage message = new Message();
-            foreach (KeyValuePair<string, Tuple<double, DateTime>> item in _bonus) {
-                if (item.Value.Item2 != DateTime.MaxValue && DateTime.Now >= item.Value.Item2) {
+            foreach (var item in _bonus) {
+                if (item.Value.Time != DateTime.MaxValue && DateTime.Now >= item.Value.Time) {
                     query = Query.EQ("_id", item.Key);
                     found = MongoUtils.MongoData.RetrieveObject<BsonDocument>(bonusCollection, b => b["_id"] == item.Key);
                     //let's add the messages that removing the bonus/penalty could have
@@ -120,7 +89,7 @@ namespace Character {
                     }
 
                     //remove the bonus/penalty
-                    Remove((BonusTypes)Enum.Parse(typeof(BonusTypes),item.Key));
+                    Remove(item.Key);
                 }
             }
 
@@ -129,12 +98,18 @@ namespace Character {
 
         public override string ToString() {
             StringBuilder sb = new StringBuilder();
-            foreach (KeyValuePair<string, Tuple<double, DateTime>> item in _bonus) {
-                sb.AppendLine(string.Format("{0}: {1:p}",item.Key, item.Value.Item1));
+            foreach (var item in _bonus) {
+                sb.AppendLine(string.Format("{0}: {1:p}",item.Key, item.Value.Amount));
             }
 
             return sb.ToString();
         }
         
+    }
+
+    public class Bonus {
+        public string Name { get; set; }
+        public double Amount { get; set; }
+        public DateTime Time { get; set; }
     }
 }

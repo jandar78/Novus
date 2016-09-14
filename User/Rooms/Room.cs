@@ -39,9 +39,9 @@ namespace Rooms {
     public class Room : IRoom, IWeather {
         private string _description;
         private string _title;
-        public List<string> players { get; set; }
-        public List<string> npcs { get; set; }
-        public List<string> items { get; set; }
+        public List<ObjectId> players { get; set; }
+        public List<ObjectId> npcs { get; set; }
+        public List<ObjectId> items { get; set; }
 
         private List<Triggers.GeneralTrigger> _triggers;
 
@@ -201,7 +201,7 @@ namespace Rooms {
 
             //check th eplayers and see if anyones equipment is a lightsource
             if (players != null) {
-                foreach (string id in players) {
+                foreach (var id in players) {
                     IUser temp = Server.GetAUser(id);
                     Dictionary<Wearable, IItem> equipped = temp.Player.Equipment.GetEquipment();
                     foreach (IItem item in equipped.Values) {
@@ -217,7 +217,7 @@ namespace Rooms {
             //check the NPCS and do the same as we did with the players
             if (!lightSource) {
                 if (npcs != null) {
-                    foreach (string id in npcs) {
+                    foreach (var id in npcs) {
                         IActor actor = Character.NPCUtils.GetAnNPCByID(id);
                         Dictionary<Wearable, IItem> equipped = actor.Equipment.GetEquipment();
                         foreach (IItem item in equipped.Values) {
@@ -235,7 +235,7 @@ namespace Rooms {
             //finally check for items in the room (just ones laying in the room, if a container is open check in container)
             if (!lightSource) {
                 if (items != null) {
-                    foreach (string id in items) {
+                    foreach (var id in items) {
                         IItem item = Items.Items.GetByID(id).Result;
                         IContainer container = item as IContainer;
                         IIluminate light = item as IIluminate; //even if container check this first. Container may have light enchanment.
@@ -244,7 +244,7 @@ namespace Rooms {
                             break;
                         }
                         if (container != null && (container.Contents != null && container.Contents.Count > 0) && container.Opened) {//let's look in the container only if it's open
-                            foreach (string innerId in container.Contents) {
+                            foreach (var innerId in container.Contents) {
                                 IItem innerItem = await Items.Items.GetByID(id);
                                 light = innerItem as IIluminate;
                                 if (light != null && light.isLit) {
@@ -264,13 +264,13 @@ namespace Rooms {
         //just an overload since Lua will return any of our lists as objects. We just cast and call the real method.
         //I tried just using generic methods like Table2List<T>() but it didn't work out, Lua still complained.
         public void InformPlayersInRoom(IMessage message, List<object> ignoreId) {
-            InformPlayersInRoom(message, ignoreId.Select(s => s.ToString()).ToList());
+            InformPlayersInRoom(message, ignoreId.Select(s => (ObjectId)s).ToList());
         }
 
-        public void InformPlayersInRoom(IMessage message, List<string> ignoreId) {
+        public void InformPlayersInRoom(IMessage message, List<ObjectId> ignoreId) {
             if (!string.IsNullOrEmpty(message.Room)) {
                 GetPlayersInRoom();
-                foreach (string id in players) {
+                foreach (var id in players) {
                     if (!ignoreId.Contains(id)) {
                         IUser otherUser = Server.GetAUser(id);
                         if (otherUser != null && otherUser.CurrentState == UserState.TALKING) {
@@ -280,9 +280,9 @@ namespace Rooms {
                 }
 
                 GetNPCsInRoom();
-                foreach (string id in npcs) {
+                foreach (var id in npcs) {
                     if (!ignoreId.Contains(id)) {
-                        Interfaces.IUser otherUser = Character.NPCUtils.GetUserAsNPCFromList(new List<string>(new string[] { id }));
+                        Interfaces.IUser otherUser = Character.NPCUtils.GetUserAsNPCFromList(new List<ObjectId>() { id });
                         if (otherUser != null && otherUser.CurrentState == Interfaces.UserState.TALKING) {
                             otherUser.MessageHandler(message);
                         }
@@ -342,12 +342,12 @@ namespace Rooms {
             }
         }
 
-        public List<string> GetObjectsInRoom(string objectType, double percentage = 100) {
+        public List<ObjectId> GetObjectsInRoom(string objectType, double percentage = 100) {
             return GetObjectsInRoom((RoomObjects)Enum.Parse(typeof(RoomObjects), objectType), percentage);
         }
 
-        public List<string> GetObjectsInRoom(RoomObjects objectType, double percentage = 100) {
-            List<string> result = new List<string>();
+        public List<ObjectId> GetObjectsInRoom(RoomObjects objectType, double percentage = 100) {
+            List<ObjectId> result = new List<ObjectId>();
             object objectList = null;
 
             switch (objectType) {
@@ -364,7 +364,7 @@ namespace Rooms {
                     break;
             }
 
-            foreach (string id in (dynamic)objectList) {
+            foreach (ObjectId id in (dynamic)objectList) {
                 if (RandomNumber.GetRandomNumber().NextNumber(0, 100) <= percentage) {
                     result.Add(id);
                 }
@@ -386,28 +386,28 @@ namespace Rooms {
         //}
 
         private void GetNPCsInRoom() {
-            var npcsInRoom = MongoUtils.MongoData.RetrieveObjects<NPC>(MongoUtils.MongoData.GetCollection<NPC>("Characters", "NPCCharacters"), n => n.Location == Id);
+            var npcsInRoom = MongoUtils.MongoData.RetrieveObjects<NPC>(MongoUtils.MongoData.GetCollection<NPC>("Characters", "NPCCharacters"), n => n.Location.Equals(Id));
 
             if (npcs == null) {
-                npcs = new List<string>();
+                npcs = new List<ObjectId>();
             }
 
             foreach (var npc in npcsInRoom) {
-                if (!npcs.Contains(npc.ID)) {
-                    npcs.Add(npc.ID);
+                if (!npcs.Contains(npc.Id)) {
+                    npcs.Add(npc.Id);
                 }
             }
         }
 
         private void GetPlayersInRoom() {
             var playersInRoom = MongoUtils.MongoData.RetrieveObjects<Character.Character>(MongoUtils.MongoData.GetCollection<Character.Character>("Characters", "PlayerCharacter"), n => n.Location == Id);
-            players = new List<string>();
+            players = new List<ObjectId>();
 
             foreach (var player in playersInRoom) {
-               IUser temp = Server.GetAUser(player.ID);
+               IUser temp = Server.GetAUser(player.Id);
                 if (temp != null && (temp.CurrentState != UserState.LIMBO || temp.CurrentState != UserState.LOGGING_IN ||
                     temp.CurrentState != UserState.CREATING_CHARACTER || temp.CurrentState != UserState.JUST_CONNECTED)) {
-                    players.Add(player.ID);
+                    players.Add(player.Id);
                 }
             }
         }
@@ -415,10 +415,10 @@ namespace Rooms {
         private void GetItemsInRoom() {
             var itemsInRoom = MongoUtils.MongoData.RetrieveObjects<Items.Items>(MongoUtils.MongoData.GetCollection<Items.Items>("World", "Items"), i => i.Location == Id);
 
-            items = new List<string>();
+            items = new List<ObjectId>();
 
             foreach (var item in itemsInRoom) {
-                items.Add(item.Id.ToString());
+                items.Add(item.Id);
             }
         }
 
@@ -453,7 +453,7 @@ namespace Rooms {
                                     makePositive = -1;
                                 }
 
-                                foreach (string playerid in room.players) {
+                                foreach (var playerid in room.players) {
                                     IUser user = Server.GetAUser(playerid);
 
                                     if (user != null) {
@@ -461,9 +461,9 @@ namespace Rooms {
                                         user.MessageHandler(String.Format(affect["DescriptionSelf"].ToString(), (double)affect["Value"] * makePositive));
                                         message.Room = String.Format(affect["DescriptionOthers"].ToString(), user.Player.FirstName,
                                                             user.Player.Gender.ToString() == "Male" ? "his" : "her");
-                                        message.InstigatorID = user.Player.ID;
+                                        message.InstigatorID = user.Player.Id.ToString();
                                         message.InstigatorType = user.Player.IsNPC ? ObjectType.Npc : ObjectType.Player;
-                                        room.InformPlayersInRoom(message, new List<string>() { user.UserID });
+                                        room.InformPlayersInRoom(message, new List<ObjectId>() { user.UserID });
                                     }
                                 }
                             }

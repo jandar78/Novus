@@ -1,0 +1,3 @@
+ServerPath=C:\Program Files\MongoDB\Server\3.2\bin\mongod.exe;
+IpAddress=10.0.0.187;
+Port=1301;

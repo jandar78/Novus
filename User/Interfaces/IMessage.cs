@@ -1,4 +1,5 @@
-﻿using System;
+﻿using MongoDB.Bson;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -9,7 +10,7 @@ namespace Interfaces
     public enum ObjectType { Player, Npc, Room, Item, None }
 
     public interface IMessage {
-        string Id { get; set; }
+        ObjectId Id { get; set; }
         string[] _messages { get; set; }
 
         string Self { get; set; }
@@ -24,7 +25,7 @@ namespace Interfaces
 
     public class Message : IMessage {
 
-        public string Id { get; set; }
+        public ObjectId Id { get; set; }
         public string[] _messages { get; set; }
         public string Self { get; set; }
         public string Target { get; set; }
@@ -36,6 +37,6 @@ namespace Interfaces
 
         public Message() { }
 
-        public Message(List<string> messages, string instigatorID = null, ObjectType instigatorType = ObjectType.None, string targetid = null, ObjectType targetType = ObjectType.None) { }
+        public Message(List<string> messages, ObjectId instigatorID,  ObjectId targetid, ObjectType instigatorType = ObjectType.None, ObjectType targetType = ObjectType.None) { }
     }
 }

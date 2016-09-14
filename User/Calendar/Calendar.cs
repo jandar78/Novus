@@ -45,7 +45,7 @@ namespace Calendar {
 		}
 
         public static void UpdateClock() {
-            var calendar = MongoUtils.MongoData.GetCollection<BsonDocument>("World", "Calendar");
+            var calendar = MongoUtils.MongoData.GetCollection<BsonDocument>("World", "Globals");
             BsonDocument time = MongoUtils.MongoData.RetrieveObject<BsonDocument>(calendar, t => t["_id"] == "Time");
             time["Second"] = time["Second"].AsInt32 + 28;
 
@@ -132,8 +132,8 @@ namespace Calendar {
 			return time;
 		}
 
-		private static void UpdateCalendar(BsonDocument calendar) {
-             MongoUtils.MongoData.Save<BsonDocument>(MongoUtils.MongoData.GetCollection<BsonDocument>("World", "Globals"), c => c["_id"] == "Calendar", calendar);
+		private async static void UpdateCalendar(BsonDocument calendar) {
+             await MongoUtils.MongoData.SaveAsync<BsonDocument>(MongoUtils.MongoData.GetCollection<BsonDocument>("World", "Globals"), c => c["_id"] == calendar["_id"], calendar);
 		}
 
 		private static BsonDocument GetCalendarData() {
@@ -289,14 +289,14 @@ namespace Calendar {
                             //this can be modified to include more steps easily by making item1 a list and using steps to keep track
                             if (tuple != null) {
 								message.Room = tuple.Item1;
-                                room.InformPlayersInRoom(message, new List<string>() { });
+                                room.InformPlayersInRoom(message, new List<ObjectId>() { });
 
 								System.Threading.Thread.Sleep(tuple.Item2 * 1000);
                                 return true; //we still want the other sequence to execute we will set the tuple to null in the body of the while loop
                             }
 							//run the main sequence script
 							message.Room = sequence[step]["Step"].AsString;
-                            room.InformPlayersInRoom(message, new List<string>() { });
+                            room.InformPlayersInRoom(message, new List<ObjectId>() { });
                         }
                     }
                 }

@@ -1,27 +1,25 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using System.Collections.Concurrent;
 using MongoDB.Bson;
 using MongoDB.Driver;
-using MongoDB.Driver.Builders;
 using Extensions;
 using Interfaces;
+using System.Threading.Tasks;
 
 namespace Character {
 	public class NPCUtils {
-		private static NPCUtils Instance;
-		private static ConcurrentBag<string> _npcList;
+		private static NPCUtils _instance;
+	//	private static ConcurrentBag<string> _npcList;
 
 		private NPCUtils() {
 			ProcessingAI = false;
-			_npcList = new ConcurrentBag<string>();
+			//_npcList = new ConcurrentBag<string>();
 		}
 
 		public static NPCUtils GetInstance() {
-			return Instance ?? (Instance = new NPCUtils());
+			return _instance ?? (_instance = new NPCUtils());
 		}
 
 		public bool ProcessingAI {
@@ -29,34 +27,31 @@ namespace Character {
 			set;
 		}
 
-		public void LoadNPCs() {
-			GetNPCList();
-		}
+        //public void LoadNPCs() {
+        //    GetNPCList();
+        //}
 
-		public void ProcessAIForNPCs() {
-			if (!ProcessingAI) {
-				ProcessingAI = true;
-				LoadNPCs();
-				//loop through each NPC and call the Update() method
-				foreach (string id in _npcList) {
-					IActor actor = Factories.Factory.CreateCharacter(CharacterType.NPC);
-					actor.Load(id);
-					INpc npc = actor as INpc;
-					if (DateTime.Now.ToUniversalTime() > npc.NextAiAction) {
-						npc.Update();
-						//in case the Rot Ai state cleaned this guy out of the DB.
-						if (GetAnNPCByID(id) != null) {
-							actor.Save();
-						}
-					}
-				}
-				ProcessingAI = false;
-			}
+		public async void ProcessAIForNPCs() {
+            await Task.Run(async () => {
+                if (!ProcessingAI) {
+                    ProcessingAI = true;
+                    //loop through each NPC and call the Update() method
+                    foreach (var npc in await MongoUtils.MongoData.FindAll<NPC>(MongoUtils.MongoData.GetCollection<NPC>("Characters", "NPCCharacters"))) {
+                        if (DateTime.Now.ToUniversalTime() > npc.NextAiAction) {
+                            npc.Update();
+                            //in case the Rot Ai state cleaned this guy out of the DB.
+                            if (GetAnNPCByID(npc.Id) != null) {
+                                npc.Save();
+                            }
+                        }
+                    }
+                    ProcessingAI = false;
+                }
+            });
 		}
 
 		//this creates a new type of NPC as long as it hasn't hit the max world amount permissible
 		public static IActor CreateNPC(int MobTypeID, string state = null) {
-			MongoUtils.MongoData.ConnectToDatabase();
 			var npcCollection = MongoUtils.MongoData.GetCollection<BsonDocument>("World", "NPCs");
             var npcMobs = MongoUtils.MongoData.RetrieveObjectAsync<BsonDocument>(npcCollection, n => n["MobTypeID"] == MobTypeID).Result;
 
@@ -75,47 +70,43 @@ namespace Character {
 			return actor;
 		}
 
-		public void RegenerateAttributes() {
-			if (_npcList != null) {
-				foreach (string id in _npcList) {
-					IActor actor = Factories.Factory.CreateCharacter(CharacterType.NPC);
-					actor.Load(id);
-					foreach (KeyValuePair<string, IAttributes> attrib in actor.GetAttributes()) {
-						actor.ApplyRegen(attrib.Key);
-					}
-					actor.Save();
-				}
-			}
-		}
+        public async void RegenerateAttributes() {
+            foreach (var npc in await MongoUtils.MongoData.FindAll<NPC>(MongoUtils.MongoData.GetCollection<NPC>("Characters", "NPCCharacters"))) {
+                //           IActor actor = Factories.Factory.CreateCharacter(CharacterType.NPC);
+                //actor.Load(id);
+                foreach (var attrib in npc.GetAttributes()) {
+                    npc.ApplyRegen(attrib.Name);
+                }
+                npc.Save();
+            }
+        }
 
-		public void CleanupBonuses() {
-			if (_npcList != null) {
-				foreach (string id in _npcList) {
-					IActor actor = Factories.Factory.CreateCharacter(CharacterType.NPC);
-					actor.Load(id);
-					actor.CleanupBonuses();
-					actor.Save();
-				}
-			}
-		}
+        public async void CleanupBonuses() {
+            //	if (_npcList != null) {
+            foreach (var npc in await MongoUtils.MongoData.FindAll<NPC>(MongoUtils.MongoData.GetCollection<NPC>("Characters", "NPCCharacters"))) {
+                //           IActor actor = Factories.Factory.CreateCharacter(CharacterType.NPC);
+                //actor.Load(id);
+                npc.CleanupBonuses();
+                npc.Save();
+            }
+        }
 
-		private void GetNPCList() {
-			var npcCollection = MongoUtils.MongoData.GetCollection<NPC>("Characters", "NPCCharacters");
+		//public void GetNPCList() {
+		//	var npcCollection = MongoUtils.MongoData.GetCollection<NPC>("Characters", "NPCCharacters");
 
-			if (!_npcList.IsEmpty) {
-				_npcList = new ConcurrentBag<string>(); //new it up to clear it
-			}
-
+		//	if (!_npcList.IsEmpty) {
+		//		_npcList = new ConcurrentBag<string>(); //new it up to clear it
+		//	}
             
-            foreach (var npc in MongoUtils.MongoData.FindAll<NPC>(npcCollection).Result) {
-				_npcList.Add(npc.ID);
-			}
-		}
+  //          foreach (var npc in MongoUtils.MongoData.FindAll<NPC>(npcCollection).Result) {
+		//		_npcList.Add(npc.Id);
+		//	}
+		//}
 
-		public static List<IActor> GetAnNPCByName(string name, string location = null) {
+		public static List<IActor> GetAnNPCByName(string name, string location) {
 			List<IActor> npcList = null;
             IEnumerable<NPC> results;
-			var npcCollection = MongoUtils.MongoData.GetCollection<NPC>("Charcaters", "NPCCharacters");
+			var npcCollection = MongoUtils.MongoData.GetCollection<NPC>("Characters", "NPCCharacters");
             if (!string.IsNullOrEmpty(location)) {
                 results = MongoUtils.MongoData.RetrieveObjectsAsync<NPC>(npcCollection, n => n.FirstName == name.CamelCaseWord() && n.Location == location).Result;
             }
@@ -133,7 +124,7 @@ namespace Character {
 			return npcList;
 		}
 
-		public static IUser GetUserAsNPCFromList(List<string> id) {
+		public static IUser GetUserAsNPCFromList(List<ObjectId> id) {
 			if (id.Count > 0) {
 				IUser result = new Sockets.User();
 				result.Player = GetAnNPCByID(id[0]);
@@ -144,13 +135,13 @@ namespace Character {
 			return null;
 		}
 
-		public static IActor GetAnNPCByID(string id) {
-			if (string.IsNullOrEmpty(id)) {
+		public static IActor GetAnNPCByID(ObjectId id) {
+			if (id != null) {
 				return null;
 			}
 
 			var npcCollection = MongoUtils.MongoData.GetCollection<NPC>("Characters", "NPCCharacters");
-			var result = MongoUtils.MongoData.RetrieveObjectAsync<NPC>(npcCollection, n => n.ID == id).Result;
+			var result = MongoUtils.MongoData.RetrieveObjectAsync<NPC>(npcCollection, n => n.Id == id).Result;
 			
 			//if (results != null) {
 			//	npc = CharacterFactory.Factory.CreateCharacter(CharacterType.NPC);
@@ -160,15 +151,15 @@ namespace Character {
 			return result;
 		}
 
-		public async static void AlertOtherMobs(string location, int mobType, string id) {
+		public async static void AlertOtherMobs(ObjectId location, int mobType, ObjectId id) {
 			var collection = MongoUtils.MongoData.GetCollection<NPC>("Characters", "NPCCharacters");
-			var results = MongoUtils.MongoData.RetrieveObjectsAsync<NPC>(collection, n => n.Location == location && n.MobTypeID == mobType).Result;
+			var results = MongoUtils.MongoData.RetrieveObjectsAsync<NPC>(collection, n => n.Location.Equals(location) && n.MobTypeID == mobType).Result;
 
 			foreach (var npc in results) {
 				npc.CurrentTarget = id;
 				npc.Fsm.ChangeState(AI.Combat.GetState(), npc);
 				npc.NextAiAction = DateTime.Now.ToUniversalTime();
-				await MongoUtils.MongoData.SaveAsync<NPC>(collection, n => n.ID == npc.ID, npc);
+				await MongoUtils.MongoData.SaveAsync<NPC>(collection, n => n.Id == npc.Id, npc);
 			}
 		}
 	}

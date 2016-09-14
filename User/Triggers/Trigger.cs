@@ -67,10 +67,10 @@ namespace Triggers {
 
             switch (typeEventCaller) {
                 case TriggerEventArgs.IDType.Npc:
-                    caller = Character.NPCUtils.GetUserAsNPCFromList(new List<string>() { callerID });
+                    caller = Character.NPCUtils.GetUserAsNPCFromList(new List<ObjectId>() { callerID });
                     break;
                 case TriggerEventArgs.IDType.Room:
-                    caller = Room.GetRoom(callerID);
+                    caller = Room.GetRoom(callerID.ToString());
                     break;
                 default:
                     break;
@@ -93,7 +93,7 @@ namespace Triggers {
             if (((TriggerEventArgs)e).InstigatorType == TriggerEventArgs.IDType.Player) {
                 script.AddVariable(Server.GetAUser(((TriggerEventArgs)e).InstigatorID), "player");
             } else if (((TriggerEventArgs)e).InstigatorType == TriggerEventArgs.IDType.Npc) {
-                script.AddVariable(Character.NPCUtils.GetUserAsNPCFromList(new List<string>() { ((TriggerEventArgs)e).InstigatorID }), "player");
+                script.AddVariable(Character.NPCUtils.GetUserAsNPCFromList(new List<ObjectId>() { ((TriggerEventArgs)e).InstigatorID }), "player");
             }
 
             await Task.Run(() => script.RunScript());
@@ -121,7 +121,7 @@ namespace Triggers {
                     caller = Character.NPCUtils.GetAnNPCByID(callerID);
                     break;
                 case TriggerEventArgs.IDType.Room:
-                    caller = Room.GetRoom(callerID);
+                    caller = Room.GetRoom(callerID.ToString());
                     break;
                 default:
                     break;
@@ -136,14 +136,14 @@ namespace Triggers {
             if (caller is IRoom) {
                 script.AddVariable((IRoom)caller, "room");
             } else if (caller is IActor) {
-                script.AddVariable(Character.NPCUtils.GetUserAsNPCFromList(new List<string>() { ((IActor)caller).ID }), "npc");
+                script.AddVariable(Character.NPCUtils.GetUserAsNPCFromList(new List<ObjectId>() { ((IActor)caller).Id }), "npc");
             }
 
             //add the player (instigator) to the script
             if (((TriggerEventArgs)e).InstigatorType == TriggerEventArgs.IDType.Player) {
                 script.AddVariable(Server.GetAUser(((TriggerEventArgs)e).InstigatorID), "player");
             } else if (((TriggerEventArgs)e).InstigatorType == TriggerEventArgs.IDType.Npc) {
-                script.AddVariable(Character.NPCUtils.GetUserAsNPCFromList(new List<string>() { ((TriggerEventArgs)e).InstigatorID }), "player");
+                script.AddVariable(Character.NPCUtils.GetUserAsNPCFromList(new List<ObjectId>() { ((TriggerEventArgs)e).InstigatorID }), "player");
             }
 
             //add a message if there is one
@@ -165,7 +165,7 @@ namespace Triggers {
 
         public async override void HandleEvent(object o, EventArgs e) {
             //for items we want to add the item and the owner into the script as variables
-            var item = await Items.Items.GetByID(((ItemEventArgs)e).ItemID.ToString());
+            var item = await Items.Items.GetByID(((ItemEventArgs)e).ItemID);
             if (item != null) {
                 script.AddVariable(item, "item");
 
@@ -178,7 +178,7 @@ namespace Triggers {
                     if (script.ScriptType == ScriptTypes.Lua) {
                         script.AddVariable(player.Player, "player");
                     } else {
-                        script.AddVariable(player.Player.ID, "playerID");
+                        script.AddVariable(player.Player.Id, "playerID");
                     }
                 }
 

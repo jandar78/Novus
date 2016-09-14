@@ -16,7 +16,7 @@ namespace Commands {
 		
 		public static void Move(IUser player, List<string> commands) {
 			IMessage message = new Message();
-			message.InstigatorID = player.UserID;
+			message.InstigatorID = player.UserID.ToString();
      		message.InstigatorType = player.Player.IsNPC ? ObjectType.Npc : ObjectType.Player;
 
 			if (!player.Player.InCombat) {
@@ -77,7 +77,7 @@ namespace Commands {
 							//when sneaking the skill displays the leave/arrive message
 							if (player.Player.ActionState != CharacterActionState.Sneaking) {
 								message.Room = String.Format(leave["ShowOthers"].AsString, who, direction);
-								Room.GetRoom(player.Player.LastLocation).InformPlayersInRoom(message, new List<string>() { player.UserID });
+								Room.GetRoom(player.Player.LastLocation).InformPlayersInRoom(message, new List<ObjectId>() { player.UserID });
 							}
 
 							//now we reverse the direction
@@ -164,7 +164,7 @@ namespace Commands {
 			else {
 				player.MessageHandler(message.Self);
 			}
-			Room.GetRoom(player.Player.Location).InformPlayersInRoom(message, new List<string>() { player.UserID });
+			Room.GetRoom(player.Player.Location).InformPlayersInRoom(message, new List<ObjectId>() { player.UserID });
 		}
 
 		#region Open things
@@ -203,12 +203,11 @@ namespace Commands {
 			//this is a quick work around for knowing which container to open without implementing the dot operator
 			//I need to come back and make it work like with NPCS once I've tested everything works correctly
 			IMessage message = new Message();
-			message.InstigatorID = player.UserID;
+			message.InstigatorID = player.UserID.ToString();
 			message.InstigatorType = player.Player.IsNPC == false ? ObjectType.Player : ObjectType.Npc;
 
-			string location;
+            string location = null;
             if (string.Equals(commands[commands.Count - 1], "inventory", StringComparison.InvariantCultureIgnoreCase)) {
-                location = null;
                 commands.RemoveAt(commands.Count - 1); //get rid of "inventory" se we can parse an index specifier if there is one
             }
             else {
@@ -226,8 +225,8 @@ namespace Commands {
             
             int index = 1;
             IRoom room = Room.GetRoom(location);
-            if (!string.IsNullOrEmpty(location)) {//player didn't specify it was in his inventory check room first
-                foreach (string itemID in room.GetObjectsInRoom(RoomObjects.Items)) {
+            if (location == null) {//player didn't specify it was in his inventory check room first
+                foreach (var itemID in room.GetObjectsInRoom(RoomObjects.Items)) {
                     IItem inventoryItem = await Items.Items.GetByID(itemID);
                     inventoryItem = KeepOpening(itemNameToGet, inventoryItem, itemPosition);
 
@@ -276,14 +275,14 @@ namespace Commands {
 			else {
 				player.MessageHandler(message.Self);
 			}
-			room.InformPlayersInRoom(message, new List<string>() { player.UserID });
+			room.InformPlayersInRoom(message, new List<ObjectId>() { player.UserID });
 		}
 
         private static IItem KeepOpening(string itemName, IItem item, int itemPosition = 1, int itemIndex = 1) {
             IContainer container = item as IContainer;
 
             if (item.ItemType.ContainsKey(ItemsType.CONTAINER) && container.Contents.Count > 0) {
-                foreach (string innerID in container.GetContents()) {
+                foreach (var innerID in container.GetContents()) {
                     IItem innerItem = Items.Items.GetByID(innerID).Result;
                     if (innerItem != null && KeepOpening(itemName, innerItem, itemPosition, itemIndex).Name.Contains(itemName)) {
                         if (itemIndex == itemPosition) {
@@ -306,7 +305,7 @@ namespace Commands {
 
 		private static void OpenDoor(IUser player, IDoor door) {
 			IMessage message = new Message();
-			message.InstigatorID = player.UserID;
+			message.InstigatorID = player.UserID.ToString();
 			message.InstigatorType = player.Player.IsNPC == false ? ObjectType.Player : ObjectType.Npc;
 			IRoom room = Room.GetRoom(player.Player.Location);
 
@@ -347,7 +346,7 @@ namespace Commands {
 			else {
 				player.MessageHandler(message.Self);
 			}
-			room.InformPlayersInRoom(message, new List<string>() { player.UserID });
+			room.InformPlayersInRoom(message, new List<ObjectId>() { player.UserID });
 		}
 		#endregion
 		
@@ -367,11 +366,10 @@ namespace Commands {
 
         private async static void CloseContainer(IUser player, List<string> commands) {
 			IMessage message = new Message();
-			message.InstigatorID = player.UserID;
+			message.InstigatorID = player.UserID.ToString();
 			message.InstigatorType = player.Player.IsNPC == false ? ObjectType.Player : ObjectType.Npc;
-			string location;
+            var location ="";
             if (string.Equals(commands[commands.Count - 1], "inventory", StringComparison.InvariantCultureIgnoreCase)) {
-                location = null;
                 commands.RemoveAt(commands.Count - 1); //get rid of "inventory" se we can parse an index specifier if there is one
             }
             else {
@@ -395,8 +393,8 @@ namespace Commands {
             //in his inventory.  I should probably check room containers first then player inventory otherwise the player can 
             //specify "inventory" to just do it in their inventory container.
 
-            if (!string.IsNullOrEmpty(location)) {//player didn't specify it was in his inventory check room first
-                foreach (string itemID in room.GetObjectsInRoom(RoomObjects.Items)) {
+            if (location.Equals(ObjectId.Empty)) {//player didn't specify it was in his inventory check room first
+                foreach (var itemID in room.GetObjectsInRoom(RoomObjects.Items)) {
                     IItem roomItem = await Items.Items.GetByID(itemID);
                     if (string.Equals(roomItem.Name, itemNameToGet, StringComparison.InvariantCultureIgnoreCase)) {
                         if (index == itemPosition) {
@@ -432,7 +430,7 @@ namespace Commands {
             }
 
 			player.MessageHandler(message.Self);
-			room.InformPlayersInRoom(message, new List<string>() { player.UserID });
+			room.InformPlayersInRoom(message, new List<ObjectId>() { player.UserID });
         }
 
         private static void CloseADoor(IDoor door) {
@@ -455,7 +453,7 @@ namespace Commands {
         private static void CloseDoor(IUser player, IDoor door) {
 			IMessage message = new Message();
 			IRoom room = Room.GetRoom(player.Player.Location);
-			message.InstigatorID = player.UserID;
+			message.InstigatorID = player.UserID.ToString();
 			message.InstigatorType = player.Player.IsNPC == false ? ObjectType.Player : ObjectType.Npc;
 
 			if (!player.Player.InCombat) {
@@ -493,7 +491,7 @@ namespace Commands {
 			else {
 				player.MessageHandler(message.Self);
 			}
-			room.InformPlayersInRoom(message, new List<string>() { player.UserID });
+			room.InformPlayersInRoom(message, new List<ObjectId>() { player.UserID });
 		}
 		#endregion
 
@@ -527,7 +525,7 @@ namespace Commands {
 		private static void LockDoor(IUser player, IDoor door) {
 			IRoom room = Room.GetRoom(player.Player.Location);
 			IMessage message = new Message();
-			message.InstigatorID = player.UserID;
+			message.InstigatorID = player.UserID.ToString();
 			message.InstigatorType = player.Player.IsNPC == false ? ObjectType.Player : ObjectType.Npc;
 
 			if (!player.Player.InCombat) {
@@ -582,7 +580,7 @@ namespace Commands {
 			else {
 				player.MessageHandler(message.Self);
 			}
-			room.InformPlayersInRoom(message, new List<string>(new string[] { player.UserID }));
+			room.InformPlayersInRoom(message, new List<ObjectId>() { player.UserID });
 		}
 
 		private static void Unlock(IUser player, List<string> commands) {
@@ -597,7 +595,7 @@ namespace Commands {
 
 		private static void UnlockDoor(IUser player, IDoor door) {
 			IMessage message = new Message();
-			message.InstigatorID = player.UserID;
+			message.InstigatorID = player.UserID.ToString();
 			message.InstigatorType = player.Player.IsNPC == false ? ObjectType.Player : ObjectType.Npc;
 
             if (!player.Player.InCombat) {
@@ -649,7 +647,7 @@ namespace Commands {
 					player.MessageHandler(message.Self);
 				}
                 
-                room.InformPlayersInRoom(message, new List<string>() { player.UserID });
+                room.InformPlayersInRoom(message, new List<ObjectId>() { player.UserID });
                 
             }
             else {
@@ -667,7 +665,7 @@ namespace Commands {
 
        private static void Prone(IUser player, List<string> commands) {
 			IMessage message = new Message();
-			message.InstigatorID = player.UserID;
+			message.InstigatorID = player.UserID.ToString();
 			message.InstigatorType = player.Player.IsNPC == false ? ObjectType.Player : ObjectType.Npc;
 
 			if (player.Player.StanceState != CharacterStanceState.Prone && (player.Player.ActionState == CharacterActionState.None
@@ -690,7 +688,7 @@ namespace Commands {
 			else {
 				player.MessageHandler(message.Self);
 			}
-			Room.GetRoom(player.Player.Location).InformPlayersInRoom(message, new List<string>() { player.UserID });
+			Room.GetRoom(player.Player.Location).InformPlayersInRoom(message, new List<ObjectId>() { player.UserID });
 		}
 
 		//this should replace any current methods that change a players stance like Stand() and Prone() we just need to add the messages to the DB
@@ -698,7 +696,7 @@ namespace Commands {
 		//***** This has not been tested!! ******
 		private static void ChangeStance(IUser player, List<string> commands) {
 			IMessage message = new Message();
-			message.InstigatorID = player.UserID;
+			message.InstigatorID = player.UserID.ToString();
 			message.InstigatorType = player.Player.IsNPC == false ? ObjectType.Player : ObjectType.Npc;
 
 			var stances = MongoUtils.MongoData.GetCollection<BsonDocument>("Charcaters", "Stances");
@@ -726,12 +724,12 @@ namespace Commands {
 			else {
 				player.MessageHandler(message.Self);
 			}
-			Room.GetRoom(player.Player.Location).InformPlayersInRoom(message, new List<string>() { player.UserID });
+			Room.GetRoom(player.Player.Location).InformPlayersInRoom(message, new List<ObjectId>() { player.UserID });
 		}
 
 		private static void Stand(IUser player, List<string> commands) {
 			IMessage message = new Message();
-			message.InstigatorID = player.UserID;
+			message.InstigatorID = player.UserID.ToString();
 			message.InstigatorType = player.Player.IsNPC == false ? ObjectType.Player : ObjectType.Npc;
 
 			if (player.Player.StanceState != CharacterStanceState.Standing && (player.Player.ActionState == CharacterActionState.None
@@ -756,12 +754,12 @@ namespace Commands {
 				player.MessageHandler(message.Self);
 			}
 
-			Room.GetRoom(player.Player.Location).InformPlayersInRoom(message, new List<string>() { player.UserID });
+			Room.GetRoom(player.Player.Location).InformPlayersInRoom(message, new List<ObjectId>() { player.UserID });
 		}
 
 		private static void Sit(IUser player, List<string> commands) {
 			IMessage message = new Message();
-			message.InstigatorID = player.UserID;
+			message.InstigatorID = player.UserID.ToString();
 			message.InstigatorType = player.Player.IsNPC == false ? ObjectType.Player : ObjectType.Npc;
 
 			if (player.Player.StanceState != CharacterStanceState.Sitting && (player.Player.ActionState == CharacterActionState.None
@@ -784,7 +782,7 @@ namespace Commands {
 			else {
 				player.MessageHandler(message.Self);
 			}
-			Room.GetRoom(player.Player.Location).InformPlayersInRoom(message, new List<string>(){ player.UserID });
+			Room.GetRoom(player.Player.Location).InformPlayersInRoom(message, new List<ObjectId>(){ player.UserID });
 		}
 
         

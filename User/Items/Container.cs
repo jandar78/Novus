@@ -19,13 +19,13 @@ namespace Items {
         public bool IsOpenable { get; set; }
         public bool Opened { get; set; }
 
-        public List<string> Contents { get; set; }
+        public List<ObjectId> Contents { get; set; }
 
-        public List<string> GetContents() {
+        public List<ObjectId> GetContents() {
             return Contents;
         }
 
-        public IItem RetrieveItem(string id) {
+        public IItem RetrieveItem(ObjectId id) {
             if ((IsOpenable && Opened) || !IsOpenable) {
                 if (Contents.Contains(id)) {
                     IItem temp = Items.GetByID(id).Result;
@@ -42,7 +42,7 @@ namespace Items {
             return null;
         }
 
-        public bool StoreItem(string id) {
+        public bool StoreItem(ObjectId id) {
             bool added = false;
             IItem temp = Items.GetByID(id).Result;
 
@@ -50,7 +50,7 @@ namespace Items {
             if ((IsOpenable && Opened) || !IsOpenable) {
                 if (CurrentWeight + temp.Weight <= WeightLimit) {
                     CurrentWeight += temp.Weight;
-                    Contents.Add(temp.Id.ToString());
+                    Contents.Add(temp.Id);
                     added = true;
 
                     if (Worn) {
@@ -114,7 +114,7 @@ namespace Items {
                 StringBuilder sb = new StringBuilder();
                 sb.AppendLine(Name + " contents:");
                 if (GetContents().Count > 0) {
-                    foreach (string itemID in GetContents()) {
+                    foreach (var itemID in GetContents()) {
                         IItem tempItem = Items.GetByID(itemID).Result;
                         sb.AppendLine(tempItem.Name);
                     }
