@@ -10,48 +10,41 @@ using Interfaces;
 namespace Character {
     /// <summary>
     /// This class can hold Bonus/Penalty for each type.  This way we can just offset bonuses and penalties at the core.
-    /// We can display to the user for example that their DEX is -5% or Dodge is +10% instead of doing Bonus Dodge = 15% Penalty Dodge = -5%
+    /// We can display to the user for example that their DEX is -5% or Dodge is +10% instead of doing Bonus Dodge = +15% Penalty Dodge = -5%
     /// </summary>
    public class StatBonuses : IStatBonuses {
-        
-        public Dictionary<BonusTypes, Bonus> _bonus {
-            get {
-                if (_bonus == null) {
-                    return new Dictionary<BonusTypes, Bonus>();
-                }
-                return _bonus;
-            }
-            set {
-                _bonus = value;
-            }
+
+		public Dictionary<BonusTypes, Bonus> Bonuses {
+			get;
+			set;
         }
         
-        /// <summary>
+		/// <summary>
         /// Adds an amount (positive or negative) to the type specified. Passing in zero or null for the time will make this bonus never expire.
         /// </summary>
         /// <param name="name"></param>
         /// <param name="amount"></param>
         /// <param name="time"></param>
         public void Add(BonusTypes name, double amount, int time = 0) {
-            if (_bonus.ContainsKey(name)) {
-                _bonus[name].Amount += amount;
-                _bonus[name].Time = time == 0 ? DateTime.MaxValue : DateTime.Now.AddSeconds(time);
+            if (Bonuses.ContainsKey(name)) {
+                Bonuses[name].Amount += amount;
+                Bonuses[name].Time = time == 0 ? DateTime.MaxValue : DateTime.Now.AddSeconds(time);
             }
             else {
-                _bonus.Add(name, new Bonus() { Name = name.ToString(), Amount = amount, Time = time == 0 ? DateTime.MaxValue : DateTime.Now.AddSeconds(time) });
+                Bonuses.Add(name, new Bonus() {Amount = amount, Time =(time == 0 ? DateTime.MaxValue : DateTime.Now.AddSeconds(time)) });
             }
         }
 
         public void Remove(BonusTypes name) {
-            if (_bonus.ContainsKey(name)) {
-                _bonus.Remove(name);
+            if (Bonuses.ContainsKey(name)) {
+                Bonuses.Remove(name);
             }
         }
 
          public double GetBonus(BonusTypes type) {
             double bonus = 0.0d;
-            if (_bonus.ContainsKey(type)) {
-                bonus = _bonus[type].Amount;
+            if (Bonuses.ContainsKey(type)) {
+				bonus = Bonuses[type].Amount;
             }
 
             return bonus;
@@ -68,7 +61,7 @@ namespace Character {
             BsonArray array = null;
             IMongoQuery query = null;
             IMessage message = new Message();
-            foreach (var item in _bonus) {
+            foreach (var item in Bonuses) {
                 if (item.Value.Time != DateTime.MaxValue && DateTime.Now >= item.Value.Time) {
                     query = Query.EQ("_id", item.Key);
                     found = MongoUtils.MongoData.RetrieveObject<BsonDocument>(bonusCollection, b => b["_id"] == item.Key);
@@ -98,7 +91,7 @@ namespace Character {
 
         public override string ToString() {
             StringBuilder sb = new StringBuilder();
-            foreach (var item in _bonus) {
+            foreach (var item in Bonuses) {
                 sb.AppendLine(string.Format("{0}: {1:p}",item.Key, item.Value.Amount));
             }
 
@@ -108,7 +101,6 @@ namespace Character {
     }
 
     public class Bonus {
-        public string Name { get; set; }
         public double Amount { get; set; }
         public DateTime Time { get; set; }
     }

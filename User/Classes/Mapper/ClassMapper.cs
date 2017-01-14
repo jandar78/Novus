@@ -33,20 +33,21 @@ namespace MongoUtils {
             {
                 cm.AutoMap();
                 cm.MapIdMember(p => p.Id);
-                cm.MapMember(p => p.Bonuses).SetSerializer(new DictionaryInterfaceImplementerSerializer<Dictionary<BonusTypes, Bonus>>(DictionaryRepresentation.ArrayOfArrays));
-            });       
+				cm.MapMember(n => n.Bonuses).SetSerializer(new DictionaryInterfaceImplementerSerializer<Dictionary<BonusTypes, Bonus>>(DictionaryRepresentation.ArrayOfDocuments));
+			});       
         }
 
         private static void RegisterNPCMapping() {
-            BsonClassMap.RegisterClassMap<NPC>(cm =>
+			BsonSerializer.RegisterSerializer(new EnumSerializer<BonusTypes>(BsonType.String));
+			BsonClassMap.RegisterClassMap<NPC>(cm =>
             {
                 cm.AutoMap();
                 cm.MapIdMember(n => n.Id);
                 cm.MapMember(n => n.LastCombatTime).SetSerializer(new DateTimeSerializer(DateTimeKind.Utc));
                 cm.MapMember(n => n.NextAiAction).SetSerializer(new DateTimeSerializer(DateTimeKind.Utc));
                 cm.MapMember(n => n.XpTracker).SetSerializer(new DictionaryInterfaceImplementerSerializer<Dictionary<ObjectId, double>>(DictionaryRepresentation.ArrayOfDocuments));
-                cm.MapMember(n => n.Bonuses).SetSerializer(new DictionaryInterfaceImplementerSerializer<Dictionary<BonusTypes, Bonus>>(DictionaryRepresentation.ArrayOfArrays));
-            });
+				cm.MapMember(n => n.Bonuses).SetSerializer(new DictionaryInterfaceImplementerSerializer<Dictionary<BonusTypes, Bonus>>(DictionaryRepresentation.ArrayOfDocuments));
+			});
         }
 
         private static void RegisterRoomMapping() {
@@ -108,7 +109,7 @@ namespace MongoUtils {
 
             BsonClassMap.RegisterClassMap<Triggers.QuestTrigger>(cm => {
                 cm.AutoMap();
-            });
+			});
 
             BsonClassMap.RegisterClassMap<Triggers.ItemTrigger>(cm => {
                 cm.AutoMap();
@@ -143,7 +144,7 @@ namespace MongoUtils {
 
             BsonClassMap.RegisterClassMap<Character.StatBonuses>(cm => {
                 cm.AutoMap();
-            });
+			});
         }
     }
 }

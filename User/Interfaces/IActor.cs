@@ -80,6 +80,7 @@ namespace Interfaces
         SkinColors SkinColor { get; set; }
         SkinType SkinType { get; set; }
         HairColors HairColor { get; set; }
+		Dictionary<BonusTypes, Character.Bonus> Bonuses { get; set; }
         #endregion General
 
         #region Stances

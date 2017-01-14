@@ -317,8 +317,8 @@ namespace Rooms {
                             break;
                         }
                     }
-                    if (trigger.AndOn.Count > 0) {
-                        foreach (string and in trigger.AndOn) {
+                    if (trigger.And.Count > 0) {
+                        foreach (string and in trigger.And) {
                             if (message.Contains(and)) {
                                 hasAnd = true;
                                 break;

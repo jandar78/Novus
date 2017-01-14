@@ -91,7 +91,10 @@ namespace AI {
 
         public void InterpretMessage(IMessage message, IActor actor) {
             NPC npc = actor as NPC;
-            MessageParser parser = new MessageParser(message, actor, npc.Triggers);
+			List<ITrigger> triggers = new List<ITrigger>();
+			npc.Triggers.ForEach((t) => triggers.Add(t));
+
+            MessageParser parser = new MessageParser(message, actor, triggers);
             
             parser.FindTrigger();
             

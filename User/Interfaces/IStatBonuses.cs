@@ -10,7 +10,7 @@ namespace Interfaces
 {
     public interface IStatBonuses
     {
-        Dictionary<BonusTypes, Bonus> _bonus { get; set; }
+        Dictionary<BonusTypes, Bonus> Bonuses { get; set; }
 
         void Add(BonusTypes name, double amount, int time = 0);
         void Remove(BonusTypes name);

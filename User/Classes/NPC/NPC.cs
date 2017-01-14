@@ -7,6 +7,8 @@ using MongoDB.Driver;
 using Extensions;
 using Triggers;
 using Character;
+using MongoDB.Bson.Serialization.Attributes;
+using MongoDB.Bson.Serialization.Serializers;
 
 namespace Interfaces {
 	public class NPC : IActor, INpc {
@@ -47,7 +49,7 @@ namespace Interfaces {
             }
         }
 		public Queue<string> Messages;
-		public List<ITrigger> Triggers;
+		public List<GeneralTrigger> Triggers;
 		#endregion Public Members
 
 		#region Protected Members
@@ -55,7 +57,7 @@ namespace Interfaces {
 		protected Dictionary<string, double> SubAttributes;
 		protected HashSet<Languages> KnownLanguages; //this will hold all the languages the player can understand
 		protected double _levelModifier;
-		public StatBonuses Bonuses { get; set; }
+		public StatBonuses StatBonus { get; set; }
 
 		#region Stances
 		protected CharacterStanceState _stanceState;
@@ -190,6 +192,10 @@ namespace Interfaces {
 			set;
 		}
 
+		public Dictionary<BonusTypes, Bonus> Bonuses {
+			get;
+			set;
+		}
 
 		#endregion Properties
 
@@ -451,8 +457,8 @@ namespace Interfaces {
 
 			Inventory = new Inventory();
 			XpTracker = new Dictionary<ObjectId, double>();
-			Triggers = new List<ITrigger>();
-			Bonuses = new StatBonuses();
+			Triggers = new List<GeneralTrigger>();
+			StatBonus = new StatBonuses();
 			Quests = new List<IQuest>();
 
 			FirstName = "";
@@ -724,12 +730,12 @@ namespace Interfaces {
             Title = found.Title;
 			KillerID = found.KillerID;
 
-			//if you just use var instead of casting it like this you will be in a world of pain and suffering when dealing with subdocuments.
 			Attributes = found.Attributes;
 			XpTracker = found.XpTracker;
 			Triggers = found.Triggers;
 			Quests = found.Quests;
 			Bonuses = found.Bonuses;
+			StatBonus.Bonuses = Bonuses;
 			
 			//if (playerAttributes != null) {
 			//	foreach (BsonDocument attrib in playerAttributes) {
@@ -860,7 +866,10 @@ namespace Interfaces {
 				Fsm.InterpretMessage(message, this);
 
 				//let's see if we have a general trigger hit
-				var parser = new AI.MessageParser(message, this, Triggers);
+				List<ITrigger> triggers = new List<ITrigger>();
+				Triggers.ForEach((t) => triggers.Add(t)); //converting the to ITrigger here until I can figure out how to get it to come back as ITrigger form the DB
+
+				var parser = new AI.MessageParser(message, this, triggers);
 				parser.FindTrigger();
 
 				if (parser.TriggersToExecute.Count > 0) {
@@ -1162,7 +1171,7 @@ namespace Interfaces {
 		/// <param name="amount"></param>
 		/// <param name="time"></param>
 		public void AddBonus(BonusTypes type, string name, double amount, int time = 0) {
-			Bonuses.Add(type, amount, time);
+			StatBonus.Add(type, amount, time);
 		}
 
 		/// <summary>
@@ -1172,8 +1181,8 @@ namespace Interfaces {
 		/// <param name="name"></param>
 		/// <param name="bonus"></param>
 		public void RemoveBonus(BonusTypes type, string name, double bonus) {
-            if (Bonuses != null) {
-                Bonuses.Remove(type);
+            if (StatBonus != null) {
+				StatBonus.Remove(type);
             }
 		}
 
@@ -1181,13 +1190,13 @@ namespace Interfaces {
 		/// Removes any bonuses whose time has expired.
 		/// </summary>
 		public void CleanupBonuses() {
-            if (Bonuses != null) {
-                Bonuses.Cleanup();
+            if (StatBonus != null) {
+				StatBonus.Cleanup();
             }
 		}
 
 		public double GetBonus(BonusTypes type) {
-			return Bonuses.GetBonus(type);
+			return StatBonus.GetBonus(type);
 		}
 	}
 }

@@ -8,7 +8,7 @@ using MongoDB.Bson;
 namespace Interfaces {
     public interface ITrigger {
         List<string> TriggerOn { get; set; }
-		List<string> AndOn { get; set; }
+		List<string> And { get; set; }
 		List<string> NotOn { get; set; }
 		double ChanceToTrigger { get; set; }
         BsonArray MessageOverrides { get; set; }
@@ -16,7 +16,7 @@ namespace Interfaces {
         string StateToExecute { get; set; }
 		string Type { get; set; }
 		bool AutoProcess { get; set; }
-        string Id { get; set; }
+        string TriggerId { get; set; }
 
         void HandleEvent(object o, EventArgs e);
         void HandleEvent();

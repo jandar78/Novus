@@ -17,7 +17,7 @@ namespace Triggers {
     public class GeneralTrigger : ITrigger {
         public GeneralTrigger(BsonDocument doc, TriggerType triggerType) {
             TriggerOn = new List<string>();
-            AndOn = new List<string>();
+            And = new List<string>();
             NotOn = new List<string>();
             MessageOverrideAsString = new List<string>();
             if (doc != null && doc.ElementCount > 0 && doc.Contains("TriggerOn")) {
@@ -25,7 +25,7 @@ namespace Triggers {
                     TriggerOn.Add(on.AsString);
                 }
                 foreach (var and in doc["And"].AsBsonArray) {
-                    AndOn.Add(and.AsString);
+                    And.Add(and.AsString);
                 }
                 foreach (var not in doc["NoTriggerOn"].AsBsonArray) {
                     NotOn.Add(not.AsString);
@@ -37,19 +37,20 @@ namespace Triggers {
                     MessageOverrideAsString.Add(overrides.AsString);
                 }
                 Type = doc["Type"].AsString;
+				TriggerId = doc["Id"].AsString;
             }
         }
 
         public GeneralTrigger() {
             TriggerOn = new List<string>();
-            AndOn = new List<string>();
+            And = new List<string>();
             NotOn = new List<string>();
             MessageOverrideAsString = new List<string>();
         }
 
-        public string Id { get; set; }
+        public string TriggerId { get; set; }
         public List<string> TriggerOn { get; set; }
-        public List<string> AndOn { get; set; }
+        public List<string> And { get; set; }
         public List<string> NotOn { get; set; }
         public double ChanceToTrigger { get; set; }
         public BsonArray MessageOverrides { get; set; }

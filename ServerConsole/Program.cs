@@ -30,6 +30,9 @@ namespace ServerConsole {
 			System.Diagnostics.Process.Start(databasePath);
 
 			Console.WriteLine(">>> MongoDB initialized <<<");
+			Console.Write("Registering classes in Database...");
+			MongoUtils.ClassMapper.RegisterMappings();
+			Console.WriteLine("Done");
 
 			MessageBuffer messageHandler = new MessageBuffer("Server");
 

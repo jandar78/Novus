@@ -40,7 +40,8 @@ namespace Character{
         protected Dictionary<string, double> SubAttributes;
         protected HashSet<Languages> KnownLanguages; //this will hold all the languages the player can understand
         protected double _levelModifier;
-        public StatBonuses Bonuses;
+        public StatBonuses StatBonus;
+		public Dictionary<BonusTypes, Bonus> Bonuses { get; set; }
         
         #region Stances
         protected CharacterStanceState _stanceState;
@@ -134,8 +135,10 @@ namespace Character{
 
             Inventory = new Inventory();
             Equipment = new Equipment();
-            Bonuses = new StatBonuses();
-            
+			Bonuses = new Dictionary<BonusTypes, Bonus>();
+			StatBonus = new StatBonuses();
+			StatBonus.Bonuses = Bonuses;
+			
             Attributes = new List<Attribute>();
 
             Attributes.Add(new Attribute(150, "Hitpoints", 150, 0.1, 1));
@@ -250,7 +253,9 @@ namespace Character{
 
             Inventory = new Inventory();
 			Equipment = new Equipment();
-            Bonuses = new StatBonuses();
+			Bonuses = new Dictionary<BonusTypes, Bonus>();
+            StatBonus = new StatBonuses();
+			StatBonus.Bonuses = Bonuses;
 
 			Inventory.playerID = Id;
 			Equipment.playerID = Id;
@@ -1077,7 +1082,7 @@ namespace Character{
         /// <param name="amount"></param>
         /// <param name="time"></param>
         public void AddBonus(BonusTypes type, string name, double amount, int time = 0) {
-            Bonuses.Add(type, amount, time);
+            StatBonus.Add(type, amount, time);
         }
         
         /// <summary>
@@ -1087,18 +1092,18 @@ namespace Character{
         /// <param name="name"></param>
         /// <param name="bonus"></param>
         public void RemoveBonus(BonusTypes type, string name, double bonus) {
-            Bonuses.Remove(type);
+			StatBonus.Remove(type);
         }
 
         /// <summary>
         /// Removes any bonuses whose time has expired.
         /// </summary>
         public void CleanupBonuses() {
-            Bonuses.Cleanup();
+			StatBonus.Cleanup();
         }
 
         public double GetBonus(BonusTypes type) {
-            return Bonuses.GetBonus(type);
+            return StatBonus.GetBonus(type);
         }
     }
 
