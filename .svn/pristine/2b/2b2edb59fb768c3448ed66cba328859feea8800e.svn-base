@@ -1,0 +1,136 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace AI {
+    public class FSM {
+        public IState state {
+            get;
+            private set;
+        }
+
+        public IState globalState {
+            get;
+           private set;
+        }
+
+        public IState previousState {
+            get;
+            private set;
+        }
+
+        private User.User Actor {
+            get;
+            set;
+        }
+
+        public FSM(string ID, string current = null, string previous = null, string global = null) {
+            Actor = MySockets.Server.GetAUser(ID);
+            state = GetStateFromName(current);
+            previousState = GetStateFromName(previous);
+            globalState = GetStateFromName(global);
+        }
+
+
+        //this might be the slowest part in the entire FSM
+        private IState GetStateFromName(string stateName) {
+            if (stateName == null) {
+                return null;
+            }
+
+            IState state = null;
+
+            var totalerTypes = System.Reflection.Assembly.GetExecutingAssembly().GetTypes().Where(t => typeof(IState).IsAssignableFrom(t) && t.IsClass == true);
+            foreach (Type totalerType in totalerTypes) {
+                if (totalerType.Name.ToUpper().Contains(stateName.ToUpper())) {
+                    state = (IState)Activator.CreateInstance(totalerType, new object[] { });
+                    break;
+                }
+            }
+            
+            return state;
+        }
+
+        private void ChangeState(IState newState) {
+            if (state != null && newState != null) {
+                state.Exit(Actor);
+                previousState = state;
+                state = newState;
+                state.Enter(Actor);
+            }
+        }
+
+        private void RevertState() {
+            IState temp = state;
+            state = previousState;
+            previousState = temp;
+            temp = null;
+        }
+
+        public void Update() {
+            if (state != null) {
+                state.Execute(Actor);
+            }
+            if (globalState != null) {
+                globalState.Execute(Actor);
+            }
+        }
+    }
+
+
+    internal interface IState {
+        public void Execute(User.User actor);
+        public void Enter(User.User actor);
+        public void Exit(User.User actor);
+        public override string ToString();
+    }
+
+    internal class Wander : IState {
+        private static Wander _wander;
+        private Wander() { }
+
+        public static Wander GetState() {
+            return _wander ?? (_wander = new Wander());
+        }
+
+        public void Execute(User.User actor) {
+        }
+
+        public void Enter(User.User actor) {
+        }
+
+        public void Exit(User.User actor) {
+        }
+
+        public override string ToString() {
+            return "Wander";
+        }
+
+    }
+
+    internal class Speak : IState {
+        private static Speak _speak;
+        private Speak() { }
+
+        public static Speak GetState() {
+            return _speak ?? (_speak = new Speak());
+        }
+
+        public void Execute(User.User actor) {
+            Commands.CommandParser.ParseCommands(actor);
+        }
+
+        public void Enter(User.User actor) {
+        }
+
+        public void Exit(User.User actor) {
+
+        }
+        public override string ToString() {
+            return "Speak";
+        }
+    }
+}
+

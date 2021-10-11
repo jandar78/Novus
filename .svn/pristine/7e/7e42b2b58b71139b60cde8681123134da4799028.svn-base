@@ -1,0 +1,16 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace Items {
+   public interface Iweapon {
+        double MinDamage { get; set; }
+        double MaxDamage { get; set; }
+        double AttackSpeed { get; set; }
+        bool IsWieldable { get; set; }
+        double CurrentMinDamage { get; set; }
+        double CurrentMaxDamage { get; set; }
+    }
+}

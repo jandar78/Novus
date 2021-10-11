@@ -1,0 +1,57 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using CharacterEnums;
+using Character;
+
+namespace CharacterFactory {
+
+	public abstract class Factory {
+		public static Character.Character CreateCharacter(CharacterType characterType, CharacterRace race, CharacterClass characterClass, Genders gender) {
+			Character.Character character = null;
+
+			switch (characterType) {
+                //case CharacterType.PLAYER: character = CreatePlayerCharacter(race, characterClass, gender);
+                //    break;
+				case CharacterType.NPC: character = CreateNPCCharacter(race, characterClass, gender);
+					break;
+				case CharacterType.MOB: character = CreateMobCharacter(race, characterClass, gender);
+					break;
+				default: character = null;
+					break;
+			}
+			return character;
+		}
+
+
+        ////don't think this is going to be required since we load up player characters upon login
+        //internal static Character.Character CreatePlayerCharacter(CharacterRace race, CharacterClass characterClass, Genders gender) {
+        //    Character.Character playerCharacter = new Character.Character();
+        //    //Todo:
+        //    //load player info from database
+        //    return playerCharacter;
+        //}
+
+        
+		internal static Character.Character CreateNPCCharacter(CharacterRace race, CharacterClass characterClass, Genders gender) {
+			Character.Character npcCharacter = new Character.Character();
+			//Todo:
+			//load NPC info from database
+			return npcCharacter;
+		}
+
+        //mob should be same as NPC except they are not allowed to interact with player other than through combat
+		internal static Character.Character CreateMobCharacter(CharacterRace race, CharacterClass characterClass, Genders gender) {
+			Character.Character mobCharacter = new Character.Character();
+			//Todo:
+			//load mob info from database
+			return mobCharacter;
+		}
+
+	}
+}
+
+	
+

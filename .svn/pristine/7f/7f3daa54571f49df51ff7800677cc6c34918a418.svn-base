@@ -1,0 +1,221 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using MongoDB.Bson;
+using MongoDB.Driver;
+namespace Items {
+    public class Iluminate: Iitem, Iiluminate {
+        public MongoDB.Bson.ObjectId Id {
+            get;
+            set;
+        }
+
+        public string Name {
+            get;
+            set;
+        }
+
+        public string Description {
+            get;
+            set;
+        }
+
+        public double Weight {
+            get;
+            set;
+        }
+
+        public ItemCondition CurrentCondition {
+            get;
+            set;
+        }
+
+        public bool IsWearable {
+            get;
+            set;
+        }
+
+        public int MinimumLevel {
+            get;
+            set;
+        }
+
+        public Wearable WornOn {
+            get;
+            set;
+        }
+
+        public int Location {
+            get;
+            set;
+        }
+
+        public ItemType ItemType {
+            get;
+            set;
+        }
+
+        public void DeteriorateCondition() {
+            //TODO: condition should affect item stats as well
+            int newCondition = ((int)CurrentCondition) - 1;
+            if (newCondition >= 1) { //otherwise it can't deteriorate any more and it's broken anyways
+                CurrentCondition = (ItemCondition)newCondition;
+            }
+            Save();
+        }
+
+        public void ImproveCondition() {
+            //TODO: condition should affect item stats as well
+            int newCondition = ((int)CurrentCondition) + 1;
+            if (newCondition <= (int)ItemCondition.EXCELLENT) { //can't go higher than Excellent
+                CurrentCondition = (ItemCondition)newCondition;
+            }
+            Save();
+        }
+
+        public void Save() {
+            MongoUtils.MongoData.ConnectToDatabase();
+            MongoDatabase db = MongoUtils.MongoData.GetDatabase("World");
+            MongoCollection collection = db.GetCollection("Items");
+
+            collection.Save<Iluminate>(this);
+        }
+
+        public string Examine() {
+            return (Description + ExamineCharge());
+        }
+
+        public bool IsMovable {
+            get;
+            set;
+        }
+
+        public bool isLit {
+            get;
+            set;
+        }
+
+        public bool isLightable {
+            get;
+            set;
+        }
+
+        public double chargeLowWarning {
+            get;
+            set;
+        }
+
+        //how fast the charge depletes unit/sec
+        //if maxcharge is 1500 and decay rate is 1 the charge will last 1500 seconds or 25 minutes (should it be real time or in game time?)
+        public double chargeDecayRate {
+            get;
+            set;
+        }
+
+        public FuelSource fuelSource {
+            get;
+            set;
+        }
+
+        public LightType lightType {
+            get;
+            set;
+        }
+
+        public double maxCharge {
+            get;
+            set;
+        }
+
+        public double currentCharge {
+            get;
+            set;
+        }
+
+        public bool isChargeable {
+            get;
+            set;
+        }
+
+        public string Owner {
+            get;
+            set;
+        }
+
+        public List<string> Ignite() {
+            List<string> msg = new List<string>();
+            if (!isLit) {
+                //TODO: get these messages from the DB based on fuel source or type
+                msg.Add("You turn on " + Name + " and can now see in the dark.");
+                msg.Add("{0} turns on " + Name + ".");
+                isLit = true;
+                Save();
+            }
+            else {
+                msg.Add("It is already on!");
+            }
+
+            return msg;
+        }
+
+        public List<string> Extinguish() {
+            List<string> msg = new List<string>();
+            if (isLit) {
+                //TODO: get these messages from the DB based on fuel source or type
+                msg.Add("You turn off " + Name + " and can no longer see in the dark.");
+                msg.Add("{0} turns off " + Name + ".");
+                isLit = false;
+                Save();
+            }
+            else {
+                msg.Add("It is already off!");
+            }
+
+            return msg;
+        }
+
+        //TODO: I would like a timer that runs on a separate thread to call this for each item that cna lose a charge if isLit is true
+        public void Drain() {
+            currentCharge -= chargeDecayRate;
+            User.User temp = MySockets.Server.GetAUser(this.Owner);
+            if ((Math.Round(currentCharge/maxCharge,2) * 100) == chargeLowWarning){
+                //TODO: these message should be grabbed from the DB and should reflect the type of light it is
+                if (temp != null) {
+                    temp.MessageHandler("The light from your " + this.Name.ToLower() + " flickers.");
+                }
+                chargeLowWarning = chargeLowWarning / 2;
+               
+            }
+            if (Math.Round(currentCharge,2) <= 0) {
+                currentCharge = 0.0;
+                chargeLowWarning = 10;
+                isLit = false;
+                //TODO: these message should be grabbed from the DB and should reflect the type of light it is
+                if (temp != null) {
+                    temp.MessageHandler("The light from your " + this.Name.ToLower() + " goes out.");
+                }
+            }
+
+            temp.Player.GetInventoryAsItemList(); //this will force an update on the inventory items 
+            temp.Player.GetEquipment(); //this will force an update on the equipment
+            this.Save();
+        }
+
+        public void ReCharge(double chargeAmount) {
+           //TODO: check to see if player has a fuel source in inventory and consume it.  Set currentCharge = MaxCharge
+           //Are all fuel sources the same?  Do they all providea 100% charge or can some of them be partly used and give partial charges?
+           //With cloth you know you'll be able to replace the burn out one, but wiht a battery how do you know the charge?
+           
+            currentCharge = chargeAmount;
+            if (currentCharge > maxCharge) {
+                currentCharge = maxCharge;
+            }
+        }
+
+        public string ExamineCharge() {
+            return (isLit == true ? " It has " + Math.Round(currentCharge / maxCharge, 2) * 100 + "% charge left." : "");
+        }
+    }
+}

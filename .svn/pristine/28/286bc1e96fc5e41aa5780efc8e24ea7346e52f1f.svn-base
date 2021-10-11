@@ -1,0 +1,266 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using MongoDB.Driver;
+using MongoDB.Bson;
+using MongoDB.Driver.Builders;
+using System.Reflection;
+using Commands;
+using System.Threading;
+using Phydeaux.Utilities;
+
+namespace Rooms {
+    public class Exits {
+		 
+		 public Dictionary<string, int> availableExits;
+		 public Dictionary<string, Door> doors;
+
+        //item1 is the phrase to match, item2 is the action to execute
+         
+
+		 public string Description {
+			 get;
+			 set;
+		 }
+
+		 public string Direction {
+			 get;
+			 set;
+		 }
+
+        public Exits() {
+			  availableExits = new Dictionary<string, int>();
+			  doors = new Dictionary<string, Door>();
+        }
+    }
+
+    public class Door {
+        public List<Tuple<string, string, List<object>>> phraseList;
+
+        public string ID { //we need keys to match the door on the id
+            get;
+            private set;
+        }
+
+        public string Examine {
+            get;
+            private set;
+        }
+
+        public bool Breakable {
+            get;
+            private set;
+        }
+
+        public bool Openable {
+            get;
+            private set;
+        }
+        public bool Climable {
+            get;
+            private set;
+        }
+
+        public bool Crawlable {
+            get;
+            private set;
+        }
+
+        public bool Lockable {
+            get;
+            private set;
+        }
+
+        public string Type {
+            get;
+            private set;
+        }
+
+        public double Hitpoints {
+            get;
+            private set;
+        }
+
+        public bool Open {
+            get;
+            set;
+        }
+
+        public bool Locked {
+            get;
+            set;
+        }
+
+        public string Name {
+            get;
+            private set;
+        }
+
+        public string Description {
+            get {
+                if (Hitpoints > 0) {
+                    return _descriptions[0];
+                }
+                else {
+                    return _descriptions[1];
+                }
+            }
+        }
+
+        public bool Destroyed {
+            get;
+            private set;
+        }
+
+        //ok this may be a crazy idea but the door could be listening to what players say, for example the door could only be opened by saying a phrase or word.
+        //Klaatu Barada Nicto anyone?  If the door is a listener the room will inform it of what each player says, it will probably need to be passed in a userID and the phrase
+        public bool Listener {
+            get;
+            protected set;
+        }
+
+        List<string> _descriptions;
+
+        public Door(bool breakable, bool destroyed, bool openable, bool lockable, string doorType, double hitpoints, bool locked, bool open, string name,
+                    List<string> description, string id, bool climable, bool crawlable, bool listener, string examine) {
+            phraseList = new List<Tuple<string, string, List<object>>>();
+            //get phrases and actions from the DB
+            _descriptions = description;
+            Breakable = breakable;
+            Type = doorType; //may implement a table that has stats for certain type of materials in the future
+            Hitpoints = hitpoints;
+            Locked = locked;
+            Name = name;
+            ID = id;
+            Open = open;
+            Destroyed = destroyed;
+            Lockable = lockable;
+            Openable = openable;
+            Climable = climable;
+            Crawlable = crawlable;
+            Listener = listener;
+            Examine = examine;
+            if (Listener) FillUpPhrases();
+        }
+
+        private void FillUpPhrases() {
+            BsonDocument door = GetDoorFromDB();
+            BsonArray phraseArray = door["Phrases"].AsBsonArray;
+            List<object> parameters = new List<object>();
+            foreach (BsonDocument phrase in phraseArray) {
+                foreach (BsonDocument method in phrase["Action"].AsBsonArray.Where(a => a.AsBsonDocument.Count() > 0)) {
+                    foreach (BsonDocument param in method["Parameters"].AsBsonArray.Where(p => p.AsBsonDocument.Count() > 0)) {
+                        switch (param["Param"].BsonType) {
+                            case BsonType.Boolean:
+                                parameters.Add(param["Param"].AsBoolean);
+                                break;
+                            case BsonType.Int32:
+                                parameters.Add(param["Param"].AsInt32);
+                                break;
+                            case BsonType.Double:
+                                parameters.Add(param["Param"].AsDouble);
+                                break;
+                            case BsonType.String:
+                            default:
+                                parameters.Add(param["Param"].AsString);
+                                break;
+                        }
+
+                    }
+                    phraseList.Add(Tuple.Create(phrase["Phrase"].AsString, method["Method"].AsString, new List<object>(parameters)));
+                    parameters.Clear();
+                }
+            }
+        }
+
+        public List<string> ApplyDamage(double damage) {
+            List<string> message = new List<string>();
+            if (!Breakable) {
+                message.Add("You could hit this " + this.Name.ToLower() + " all day and not even dent it.");
+                message.Add("{0} could hit this " + this.Name.ToLower() + " all day and it would not even dent.");
+            }
+            else {
+                Hitpoints = 0;
+                message.Add("You hit the " + this.Name.ToLower() + " and it smashes to smithereens!");
+                message.Add("{0} hits the " + this.Name.ToLower() + " and it smashes to smithereens!");
+                Destroyed = true;
+                Open = true;
+                Locked = false;
+            }
+            return message;
+        }
+
+        private BsonDocument GetDoorFromDB() {
+            MongoCollection doorCollection = GetDoorCollection();
+
+            IMongoQuery query = Query.EQ("_id", this.ID);
+
+            return doorCollection.FindOneAs<BsonDocument>(query);
+        }
+
+        private MongoCollection GetDoorCollection() {
+            MongoUtils.MongoData.ConnectToDatabase();
+            MongoDatabase worldDB = MongoUtils.MongoData.GetDatabase("World");
+            return worldDB.GetCollection("Doors");
+        }
+
+        public void UpdateDoorStatus() {
+            BsonDocument door = GetDoorFromDB();
+
+            //these are the only things that players can change
+            door["Open"] = this.Open;
+            door["Locked"] = this.Locked;
+            door["Hitpoints"] = this.Hitpoints;
+            door["Destroyed"] = this.Destroyed;
+
+            GetDoorCollection().Save(door, WriteConcern.Acknowledged);
+        }
+
+        public string CheckPhrase(string message, out List<object> paramsOut) {
+            string result = "";
+            paramsOut = null;
+            message = message.Substring(message.IndexOf("says") + 4).Replace("\"", "").Trim();
+            foreach (Tuple<string, string, List<object>> phrase in phraseList) {
+                if (string.Equals(phrase.Item1, message, StringComparison.InvariantCultureIgnoreCase)) { //phrase matches let's perform the action
+                    ThreadPool.QueueUserWorkItem(delegate { IterateThroughActions(phrase.Item1); });
+                    break;
+                }
+            }
+            return result;
+        }
+
+        private void IterateThroughActions(string match) {
+            Type type = typeof(Rooms.Room);
+            foreach (Tuple<string, string, List<object>> phrase in phraseList.Where(p => p.Item1 == match)) {
+                var method = Phydeaux.Utilities.Dynamic<DoorHelpers>.Static.Function<object>.Explicit<List<object>>.CreateDelegate(phrase.Item2);
+                method(phrase.Item3); 
+            }
+        }
+    }
+
+    #region Helper Methods for Dynamically bound methods for doors
+    //These methods below are used to call the appropriate methods without having to cycle through all the classes to find the correct method why dynamically binding them
+    //so they are all kept here and make the call to each class that has
+    public class DoorHelpers {
+        
+        public static object OpenDoor(List<object> parameters) {
+            if (CommandParser.OpenDoor((int)parameters[1], (string)parameters[0])) {
+                InformAllPlayersInRoom(parameters);
+            }
+            return null;
+        }
+
+        public static object InformAllPlayersInRoom(List<object> parameters) {
+            Room.InformPlayersInRoom((string)parameters[0], (int)parameters[1], new List<string>(new string[] { "" }));
+            return null;
+        }
+
+        public static object Wait(List<object> parameters) {
+            Thread.Sleep((int)parameters[0] * 1000);
+            return null;
+        }
+    }
+    #endregion
+}

@@ -1,0 +1,177 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using MongoDB.Bson;
+using MongoDB.Bson.Serialization.Attributes;
+using MongoDB.Bson.Serialization.Options;
+using MongoDB.Driver;
+
+namespace Items {
+    class Container : Iitem, Icontainer {
+        public ObjectId Id { get; set; }
+        public string Name { get; set; }
+        public string Description { get; set; }
+        public double Weight { get; set; }
+        public ItemCondition CurrentCondition { get; set; }
+        public ItemCondition MaxCondition { get; set; }
+        public bool IsWearable { get; set; }
+        public int MinimumLevel { get; set; }
+        public ItemType ItemType { get; set; }
+        public Wearable WornOn { get; set; }
+        public int Location { get; set; }
+        public double WeightLimit { get; set; }
+        public double CurrentWeight { get; set; }
+        public double ReduceCarryWeightBy { get; set; }
+        public bool Worn { get; set; }
+        public bool IsOpenable { get; set; }
+        public bool Opened { get; set; }
+        public bool IsMovable { get; set; }
+        public string Owner { get; set; }
+
+        public List<string> Contents { get; set; }
+
+        public Container() {}
+
+        public List<string> GetContents() {
+            return Contents;
+        }
+
+        public Iitem RetrieveItem(string id) {
+            if ((IsOpenable && Opened) || !IsOpenable) {
+                if (Contents.Contains(id)) {
+                    Iitem temp = Items.GetByID(id);
+                    CurrentWeight -= temp.Weight;
+                    Contents.Remove(id);
+                    Save();
+                    if (Worn) {
+                        Weight = CurrentWeight - (CurrentWeight * ReduceCarryWeightBy);
+                    }
+                    return temp;
+                }
+            }
+            return null;
+        }
+
+        public bool StoreItem(string id) {
+            bool added = false;
+            Iitem temp = Items.GetByID(id);
+
+            //containers can't be encumbered they can only hold so much
+            if ((IsOpenable && Opened) || !IsOpenable) {
+                if (CurrentWeight + temp.Weight <= WeightLimit) {
+                    CurrentWeight += temp.Weight;
+                    Contents.Add(temp.Id.ToString());
+                    added = true;
+
+                    if (Worn) {
+                        Weight = CurrentWeight - (CurrentWeight * ReduceCarryWeightBy);
+                    }
+                    Save();
+                }
+            }
+           
+            return added;
+        }
+
+        public string Examine() {
+            StringBuilder sb = new StringBuilder();
+            sb.AppendLine(Description);
+            sb.AppendLine("This " + Name.ToLower() + " will allow you to carry more items when equipped.");
+            return sb.ToString();
+        }
+
+        public string Open(){
+            string result = null;
+            if (IsOpenable && !Opened) {
+                result = "You open the " + Name.ToLower();
+                Opened = true;
+                Save();
+            }
+            else if (Opened) {
+                result = "The " + Name.ToLower() + " is already opened.";
+            }
+            else {
+                result = "The " + Name.ToLower() + " was not designed to be opened.";
+            }
+
+            return result;
+        }
+
+        public string Close(){
+            string result = null;
+            if (IsOpenable && Opened) {
+                result = "You close the " + Name.ToLower();
+                Opened = false;
+                Save();
+            }
+            else if (!Opened) {
+                result = "The " + Name.ToLower() + " is already closed.";
+            }
+            else {
+                result = "The " + Name.ToLower() + " was not designed to be closed.";
+            }
+            
+            return result;
+        }
+
+        public void Wear() {
+            Worn = true;
+            Weight = CurrentWeight - (CurrentWeight * ReduceCarryWeightBy);
+            Save();
+        }
+
+        public void Save() {
+            MongoUtils.MongoData.ConnectToDatabase();
+            MongoDatabase db = MongoUtils.MongoData.GetDatabase("World");
+            MongoCollection collection = db.GetCollection("Items");
+            collection.Save<Container>(this);
+        }
+
+        public void DeteriorateCondition() {
+            //TODO: condition should affect item stats as well
+            int newCondition = ((int)CurrentCondition) - 1;
+            if (newCondition >= 0) { //otherwise it can't deteriorate any more and it's broken anyways
+                CurrentCondition = (ItemCondition)newCondition;
+            }
+            Save();
+        }
+
+        public string LookIn() {
+            if ((IsOpenable && Opened) || !IsOpenable) {
+                StringBuilder sb = new StringBuilder();
+                sb.AppendLine(Name + " contents:");
+                if (GetContents().Count > 0) {
+                    foreach (string itemID in GetContents()) {
+                        Iitem tempItem = Items.GetByID(itemID);
+                        sb.AppendLine(tempItem.Name);
+                    }
+
+                    sb.AppendLine();
+                }
+                else {
+                    sb.AppendLine("\n[ EMPTY ]\n");
+                }
+                return sb.ToString();
+            }
+            else {
+                return "You must open " + Name + " before seeing what is in it.";
+            }
+        }
+
+        public void ImproveCondition() {
+            //this shouldn't return anything because items will decay over time with use....silently
+            //TODO: condition should affect item stats as well
+            int newCondition = ((int)CurrentCondition) + 1;
+            if (newCondition <= (int)MaxCondition) { //can't go higher than the max
+                CurrentCondition = (ItemCondition)newCondition;
+                Save();
+            }
+            else {
+                //this should probably return a string so that we can inform a player for example that it can't be repaired byeond its current point
+                //or to what level it was repaired
+            }
+        }
+    }
+}

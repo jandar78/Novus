@@ -1,0 +1,71 @@
+﻿using System.Collections.Generic;
+using MongoDB.Bson;
+using Extensions;
+using Triggers;
+using Interfaces;
+using Sockets;
+
+namespace Commands {   
+
+    public class Skill {
+        public BsonArray CheckPlayersInRoom { get; set; }
+        
+        public SkillLevel skillLevel { get; set; }
+        public SkillTypes skillType { get; set; }
+         
+        public List<string> UserCommand { get; set; }
+
+        public IUser Target { get; set; }
+        public IUser Player { get; set; }
+
+        //this may end up being a dictionary if player can have more than one action state applied
+        //there could be states if skill outcome is succesful or not that affects the player and others around him
+        //ex. if player cartwheels and fails stance would be lying down and not standing. (what if different stances based on how close to success it was?)
+        //may make these a dictionary in the future we'll see
+        public CharacterActionState StateIfSuccessSelf { get; set; }
+        public CharacterStanceState StanceIfSuccessSelf { get; set; }
+
+        public CharacterActionState StateIfSuccessOthers { get; set; }
+        public CharacterStanceState StanceIfSuccessOthers { get; set; }
+        
+        public IScript script;
+
+        public Skill() {}
+
+        public void FillSkill(IUser user, List<string> commands)
+        {
+            UserCommand = commands;
+
+            script = TriggerScriptFactory.GetScript(commands[1].CamelCaseWord(), "Action");
+
+            UserCommand.RemoveAt(0);
+            Player = user;
+
+            script.AddVariable(UserCommand, "UserCommand");
+            script.AddVariable(Player.Player, "player" + (script.ScriptType == ScriptTypes.Lua ? "" : "ID"));
+
+            //if they have a target or they passed one in let's add it to the script variables as well
+            if (Player.Player.CurrentTarget != null || commands.Count > 3)
+            {
+                if (Player.Player.CurrentTarget != null && commands.Count <= 3)
+                { //didn't pass a target because they have one
+                    Target = Server.GetAUser(Player.Player.CurrentTarget);
+                }
+                else
+                { //they passed in a target
+                    Target = CommandParser.FindTargetByName(commands[2], user.Player.Location);
+                }
+
+                if (Target != null)
+                {
+                    script.AddVariable(Target.Player, "target" + (script.ScriptType == ScriptTypes.Lua ? "" : "ID"));
+                }
+            }
+        }
+        
+        public void ExecuteScript() {
+            script.RunScript();
+        }       
+    }
+
+}

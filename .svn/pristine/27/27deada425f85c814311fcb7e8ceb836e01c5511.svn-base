@@ -1,0 +1,84 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace Commands {
+	public partial class CommandParser {
+		//this is where all the commands will go just follow whats already here
+		static public void LoadUpCommandDictionary() {
+
+			MovementCommands = new Dictionary<string, CommandDelegate>();
+			CombatCommands = new Dictionary<string, CommandDelegate>();
+			PlayerCommands = new Dictionary<string, CommandDelegate>();
+			VisualCommands = new Dictionary<string, CommandDelegate>();
+            GeneralCommands = new Dictionary<string, CommandDelegate>();
+            
+            //General commands (biggest of the list)
+            GeneralCommands.Add("GRAB", new CommandDelegate(Grab));
+            GeneralCommands.Add("PICKUP", new CommandDelegate(Grab));
+            GeneralCommands.Add("DROP", new CommandDelegate(Drop));
+            GeneralCommands.Add("UNEQUIP", new CommandDelegate(Unequip));
+            GeneralCommands.Add("EQUIP", new CommandDelegate(Equip));
+            GeneralCommands.Add("WIELD", new CommandDelegate(Wield));
+            GeneralCommands.Add("UNWIELD", new CommandDelegate(Unequip));
+            GeneralCommands.Add("EAT", new CommandDelegate(Eat));
+
+			//Movement Commands
+			MovementCommands.Add("NORTH", new CommandDelegate(Move));
+			MovementCommands.Add("N", new CommandDelegate(Move));
+			MovementCommands.Add("SOUTH", new CommandDelegate(Move));
+			MovementCommands.Add("S", new CommandDelegate(Move));
+			MovementCommands.Add("EAST", new CommandDelegate(Move));
+			MovementCommands.Add("E", new CommandDelegate(Move));
+			MovementCommands.Add("WEST", new CommandDelegate(Move));
+			MovementCommands.Add("W", new CommandDelegate(Move));
+			MovementCommands.Add("UP", new CommandDelegate(Move));
+			MovementCommands.Add("U", new CommandDelegate(Move));
+			MovementCommands.Add("DOWN", new CommandDelegate(Move));
+			MovementCommands.Add("D", new CommandDelegate(Move));
+			MovementCommands.Add("OPEN", new CommandDelegate(Open));
+			MovementCommands.Add("CLOSE", new CommandDelegate(Close));
+			MovementCommands.Add("LOCK", new CommandDelegate(Lock));
+			MovementCommands.Add("UNLOCK", new CommandDelegate(Unlock));
+			MovementCommands.Add("SIT", new CommandDelegate(Sit));
+			MovementCommands.Add("STAND", new CommandDelegate(Stand));
+			MovementCommands.Add("LAY", new CommandDelegate(Prone));
+			MovementCommands.Add("PRONE", new CommandDelegate(Prone));
+
+			//Visual commands
+			VisualCommands.Add("LOOK", new CommandDelegate(Look));
+			VisualCommands.Add("DATE", new CommandDelegate(DisplayDate));
+			VisualCommands.Add("TIME", new CommandDelegate(DisplayTime));
+            VisualCommands.Add("EXAMINE", new CommandDelegate(Examine));
+
+			//Player information commands
+			PlayerCommands.Add("STATS", new CommandDelegate(DisplayStats));
+			PlayerCommands.Add("SAY", new CommandDelegate(Say));
+			PlayerCommands.Add("WHISPER", new CommandDelegate(Whisper));
+			PlayerCommands.Add("TELL", new CommandDelegate(Tell));
+			PlayerCommands.Add("EMOTE", new CommandDelegate(Emote));
+			PlayerCommands.Add("WHO", new CommandDelegate(Who));
+			PlayerCommands.Add("HELP", new CommandDelegate(Help));
+            PlayerCommands.Add("LEVEL", new CommandDelegate(LevelUp));
+            PlayerCommands.Add("INVENTORY", new CommandDelegate(Inventory));
+            PlayerCommands.Add("EQUIPMENT", new CommandDelegate(Equipment));
+
+			//Combat Commands
+			CombatCommands.Add("ATTACK", new CommandDelegate(Kill));
+			CombatCommands.Add("KILL", new CommandDelegate(Kill));
+			CombatCommands.Add("CLEAVE", new CommandDelegate(Cleave));
+			CombatCommands.Add("DESTROY", new CommandDelegate(Destroy));
+			CombatCommands.Add("BREAK", new CommandDelegate(Break));
+			
+			//we don't want to add the combat dictionary to the list because we are already checking it before any of these
+			CommandsList = new List<Dictionary<string, CommandDelegate>>();
+			CommandsList.Add(VisualCommands);
+			CommandsList.Add(PlayerCommands);
+			CommandsList.Add(MovementCommands);
+            CommandsList.Add(GeneralCommands);
+
+		}
+	}
+}

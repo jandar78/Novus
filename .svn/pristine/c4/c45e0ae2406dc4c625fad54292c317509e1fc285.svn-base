@@ -1,0 +1,559 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using Rooms;
+using User;
+using MongoDB.Driver;
+using MongoDB.Bson;
+using MongoDB.Driver.Builders;
+using Extensions;
+
+namespace Commands {
+	public partial class CommandParser {
+		//Todo: Doors still need a lock/unlock method, needs to be usable with both keys and objects
+		//for example a lever in one room could unlock a door in the room it is in or in another room.
+		//going to have to wait until Items are introduced for that though
+
+		public static void Move(User.User player, List<string> commands) {
+            if (!player.Player.InCombat) {
+                bool foundExit = false;
+                string direction = commands[1].ToLower();
+                MongoUtils.MongoData.ConnectToDatabase();
+                MongoDatabase worldDB = MongoUtils.MongoData.GetDatabase("Commands");
+                MongoCollection roomCollection = worldDB.GetCollection("General"); //this is where general command messages are stored
+
+                if (direction == "north" || direction == "n") direction = "North";
+                else if (direction == "south" || direction == "s") direction = "South";
+                else if (direction == "west" || direction == "w") direction = "West";
+                else if (direction == "east" || direction == "e") direction = "East";
+                else if (direction == "up" || direction == "u") direction = "Up";
+                else if (direction == "down" || direction == "d") direction = "Down";
+
+                List<Exits> exitList = Rooms.Room.GetRoomExits(player.Player.Location);
+                foreach (Exits exit in exitList) {
+                    if (exit.availableExits.ContainsKey(direction.CamelCaseWord())) {
+
+                        //is there a door blocking the exit?
+                        bool blocked = false;
+                        if (exit.doors.Count > 0 && !exit.doors[exit.Direction.CamelCaseWord()].Open && !exit.doors[exit.Direction.CamelCaseWord()].Destroyed) {
+                            blocked = true;
+                        }
+
+                        if (!blocked) {
+                            player.Player.LastLocation = player.Player.Location;
+                            player.Player.Location = exit.availableExits[direction.CamelCaseWord()];
+
+                            IMongoQuery query = Query.EQ("_id", "Leaves");
+                            BsonDocument leave = roomCollection.FindOneAs<BsonDocument>(query);
+
+                            //semantics
+                            if (direction.ToLower() == "up") { direction = "above"; }
+                            else if (direction.ToLower() == "down") { direction = "below"; }
+
+
+                            string who = player.Player.FirstName;
+
+                            if (Room.IsDark(player.Player.LastLocation)) {
+                                who = "Someone";
+                                direction = "somewhere";
+                            }
+
+                            string temp = String.Format(leave["ShowOthers"].AsString, who, direction);
+                            Rooms.Room.InformPlayersInRoom(temp, player.Player.LastLocation, new List<string>(new string[] { player.UserID }));
+
+                            //now we reverse the direction
+                            if (direction == "north") direction = "south";
+                            else if (direction == "south") direction = "north";
+                            else if (direction == "west") direction = "east";
+                            else if (direction == "above") direction = "below";
+                            else if (direction == "below") direction = "above";
+                            else direction = "west";
+
+                            query = Query.EQ("_id", "Arrives");
+                            BsonDocument message = roomCollection.FindOneAs<BsonDocument>(query);
+
+                            if (Room.IsDark(player.Player.Location)) {
+                                who = "Someone";
+                                direction = "somewhere";
+                            }
+                            else {
+                                who = player.Player.FirstName;
+                            }
+
+                            temp = String.Format(message["ShowOthers"].AsString, who, direction);
+                            Rooms.Room.InformPlayersInRoom(temp, player.Player.Location, new List<string>(new string[] { player.UserID }));
+
+                            player.Player.Save();
+                            if (!player.Player.IsNPC) {
+                                Look(player, commands);
+                            }
+                            ApplyRoomModifier(player);
+                            foundExit = true;
+                            break;
+                        }
+                        else {//uh-oh there's a door and it's closed
+                            foundExit = true; //we did find an exit it just happens to be blocked by a door
+                            if (!player.Player.IsNPC) {
+                                string temp = "";
+                                IMongoQuery query = Query.EQ("_id", "NoExit");
+                                BsonDocument message = roomCollection.FindOneAs<BsonDocument>(query);
+                                temp = message["ShowSelf"].AsString;
+                                query = Query.EQ("_id", "Blocked");
+                                message = roomCollection.FindOneAs<BsonDocument>(query);
+                                temp += " " + message["ShowSelf"];
+                                query = Query.EQ("_id", "ClosedDoor");
+                                message = roomCollection.FindOneAs<BsonDocument>(query);
+                                temp = temp.Remove(temp.Length - 1); //get rid of previous line period
+                                temp += " because " + String.Format(message["ShowSelf"].AsString.ToLower(), exit.doors[exit.Direction.CamelCaseWord()].Description.ToLower());
+
+                                player.MessageHandler(temp);
+                            }
+                            break;
+                        }
+                    }
+                    else {
+                        continue;
+                    }
+                }
+                if (!foundExit) {
+                    IMongoQuery query = Query.EQ("_id", "NoExit");
+                    BsonDocument message = roomCollection.FindOneAs<BsonDocument>(query);
+                    if (!player.Player.IsNPC) {
+                        player.MessageHandler(message["ShowSelf"].AsString + "\r\n");
+                    }
+                }
+            }
+            else {
+                player.MessageHandler("You can't do that while you are in combat!");
+            }
+		}
+
+		#region Open things
+        public static bool OpenDoor(int roomID, string doorDirection) {
+            Door door = FindDoor(roomID, new List<string>() { doorDirection, doorDirection });
+            if (door.Openable) {
+                if (!door.Open && !door.Locked && !door.Destroyed) {
+                    OpenADoor(door);
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        public static bool OpenDoorOverride(int roomID, string doorDirection) {
+            Door door = FindDoor(roomID, new List<string>() { doorDirection, doorDirection });
+            if (door.Openable) {
+                    OpenADoor(door);
+                    return true;
+                }
+            return false;
+        }
+
+		private static void Open(User.User player, List<string> commands) {
+			Door door = FindDoor(player.Player.Location, commands);
+			if (door != null) {
+				OpenDoor(player, door);
+			}
+			//ok not a door so then we'll check containers in the room
+		}
+
+        private static void OpenADoor(Door door) {
+            door.Open = true;
+            door.UpdateDoorStatus();
+        }
+
+		private static void OpenDoor(User.User player, Door door) {
+            if (!player.Player.InCombat) {
+                List<string> message = new List<string>();
+                if (!Room.IsDark(player.Player.Location)) {
+                    if (door.Openable) {
+                        if (!door.Open && !door.Locked && !door.Destroyed) {
+                            door.Open = true;
+                            door.UpdateDoorStatus();
+                            message.Add(String.Format("You open {0} {1}.", GetArticle(door.Description[0]), door.Description));
+                            message.Add(String.Format("{0} opens {1} {2}.", player.Player.FirstName, GetArticle(door.Description[0]), door.Description));
+                        }
+                        else if (door.Open && !door.Destroyed) {
+                            message.Add("It's already open.");
+                        }
+                        else if (door.Locked && !door.Destroyed) {
+                            message.Add("You can't open it because it is locked.");
+                        }
+                        else if (door.Destroyed) {
+                            message.Add("It's more than open it's in pieces!");
+                        }
+                    }
+                    else {
+                        message.Add("It can't be opened.");
+                    }
+                }
+                else {
+                    message.Add("You can't see anything! Let alone what you are trying to open.");
+                }
+
+                player.MessageHandler(message[0]);
+                if (message.Count > 1) {
+                    Room.InformPlayersInRoom(message[1], player.Player.Location, new List<string>(new string[] { player.UserID }));
+                }
+            }
+            else {
+                player.MessageHandler("You are in the middle of combat, there are more pressing matters at hand than opening something.");
+            }
+		}
+		#endregion
+		
+		#region Close things
+		private static void Close(User.User player, List<string> commands) {
+			List<string> message = new List<string>();
+
+			Door door = FindDoor(player.Player.Location, commands);
+			if (door != null) {
+				CloseDoor(player, door);
+			}
+			//ok not a door so then we'll check containers in the room
+		}
+
+		private static void CloseDoor(User.User player, Door door) {
+            if (!player.Player.InCombat) {
+                List<string> message = new List<string>();
+                if (!Room.IsDark(player.Player.Location)) {
+                    if (door.Openable) {
+                        if (door.Open && !door.Destroyed) {
+                            door.Open = false;
+                            door.UpdateDoorStatus();
+                            //I may end up putting these strings in the general collection and then each method just supplies the verb
+                            message.Add(String.Format("You close {0} {1}.", GetArticle(door.Description[0]), door.Description));
+                            message.Add(String.Format("{0} closes {1} {2}.", player.Player.FirstName, GetArticle(door.Description[0]), door.Description));
+                        }
+                        else if (door.Destroyed) {
+                            message.Add("You can't close it because it is in pieces!");
+                        }
+                        else {
+                            message.Add("It's already closed.");
+                        }
+                    }
+                    else {
+                        message.Add("It can't be closed.");
+                    }
+                }
+                else {
+                    message.Add("You can't see anything! Let alone what you are trying to close.");
+                }
+
+                player.MessageHandler(message[0]);
+                if (message.Count > 1) {
+                    Room.InformPlayersInRoom(message[1], player.Player.Location, new List<string>(new string[] { player.UserID }));
+                }
+            }
+            else {
+                player.MessageHandler("You are in the middle of combat, there are more pressing matters at hand than closing something.");
+            }
+		}
+		#endregion
+
+		#region Lock and Unlock
+		private static void Lock(User.User player, List<string> commands) {
+			List<string> message = new List<string>();
+
+			Door door = FindDoor(player.Player.Location, commands);
+			if (door != null) {
+				LockDoor(player, door);
+			}
+			//ok not a door so then we'll check containers in the room
+		}
+
+		private static void LockDoor(User.User player, Door door) {
+            if (!player.Player.InCombat) {
+                List<string> message = new List<string>();
+                if (!Room.IsDark(player.Player.Location)) {
+                    if (door.Lockable) {
+                        if (!door.Open && !door.Destroyed) {
+                            door.Locked = true;
+                            door.UpdateDoorStatus();
+                            //I may end up putting these strings in the general collection and then each method just supplies the verb
+                            message.Add(String.Format("You lock {0} {1}.", GetArticle(door.Description[0]), door.Description));
+                            message.Add(String.Format("{0} locks {1} {2}.", player.Player.FirstName, GetArticle(door.Description[0]), door.Description));
+                        }
+                        else if (door.Destroyed) {
+                            message.Add("Why would you want to lock something that is in pieces?");
+                        }
+                        else {
+                            message.Add("It can't be locked, the door is " + (door.Open == true ? "open" : "closed") + ".");
+                        }
+                    }
+                    else {
+                        message.Add("It can't be locked.");
+                    }
+                }
+                else {
+                    message.Add("You can't see anything! Let alone what you are trying to lock.");
+                }
+
+                player.MessageHandler(message[0]);
+                if (message.Count > 1) {
+                    Room.InformPlayersInRoom(message[1], player.Player.Location, new List<string>(new string[] { player.UserID }));
+                }
+            }
+            else {
+                player.MessageHandler("You are in the middle of combat there are more pressing matters at hand than locking something.");
+            }
+		}
+
+		private static void Unlock(User.User player, List<string> commands) {
+			List<string> message = new List<string>();
+
+			Door door = FindDoor(player.Player.Location, commands);
+			if (door != null) {
+				UnlockDoor(player, door);
+			}
+			//ok not a door so then we'll check containers in the room
+		}
+
+		private static void UnlockDoor(User.User player, Door door) {
+            if (!player.Player.InCombat) {
+                List<string> message = new List<string>();
+                if (!Room.IsDark(player.Player.Location)) {
+                    if (door.Lockable) {
+                        if (!door.Open && !door.Destroyed) {
+                            door.Locked = false;
+                            door.UpdateDoorStatus();
+                            //I may end up putting these strings in the general collection and then each method just supplies the verb
+                            message.Add(String.Format("You unlock {0} {1}.", GetArticle(door.Description[0]), door.Description));
+                            message.Add(String.Format("{0} unlocks {1} {2}.", player.Player.FirstName, GetArticle(door.Description[0]), door.Description));
+                        }
+                        else if (door.Destroyed) {
+                            message.Add("Why would you want to unlock something that is in pieces?");
+                        }
+                        else {
+                            message.Add("It can't be unlocked, the door is " + (door.Open == true ? "open" : "closed") + ".");
+                        }
+                    }
+                    else {
+                        message.Add("It can't be unlocked.");
+                    }
+                }
+                else {
+                    message.Add("You can't see anything! Let alone what you are trying to unlock.");
+                }
+
+                player.MessageHandler(message[0]);
+                if (message.Count > 1) {
+                    Room.InformPlayersInRoom(message[1], player.Player.Location, new List<string>(new string[] { player.UserID }));
+                }
+            }
+            else {
+                player.MessageHandler("You are in the middle of combat there are more pressing matters at hand than unlocking something.");
+            }
+		}
+		#endregion 
+
+		#region Actions
+        private static void UnHide(User.User user, List<string> commands) {
+            if (user.Player.ActionState == CharacterEnums.CharacterActionState.HIDING || user.Player.ActionState == CharacterEnums.CharacterActionState.SNEAKING) {
+                user.Player.SetActionState(CharacterEnums.CharacterActionState.NONE);
+                user.MessageHandler("You step out of the shadows.");
+                Room.InformPlayersInRoom(string.Format("{0} steps out of the shadows", user.Player.FirstName), user.Player.Location, new List<string>(new string[] { user.UserID }));
+            }
+            else {
+                user.MessageHandler("You are not currently hiding or sneaking.");
+            }
+        }
+
+
+        private static void Hide(User.User user, List<string> commands) {
+            string message = null;
+            string msgOthers = null;
+            double result = GetHide(user.Player.GetSubAttributes()["Agility"], user.Player.GetSubAttributes()["Cunning"], user.Player.GetAttributeRank("Dexterity"));
+            //eventually get values from the DB for minimum maximum and in between
+            double newbie = 12;
+            double master = 20;
+            double apprentice = master - (master / 4);
+            double journeyman = master - (master /8);
+            bool hidden = true;
+
+
+            if (result < newbie) {
+                message = "You fail miserably at trying to remain hidden.  Might as well walk around with a flare in your hand.";
+                hidden = false;
+            }
+            else if (result >= newbie && result < apprentice) {
+                message = "You step into the shadows hiding yourself from plain sight.";
+                msgOthers = string.Format("{0} steps into the shadows hiding from plain sight.", user.Player.FirstName);
+            }
+            else if (result >= apprentice && result < journeyman) {
+                //only those who pass th espot check see us hide
+                message = "You smoothly transition into the shadows, hiding yourself from plain sight. Only a few may know you have gone into hiding.";
+                foreach(string id in Room.GetPlayersInRoom(user.Player.Location)){
+                    User.User temp = MySockets.Server.GetAUser(id);
+                    double check = GetHide(temp.Player.GetSubAttributes()["Agility"], temp.Player.GetSubAttributes()["Cunning"], temp.Player.GetAttributeRank("Dexterity")) - result;
+                    if (result >= 0) {
+                       temp.MessageHandler(string.Format("{0} quitely moves into the shadows and is now hidden from sight.", user.Player.FirstName));
+                    }
+                }
+            }
+            else if (result >= journeyman && result < master) {
+                //only half of those who pass the spot check see us hide
+                message = "You fade into the shadows, hiding yourself from plain sight. Only a select few may have seen you vanish into the darkness.";
+                List<User.User> passedCheck = new List<User.User>();
+                foreach (string id in Room.GetPlayersInRoom(user.Player.Location)) {
+                    if (id != user.UserID) {
+                        User.User spotted = MySockets.Server.GetAUser(id);
+                        double check = GetHide(spotted.Player.GetSubAttributes()["Agility"], spotted.Player.GetSubAttributes()["Cunning"], spotted.Player.GetAttributeRank("Dexterity")) - result;
+                        if (result >= 0) {
+                            passedCheck.Add(spotted);
+                        }
+                        foreach (User.User temp in passedCheck) {
+                            if (RandomNumber.GetRandomNumber().NextNumber(0, 2) == 1) {
+                                temp.MessageHandler(string.Format("{0} fades into the shadows and is now hidden.", user.Player.FirstName));
+                            }
+                        }
+                    }
+                }
+            }
+            else {
+                //no one sees the master dissapear
+                message = "The shadows envelop you and you become one with the darkness, dissapearing completely from sight.";
+            }
+
+            if (!string.IsNullOrEmpty(msgOthers)) {
+                Room.InformPlayersInRoom(msgOthers, user.Player.Location, new List<string>(new string[] { user.UserID}));
+            }
+            if (hidden) {
+                user.Player.SetActionState(CharacterEnums.CharacterActionState.HIDING);
+            }
+            user.MessageHandler(message);
+        }
+
+        private static void Spot(User.User user, List<string> commands) {
+            foreach (string id in Room.GetPlayersInRoom(user.Player.Location)) {
+                if (id != user.UserID) {
+                    User.User temp = MySockets.Server.GetAUser(id);
+                    if (temp.Player.ActionState == CharacterEnums.CharacterActionState.HIDING || temp.Player.ActionState == CharacterEnums.CharacterActionState.SNEAKING) {
+                        user.MessageHandler(PassesCheck(temp, user.UserID));
+                    }
+                }
+            }
+            user.MessageHandler("You fail to spot anyone hiding here.");
+        }
+
+		private static void Prone(User.User user, List<string> commands) {
+			string message = "";
+			if (user.Player.StanceState != CharacterEnums.CharacterStanceState.PRONE && (user.Player.ActionState == CharacterEnums.CharacterActionState.NONE
+				|| user.Player.ActionState == CharacterEnums.CharacterActionState.FIGHTING)) {
+					user.Player.SetStanceState(CharacterEnums.CharacterStanceState.PRONE);
+					user.MessageHandler("You lay down.");
+				Room.InformPlayersInRoom(String.Format("{0} lays down on the ground.", user.Player.FirstName), user.Player.Location, new List<string>(new string[]{user.UserID}));
+			}
+			else if (user.Player.ActionState != CharacterEnums.CharacterActionState.NONE) {
+				message = String.Format("You can't lay prone.  You are {0}!", user.Player.ActionState.ToString().ToLower());
+			}
+			else {
+				message = String.Format("You can't lay prone.  You are {0}!", user.Player.StanceState.ToString().ToLower());
+			}
+			user.MessageHandler(message);
+		}
+
+		private static void Stand(User.User user, List<string> commands) {
+			string message = "";
+			if (user.Player.StanceState != CharacterEnums.CharacterStanceState.STANDING && (user.Player.ActionState == CharacterEnums.CharacterActionState.NONE
+				|| user.Player.ActionState == CharacterEnums.CharacterActionState.FIGHTING)) {
+				user.Player.SetStanceState(CharacterEnums.CharacterStanceState.STANDING);
+				user.MessageHandler("You stand up.");
+				Room.InformPlayersInRoom(String.Format("{0} stands up.", user.Player.FirstName), user.Player.Location, new List<string>(new string[] { user.UserID }));
+			}
+			else if (user.Player.ActionState != CharacterEnums.CharacterActionState.NONE) {
+				message = String.Format("You can't stand up.  You are {0}!", user.Player.ActionState.ToString().ToLower());
+			}
+			else {
+				message = String.Format("You can't stand up.  You are {0}!", user.Player.StanceState.ToString().ToLower());
+			}
+			user.MessageHandler(message);
+		}
+
+		private static void Sit(User.User user, List<string> commands) {
+			string message = "";
+			if (user.Player.StanceState != CharacterEnums.CharacterStanceState.SITTING && (user.Player.ActionState == CharacterEnums.CharacterActionState.NONE
+				|| user.Player.ActionState == CharacterEnums.CharacterActionState.FIGHTING)) {
+				user.Player.SetStanceState(CharacterEnums.CharacterStanceState.SITTING);
+				user.MessageHandler("You sit down.");
+				Room.InformPlayersInRoom(String.Format("{0} sits down.", user.Player.FirstName), user.Player.Location, new List<string>(new string[] { user.UserID }));
+			}
+			else if (user.Player.ActionState != CharacterEnums.CharacterActionState.NONE) {
+				message = String.Format("You can't sit down.  You are {0}!", user.Player.ActionState.ToString().ToLower());
+			}
+			else {
+				message = String.Format("You can't sit down.  You are {0}!", user.Player.StanceState.ToString().ToLower());
+			}
+			user.MessageHandler(message);
+		}
+		#endregion Actions
+
+		#region Helper methods
+		private static Door FindDoor(int location, List<string> commands) {
+			//this needs to be somewhat smart if the player types "break door" we should assume he wants to break the only door
+			//in the room, otherwise if he passes in "break iron door" we should be able to figure out he wants to break the door
+			//made of iron and if he passes "break west iron door"  he wants to break the iron door in the west exit.
+			//Same if he just types "break west door" he wants to break the door in the west exit.
+			string[] dirs = new string[] { "north", "south", "east", "west", "up", "down" };
+			string objectName = "";
+			string possibleDirection = "";
+			for (int i = 1; i < commands.Count; i++) {
+				if ((i == 1 || i == commands.Count - 1) && dirs.Contains(commands[i])) { //the direction is 99.9% probably going to be at the start or end
+					possibleDirection = commands[i];
+					continue;
+				}
+				if (i == 1) continue;  //I don't care about the index which is the action to get the object name
+				objectName += commands[i];
+				if (i + 1 < commands.Count) objectName += " ";
+			}
+
+			//let's see if the player provided a direction first
+			if (possibleDirection.ToUpper().Contains("NORTH")) possibleDirection = "North";
+			else if (possibleDirection.ToUpper().Contains("SOUTH")) possibleDirection = "South";
+			else if (possibleDirection.ToUpper().Contains("EAST")) possibleDirection = "East";
+			else if (possibleDirection.ToUpper().Contains("WEST")) possibleDirection = "West";
+			else if (possibleDirection.ToUpper().Contains("UP") || possibleDirection.ToUpper().Contains("ABOVE")) possibleDirection = "Up";
+			else if (possibleDirection.ToUpper().Contains("DOWN") || possibleDirection.ToUpper().Contains("BELOW")) possibleDirection = "Down";
+
+			Door door = null;
+			//get the exit based on the direction, if we find an exit then we can start looking for a door
+			List<Exits> exits = Room.GetRoomExits(location);
+			Exits exit = exits.Where(e => e.availableExits.ContainsKey(possibleDirection)).SingleOrDefault();
+
+			//let's see if we find one based on a direction
+			if (exit != null && !string.IsNullOrEmpty(possibleDirection)) { 
+				door = exit.doors[possibleDirection];
+			}
+			//didn't find anything based on direction, search based on name
+			else if (exit == null) { 
+				foreach (Exits ex in exits) {
+					if (ex.doors.Where(d => d.Value.Name.ToLower().Contains(objectName.ToLower())).Any()) {
+						door = ex.doors.Where(d => d.Value.Name.ToLower().Contains(objectName.ToLower())).SingleOrDefault().Value; 
+						break; //we found it!
+					}
+				}
+				//we didn't find it, is there even a door in the room at all? let's find the first one we see 
+				if (door == null && commands.Count < 2) { //if the player just typed "break" we'll return a door otherwise it could be another object
+					foreach (Exits ex in exits) {          //they actually wanted to break.
+						if (ex.doors.Count > 0) {
+							door = ex.doors.ElementAt(0).Value;
+							break; //we found a door
+						}
+					}
+				}
+			}
+			//at this point we either found one or didn't so we're returning the door we found or null
+			return door;
+		}
+
+
+		private static string GetArticle(char firstLetter) {
+			string[] vowels = new string[] { "a", "e", "i", "o", "u" };
+			string article = vowels.Contains(firstLetter.ToString().ToLower()) ? "an" : "a";
+			return article;
+		}
+		#endregion
+	}
+}

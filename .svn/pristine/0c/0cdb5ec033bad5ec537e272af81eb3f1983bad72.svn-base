@@ -1,0 +1,471 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using Rooms;
+using User;
+using MongoDB.Driver;
+using MongoDB.Bson;
+using MongoDB.Driver.Builders;
+using Extensions;
+
+namespace Commands {
+    public partial class CommandParser {
+        //TODO: should be able to find item based on partial name by using best guess
+        
+        public static void Drop(User.User player, List<string> commands) {
+            //1.get the item name from the command, may have to join all the words after dropping the command
+            string full = commands[0];
+            commands.RemoveAt(0);
+            commands.RemoveAt(0);
+            StringBuilder itemName = new StringBuilder();
+            foreach (string word in commands) {
+                itemName.Append(word + " ");
+            }
+
+            //2.get the item from the DB
+            Items.Iitem item = Items.Items.GetByName(itemName.ToString().Trim(), -1);  //location should be -1 if a player is in posession of an item
+            //3.have player drop item
+            string msgPlayer = null;
+
+            if (item != null) {
+                player.Player.RemoveItemFromInventory(item);
+                item.Location = player.Player.Location;
+                item.Save();
+
+                //4.Inform room and player of action
+                string msgOthers = string.Format("{0} drops {1}", player.Player.FirstName, item.Name);
+                Room.InformPlayersInRoom(msgOthers, player.Player.Location, new List<string>(new string[] { player.UserID }));
+                msgPlayer = string.Format("You drop {0}", item.Name);
+            }
+            else {
+                msgPlayer = "You are not carrying anything of the sorts.";
+            }
+            
+            player.MessageHandler(msgPlayer);
+        }
+
+        public static void Grab(User.User player, List<string> commands) {
+            if (commands.Contains("from")) {
+                commands[0].Replace("grab", "get");
+                commands[1] = "get";
+                Get(player, commands);
+                return;
+            }
+            //1.get the item name from the command, may have to join all the words after dropping the command
+            string full = commands[0];
+            commands.RemoveAt(0);
+            commands.RemoveAt(0);
+            StringBuilder itemName = new StringBuilder();
+            foreach (string word in commands) {
+                itemName.Append(word + " ");
+            }
+
+            //2.get the item from the DB
+            Items.Iitem item = Items.Items.GetByName(itemName.ToString().Trim(), player.Player.Location);  
+            string msgPlayer = null;
+            //3.have player grab item
+            if (item != null && item.IsMovable) {
+                item.Location = -1;
+                item.Save();
+                player.Player.AddItemToInventory(item);
+
+                //4.Inform room and player of action
+                string msgOthers = string.Format("{0} grabs {1}", player.Player.FirstName, item.Name);
+                Room.InformPlayersInRoom(msgOthers, player.Player.Location, new List<string>(new string[] { player.UserID }));
+
+                msgPlayer = string.Format("You grab {0}", item.Name);
+            }
+            else if (item != null && !item.IsMovable) {
+                msgPlayer = "Nope.  You are not going to be able to take this with you.";
+            }
+            else {
+                msgPlayer = "Grab what?";
+            }
+
+            player.MessageHandler(msgPlayer);
+        }
+
+        public static void Unequip(User.User player, List<string> commands) {
+            string full = commands[0];
+            commands.RemoveAt(0);
+            commands.RemoveAt(0);
+            StringBuilder itemName = new StringBuilder();
+            foreach (string word in commands) {
+                itemName.Append(word + " ");
+            }
+
+            Items.Iitem item = Items.Items.GetByName(itemName.ToString().Trim(), -1);
+            string msgPlayer = null;
+
+            if (item != null){
+                player.Player.UnequipItem(item);
+                string msgOthers = string.Format("{0} unequips {1}", player.Player.FirstName, item.Name);
+                Room.InformPlayersInRoom(msgOthers, player.Player.Location, new List<string>(new string[] {player.UserID}));
+                msgPlayer = string.Format("You unequip {0}", item.Name);
+            }
+            else {
+                msgPlayer = "You don't seem to be equipping that at the moment.";
+            }
+
+                player.MessageHandler(msgPlayer);
+        }
+
+        public static void Equip(User.User player, List<string> commands) {
+            string full = commands[0];
+            commands.RemoveAt(0);
+            commands.RemoveAt(0);
+            StringBuilder itemName = new StringBuilder();
+            foreach (string word in commands) {
+                itemName.Append(word + " ");
+            }
+
+            Items.Iitem item = Items.Items.GetByName(itemName.ToString().Trim(), -1);
+            string msgPlayer = null;
+            
+            //if item is clothing or container cast and call the appropriate Wear() method
+            //Items.Iclothing clothing = (Items.Iclothing)item;
+            Items.Icontainer container = (Items.Icontainer)item;
+            Items.Iweapon weapon = (Items.Iweapon)item;
+
+            if (item != null && item.IsWearable) {
+                player.Player.EquipItem(item);
+                if (container != null) {
+                    container.Wear();
+                }
+                //if (clothing != null) {
+                //    clothing.Wear();
+                //}
+                string msgOthers = string.Format("{0} equips {1}", player.Player.FirstName, item.Name);
+                Room.InformPlayersInRoom(msgOthers, player.Player.Location, new List<string>(new string[] { player.UserID }));
+                msgPlayer = string.Format("You equip {0}", item.Name);
+            }
+            else if (weapon.IsWieldable) {
+                msgPlayer = "This item can only be wielded not worn.";
+            }
+            else if (!item.IsWearable || !weapon.IsWieldable) {
+                msgPlayer = "That doesn't seem like something you can wear.";
+            }
+            else {
+                msgPlayer = "You don't seem to have that in your inventory to be able to wear.";
+            }
+
+                player.MessageHandler(msgPlayer);
+        }
+
+        public static void Wield(User.User player, List<string> commands) {
+            string full = commands[0];
+            commands.RemoveAt(0);
+            commands.RemoveAt(0);
+            StringBuilder itemName = new StringBuilder();
+            foreach (string word in commands) {
+                itemName.Append(word + " ");
+            }
+            
+            string msgPlayer = null;
+
+            Items.Iitem item = Items.Items.GetByName(itemName.ToString().Trim(), -1);
+            Items.Iweapon weapon = (Items.Iweapon)item;
+            
+            if (weapon != null && weapon.IsWieldable && player.Player.GetWieldedWeapons().Count < 2) {
+                if (string.IsNullOrEmpty(player.Player.MainHand)) { //no mainhand assigned yet
+                    player.Player.MainHand = Items.Wearable.WIELD_RIGHT.ToString(); //we will default to the right hand
+                }
+                
+                player.Player.Wield(item);
+                //weapon.Wield();
+                string msgOthers = string.Format("{0} wields {1}", player.Player.FirstName, item.Name);
+                Room.InformPlayersInRoom(msgOthers, player.Player.Location, new List<string>(new string[] { player.UserID }));
+                msgPlayer = string.Format("You wield {0}", item.Name);
+            }
+            else if (player.Player.GetWieldedWeapons().Count == 2){
+                msgPlayer =  "You are already wielding two weapons...and you don't seem to have a third hand.";
+            }
+            else if (item.IsWearable) {
+                msgPlayer = "This item can only be wielded not worn.";
+            }
+            else if (!item.IsWearable) {
+                msgPlayer = "That not something you can wear or would want to wear.";
+            }
+            else {
+                msgPlayer = "You don't seem to have that in your inventory to be able to wear.";
+            }
+
+            player.MessageHandler(msgPlayer);
+        }
+
+        public static void Eat(User.User player, List<string> commands) {
+            Items.Iitem item = GetItem(commands);
+            if (item == null) {
+                player.MessageHandler("You don't seem to be carrying that to eat it.");
+                return;
+            }
+
+            Items.Iedible food = item as Items.Iedible;
+            if (food != null) {
+               Consume(player, commands, "eat", food);
+            }
+            else {
+                player.MessageHandler("You can't eat that!");
+            }
+            
+        }
+
+        public static void Drink(User.User player, List<string> commands) {
+            Items.Iitem item = GetItem(commands);
+            if (item == null) {
+                player.MessageHandler("You don't seem to be carrying that to drink it.");
+                return;
+            }
+
+            Items.Ibeverage drink = item as Items.Ibeverage;
+            if (drink != null) {
+                Consume(player, commands, "drink", null, drink);
+            }
+            else {
+                player.MessageHandler("You can't drink that!");
+            }
+            
+        }
+
+        private static Items.Iitem GetItem(List<string> commands) {
+            string full = commands[0];
+            commands.RemoveAt(0);
+            commands.RemoveAt(0);
+            StringBuilder itemName = new StringBuilder();
+
+            foreach (string word in commands) {
+                itemName.Append(word + " ");
+            }
+
+            return Items.Items.GetByName(itemName.ToString().Trim(), -1);
+        }
+
+        private static void Consume(User.User player, List<string> commands, string action, Items.Iedible food = null, Items.Ibeverage drink = null){
+            string upDown = "gain";
+            StringBuilder msgPlayer = new StringBuilder();
+            string msgOtherPlayers = null;
+                        
+            Dictionary<string, double> affectAttributes = null;
+            Items.Iitem item = null;
+
+            if (food != null) {
+                affectAttributes = food.Consume();
+                item = (Items.Iitem)food;
+            }
+            else if (drink != null) {
+                affectAttributes = drink.Consume();
+                item = (Items.Iitem)drink;
+            }
+            
+            foreach (KeyValuePair<string, double> attribute in affectAttributes) {
+                //TODO: this doesn't seem to be working properly for Hitpoints, gonna have to put a breakpoint here
+                player.Player.ApplyEffectOnAttribute(attribute.Key.CamelCaseWord(), attribute.Value);
+                if (attribute.Value < 0) {
+                    upDown = "lost";
+                }
+
+                msgPlayer.AppendLine(string.Format("You {0} {1} and {2} {3:F1} points of {4}.", action, item.Name, upDown, Math.Abs(attribute.Value), attribute.Key));
+                msgOtherPlayers = string.Format("{0} {1}s {2}", player.Player.FirstName.CamelCaseWord(), action, item.Name);
+            }
+
+            //now remove it from the players inventory
+            player.Player.RemoveItemFromInventory(item);
+
+            //item has been consumed so get rid of it from the DB
+            MongoUtils.MongoData.ConnectToDatabase();
+            MongoDatabase db = MongoUtils.MongoData.GetDatabase("World");
+            MongoCollection col = db.GetCollection("Items");
+            col.Remove(Query.EQ("_id", item.Id));
+
+            Room.InformPlayersInRoom(msgOtherPlayers, player.Player.Location, new List<string>(new string[] { player.UserID })); 
+            player.MessageHandler(msgPlayer.ToString());
+        }
+
+        //container commands
+        public static void Put(User.User player, List<string> commands) {
+            string full = commands[0];
+            commands.RemoveAt(0);
+            commands.RemoveAt(0);
+
+            StringBuilder itemName = new StringBuilder();
+            foreach (string word in commands) {
+                if (!string.Equals(word, "in", StringComparison.InvariantCultureIgnoreCase)) {
+                    itemName.Append(word + " ");
+                }
+                else {
+                    //we got the item name
+                    break;
+                }
+            }
+
+            //get the container name as well
+            StringBuilder containerName = new StringBuilder();
+            bool start = false;
+            bool stored = false;
+            foreach (string word in commands) {
+                if (string.Equals(word, "in", StringComparison.InvariantCultureIgnoreCase)) {
+                    start = true;
+                    continue; //we don't want to add the word in
+                }
+                if (start) {
+                    containerName.Append(word + " ");
+                }
+            }
+
+            Items.Iitem item = Items.Items.GetByName(itemName.ToString().Trim(), -1);
+            Items.Iitem containerItem = Items.Items.GetByName(containerName.ToString().Trim(), -1);
+            if (containerItem == null) { //container is not on players persona so it may be in the room
+                containerItem = Items.Items.GetByName(containerName.ToString().Trim(), player.Player.Location);
+            }
+            Items.Icontainer container = (Items.Icontainer)containerItem;
+
+            if (item != null && container != null) {
+                item.Location = containerItem.Location;
+                item.Save();
+                stored = container.StoreItem(item.Id.ToString());
+            }
+            string msg = null;
+
+            if (!stored) {
+                msg = "You fail to place " + itemName.ToString().Trim().ToLower() + " inside the " + containerName.ToString().Trim().ToLower() + ".";
+            }
+            else {
+                msg = "You place " + itemName.ToString().Trim().ToLower() + " inside the " + containerName.ToString().Trim().ToLower() + ".";
+            }
+
+            player.MessageHandler(msg);
+        }
+
+        public static void Get(User.User player, List<string> commands) {
+            int itemPosition = 1;
+            int containerPosition = 1;
+            //this is bugged. A player can according to this only specify an index for the container or item not both
+            //so get apple.2 or get back pack.3 works
+            //but get sword.2 from chest.3 does not
+            
+            string full = commands[0];
+            commands.RemoveAt(0);
+            commands.RemoveAt(0);
+
+            StringBuilder itemName = new StringBuilder();
+            foreach (string word in commands) {
+                if (!string.Equals(word, "from", StringComparison.InvariantCultureIgnoreCase)) {
+                    itemName.Append(word + " ");
+                }
+                else {
+                    //we got the item name
+                    break;
+                }
+            }
+
+            string[] position = itemName.ToString().Trim().Split('.'); //we are separating based on using the decimal operator after the name of the npc/item
+            if (position.Count() > 1) {
+                int.TryParse(position[position.Count() - 1], out itemPosition);
+                itemName.Remove(itemName.Length - 3, 2);
+            }
+
+            //get the container name as well
+            StringBuilder containerName = new StringBuilder();
+            bool start = false;
+
+            foreach (string word in commands) {
+                if (string.Equals(word, "from", StringComparison.InvariantCultureIgnoreCase)) {
+                    start = true;
+                    continue;
+                }
+                if (start) {
+                    containerName.Append(word + " ");
+                }
+            }
+
+            string[] positionItem = containerName.ToString().Trim().Split('.'); //we are separating based on using the decimal operator after the name of the npc/item
+            if (positionItem.Count() > 1) {
+                int.TryParse(positionItem[positionItem.Count() - 1], out containerPosition);
+                containerName.Remove(containerName.Length - 3, 2);
+            }
+
+            int location = player.Player.Location;
+
+            Items.Iitem item = Items.Items.GetByName(itemName.ToString().Trim().CamelCaseString(), location);
+            if (item == null) {
+                location = -1;
+                item = Items.Items.GetByName(itemName.ToString().Trim().CamelCaseString(), location);
+            }
+           
+            int itemIndex = 1;
+            int containerIndex = 1;
+
+            Items.Iitem retrievedItem = null;
+            Items.Iitem containerItem = null;
+            
+            //using a recursive method we will dig down into each sub container and look for the appropriate item/container
+            if (!string.IsNullOrEmpty(containerName.ToString().Trim().CamelCaseString())) {
+            foreach (string itemID in Room.GetItemsInRoom(player.Player.Location)) {
+                Items.Iitem inventoryItem = Items.Items.GetByID(itemID);
+
+                
+                    inventoryItem = KeepOpening(containerName.ToString().Trim().CamelCaseString(), inventoryItem, containerPosition, containerIndex);
+
+                    if (string.Equals(inventoryItem.Name, containerName.ToString().Trim().CamelCaseString(), StringComparison.InvariantCultureIgnoreCase)) {
+                        containerItem = inventoryItem;
+                        break;
+                    }
+                }
+            }
+
+            Items.Icontainer container = null;
+
+            //if we retrieved a specific indexed container search within it for the item
+            if (containerItem != null) {
+                container = containerItem as Items.Icontainer;
+                foreach (string itemID in container.GetContents()) {
+                    Items.Iitem inventoryItem = Items.Items.GetByID(itemID);
+
+                    inventoryItem = KeepOpening(itemName.ToString().Trim().CamelCaseString(), inventoryItem, itemPosition, itemIndex);
+
+                    if (string.Equals(inventoryItem.Name, itemName.ToString().Trim().CamelCaseString(), StringComparison.InvariantCultureIgnoreCase)) {
+                        retrievedItem = inventoryItem;
+                        break;
+                    }
+                }
+            }
+            else {//we are grabbing a container or an item without a specific index
+                foreach (string itemID in Room.GetItemsInRoom(player.Player.Location)) {
+                    Items.Iitem inventoryItem = Items.Items.GetByID(itemID);
+
+                    inventoryItem = KeepOpening(itemName.ToString().Trim().CamelCaseString(), inventoryItem, itemPosition, itemIndex);
+
+                    if (string.Equals(inventoryItem.Name, itemName.ToString().Trim().CamelCaseString(), StringComparison.InvariantCultureIgnoreCase)) {
+                        retrievedItem = inventoryItem;
+                        break;
+                    }
+                }
+            }
+
+            string msg = null;
+
+            if (retrievedItem != null) {
+                if (containerItem != null) {
+                    retrievedItem = container.RetrieveItem(retrievedItem.Id.ToString());
+                    msg = "You take " + retrievedItem.Name.ToLower() + " out of " + containerItem.Name.ToLower() + ".";
+                }
+                else {
+                    msg = "You get " + retrievedItem.Name.ToLower();
+                }
+
+                retrievedItem.Location = -1;
+                retrievedItem.Save();
+                player.Player.AddItemToInventory(retrievedItem);
+            }
+            else {
+                msg = "You can't seem to find " + itemName.ToString().Trim().ToLower() + " to grab it.";
+            }
+
+            player.MessageHandler(msg);
+
+        }
+
+    }
+}

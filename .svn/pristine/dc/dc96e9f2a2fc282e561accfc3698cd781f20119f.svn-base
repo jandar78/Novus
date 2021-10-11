@@ -1,0 +1,496 @@
+﻿using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Data;
+using System.Drawing;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+using MongoDB.Bson;
+using MongoDB.Driver;
+using MongoDB.Driver.Builders;
+
+namespace WorldBuilder {
+    public partial class Form1 : Form {
+        private Items.ItemsType ItemType { get; set; }
+        private BsonArray _wieldAffects;
+        private List<BsonDocument> _itemList;
+        private BsonArray _itemTriggers;
+        private bool ConnectedToDB { get; set; }
+
+        public Form1() {
+            InitializeComponent();
+            this.playerAttackEffectValue.Enabled = false;
+            this.attackEffects.Enabled = false;
+            this.targetAttackEffectValue.Enabled = false;
+            this.attackEffectsTarget.Enabled = false;
+            this.idValue.ReadOnly = true;
+            _wieldAffects = new BsonArray();
+            _itemList = new List<BsonDocument>();
+            _itemTriggers = new BsonArray();
+            tabControl1.Enabled = false;
+            CheckConnectionStatus();
+        }
+
+        
+
+        private async void CheckConnectionStatus() {
+            ConnectedToDB = false;
+            tabControl1.Enabled = false;
+            databaseConnectionStatusValue.Text = "Database OFFLINE";
+            databaseConnectionStatusValue.ForeColor = System.Drawing.Color.Red;
+
+            Task<bool> connectedTask = ProbeDatabase();
+           
+            ConnectedToDB = await connectedTask;
+
+            if (ConnectedToDB) {
+                databaseConnectionStatusValue.Text = "Database CONNECTED";
+                databaseConnectionStatusValue.ForeColor = System.Drawing.Color.Green;
+                tabControl1.Enabled = true;
+            }
+        }
+
+        private async Task<bool> ProbeDatabase() {
+            bool result = false;
+
+            Action establishConnection = delegate {
+                while (!MongoUtils.MongoData.IsConnected()) {
+                    try {
+                        MongoUtils.MongoData.ConnectToDatabase();
+                    }
+                    catch (Exception ex) {
+                        //squashing things like no tomorrow muahahahaha
+                        continue;
+                    }
+                }
+                result = true;
+                ;
+            };
+
+            await Task.Run(establishConnection);
+
+            return result;
+        }
+
+        #region Item Stuff
+        private void GetItemsFromDB() {
+            this.itemsInDBValue.Items.Clear();
+            this._itemList.Clear();
+
+            CheckConnectionStatus();
+
+            if (ConnectedToDB) {
+                MongoCursor<BsonDocument> result = null;
+                if (string.IsNullOrEmpty(filterValue.Text)) {
+                    result = MongoUtils.MongoData.GetCollection("World", "Items").FindAllAs<BsonDocument>();
+                }
+                else {
+                    result = MongoUtils.MongoData.GetCollection("World", "Items").FindAs<BsonDocument>(Query.EQ(filterTypeValue.Text, filterValue.Text));
+                }
+
+                if (result != null) {
+                    _itemList = result.ToList<BsonDocument>();
+                }
+
+                foreach (BsonDocument doc in result) {
+                    this.itemsInDBValue.Items.Add(doc["Name"].AsString);
+                }
+            }
+        }
+
+        private void DisplayErrorBox(string msg) {
+            MessageBox.Show(msg, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+
+        private void DisplayValidationErrorBox(string msg) {
+            MessageBox.Show(msg, "Validation error", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
+        }
+
+       
+
+        private void wieldEffectValue_SelectedIndexChanged(object sender, EventArgs e) {
+            AffectedForm affectedForm = null;
+            if (wieldEffectValue.SelectedItem == "New...") {
+                affectedForm = new AffectedForm();
+            }
+            else if (wieldEffectValue.SelectedItem != null) {
+                affectedForm = new AffectedForm(_wieldAffects[wieldEffectValue.SelectedIndex - 1].AsBsonDocument);
+            }
+            else {
+                return;
+            }
+
+            affectedForm.ShowDialog();
+
+            if (affectedForm.DialogResult == DialogResult.OK) {
+                if (affectedForm.attribute != null) {
+                    _wieldAffects.Add(affectedForm.attribute);
+                    wieldEffectValue.Items.Add(affectedForm.attribute["k"].AsString + " (" + affectedForm.attribute["v"].AsDouble.ToString() + ")");
+                }
+            }
+            else if (affectedForm.DialogResult == DialogResult.Abort) {
+                _wieldAffects.RemoveAt(wieldEffectValue.SelectedIndex - 1);
+                wieldEffectValue.Items.RemoveAt(wieldEffectValue.SelectedIndex);
+            }
+            else if (affectedForm.DialogResult == DialogResult.Cancel) {
+                //user cancelled do nothing
+            }
+
+            affectedForm.Close();
+        }
+
+        private void loadItem_Click(object sender, EventArgs e) {
+            MongoCollection itemCollection = MongoUtils.MongoData.GetCollection("World", "Items");
+            BsonDocument item = null;
+            if (itemsInDBValue.SelectedIndex != -1) {
+                item = _itemList[this.itemsInDBValue.SelectedIndex];
+            }
+            else if (!string.IsNullOrEmpty(idValue.Text)) {
+                item = itemCollection.FindOneAs<BsonDocument>(Query.EQ("_id", ObjectId.Parse(idValue.Text)));
+            }
+
+            if (item != null) {
+                FillControls(item);
+            }
+        }
+
+        private void FillControls(BsonDocument item) {
+            idValue.Text = item["_id"].AsObjectId.ToString();
+            nameValue.Text = item["Name"].AsString;
+            descriptionValue.Text = item["Description"].AsString;
+            //general stuff
+            if (item.Contains("Owner") && !item["Owner"].IsBsonNull) {
+                ownerValue.Text = item["Owner"].AsString;
+            }
+            if (item.Contains("MinimumLevel") && !item["MinimumLevel"].IsBsonNull) {
+                minLevelValue.Text = item["MinimumLevel"].AsInt32.ToString();
+            }
+            if (item.Contains("CurrentCondition") && !item["CurrentCondition"].IsBsonNull) {
+                conditionValue.Text = ((Items.ItemCondition)item["CurrentCondition"].AsInt32).ToString();
+            }
+            if (item.Contains("MaxCondition") && !item["MaxCondition"].IsBsonNull) {
+                maxConditionValue.Text = ((Items.ItemCondition)item["MaxCondition"].AsInt32).ToString();
+            }
+            if (item.Contains("Weight") && !item["Weight"].IsBsonNull) {
+                weightValue.Text = item["Weight"].AsDouble.ToString();
+            }
+            if (item.Contains("IsMovable") && !item["IsMovable"].IsBsonNull) {
+                isMovable.Checked = item["IsMovable"].AsBoolean;
+            }
+            if (item.Contains("IsWearable") && !item["IsWearable"].IsBsonNull) {
+                isWearable.Checked = item["IsWearable"].AsBoolean;
+            }
+
+            //container stuff
+            if (item.Contains("ReduceCarryWeightBy") && !item["ReduceCarryWeightBy"].IsBsonNull) {
+                reduceWeightValue.Text = item["ReduceCarryWeightBy"].AsDouble.ToString();
+            }
+            if (item.Contains("WeightLimit") && !item["WeightLimit"].IsBsonNull) {
+                weightLimitValue.Text = item["WeightLimit"].AsDouble.ToString();
+            }
+            if (item.Contains("IsOpenable") && !item["IsOpenable"].IsBsonNull) {
+                isOpenable.Checked = item["IsOpenable"].AsBoolean;
+            }
+            if (item.Contains("Opened") && !item["Opened"].IsBsonNull) {
+                isOpened.Checked = item["Opened"].AsBoolean;
+            }
+            //weapon stuff
+            if (item.Contains("AttackSpeed") && !item["AttackSpeed"].IsBsonNull) {
+                attackSpeedValue.Text = item["AttackSpeed"].AsDouble.ToString();
+            }
+            if (item.Contains("MaxDamage") && !item["MaxDamage"].IsBsonNull) {
+                maxDamageValue.Text = item["MaxDamage"].AsDouble.ToString();
+            }
+            if (item.Contains("MinDamage") && !item["MinDamage"].IsBsonNull) {
+                minDamageValue.Text = item["MinDamage"].AsDouble.ToString();
+            }
+
+
+        }
+
+        private void button1_Click(object sender, EventArgs e) {
+            GetItemsFromDB();
+        }
+
+        private void button2_Click(object sender, EventArgs e) {
+            CheckConnectionStatus();
+
+            if (ConnectedToDB) {
+                BsonDocument item = new BsonDocument();
+                if (!string.IsNullOrEmpty(idValue.Text)) {
+                    item["_id"] = ObjectId.Parse(idValue.Text);
+                }
+
+                //general stuff
+                item["Name"] = nameValue.Text;
+                item["Description"] = descriptionValue.Text;
+                item["Owner"] = ownerValue.Text;
+                item["MinimumLevel"] = int.Parse(minLevelValue.Text);
+                item["CurrentCondition"] = (Items.ItemCondition)Enum.Parse(typeof(Items.ItemCondition), conditionValue.Text);
+                item["MaxCondition"] = (Items.ItemCondition)Enum.Parse(typeof(Items.ItemCondition), maxConditionValue.Text);
+                item["Weight"] = double.Parse(weightValue.Text);
+                item["IsMovable"] = isMovable.Checked;
+                item["IsWearable"] = isWearable.Checked;
+
+                //container stuff
+                item["ReduceCarryWeightBy"] = double.Parse(reduceWeightValue.Text);
+                item["WeightLimit"] = double.Parse(weightLimitValue.Text);
+                item["IsOpenable"] = isOpenable.Checked;
+                item["Opened"] = isOpened.Checked;
+
+                //weapon stuff
+                item["AttackSpeed"] = double.Parse(attackSpeedValue.Text);
+                item["MaxDamage"] = double.Parse(maxDamageValue.Text);
+                item["MinDamage"] = double.Parse(minDamageValue.Text);
+            }
+        }
+
+        private void button3_Click(object sender, EventArgs e) {
+            ClearItemCreateForm();
+        }
+
+        private void ClearItemCreateForm() {
+            //general stuff
+            idValue.Text = string.Empty;
+            nameValue.Text = string.Empty;
+            descriptionValue.Text = string.Empty;
+            ownerValue.Text = string.Empty;
+            minLevelValue.Text = string.Empty;
+            conditionValue.Text = "GOOD";
+            maxConditionValue.Text = "GOOD";
+            weightValue.Text = string.Empty;
+            isMovable.Checked = false;
+            isWearable.Checked = false;
+
+            //container stuff
+            reduceWeightValue.Text = string.Empty;
+            weightLimitValue.Text = string.Empty;
+            isOpenable.Checked = false;
+            isOpened.Checked = false;
+           
+            //weapon stuff
+            attackSpeedValue.Text = string.Empty;
+            maxDamageValue.Text = string.Empty;
+            minDamageValue.Text = string.Empty;
+        }
+
+        private void locationValue_Leave(object sender, EventArgs e) {
+            if (locationValue.Text != "-1" && !string.IsNullOrEmpty(locationValue.Text)) {
+                try {
+                    BsonDocument room = MongoUtils.MongoData.GetCollection("World", "Rooms").FindOneAs<BsonDocument>(Query.EQ("_id", int.Parse(locationValue.Text)));
+                    if (room == null) {
+                        DisplayValidationErrorBox("That is not a valid room location");
+                    }
+                }
+                catch (FormatException fe) {
+                    DisplayErrorBox(fe.Message);
+                    locationValue.Text = string.Empty;
+                    locationValue.Focus();
+                }
+            }
+        }
+
+        private void weightValue_Leave(object sender, EventArgs e) {
+            if (weightValue.Text.Length > 0){
+                if (weightValue.Text != "0" || weightValue.Text != "0.0") {
+                    if (ParseDouble(weightValue.Text) == 0d) {
+                        DisplayValidationErrorBox("Enter a valid number greater than zero.");
+                    }
+                }
+            }
+        }
+
+        private double ParseDouble(string input) {
+            double result;
+            double.TryParse(input, out result);
+            return result;
+        }
+
+        private int ParseInt(string input) {
+            int result;
+            int.TryParse(input, out result);
+            return result;
+        }
+
+        private void tabControl1_SelectedIndexChanged(object sender, EventArgs e) {
+            if (tabControl1.SelectedIndex == 0) {
+                //don't have these set-up in the game yet
+               
+                GetItemsFromDB();
+            }
+        }
+
+        
+        private void itemsInDBValue_DoubleClick(object sender, EventArgs e) {
+            loadItem_Click(null, null);
+        }
+
+        private void reduceWeightValue_Leave(object sender, EventArgs e) {
+            if (reduceWeightValue.Text.Length > 0) {
+                if (reduceWeightValue.Text != "0" || reduceWeightValue.Text != "0.0") {
+                    if (ParseDouble(reduceWeightValue.Text) == 0d) {
+                        DisplayValidationErrorBox("Enter a valid decimal number greater than zero.");
+                    }
+                }
+            }
+        }
+
+        private void weightLimitValue_Leave(object sender, EventArgs e) {
+            if (weightValue.Text.Length > 0) {
+                if (weightLimitValue.Text != "0") {
+                    if (ParseInt(weightLimitValue.Text) == 0d) {
+                        DisplayValidationErrorBox("Enter a valid integer number greater than zero.");
+                    }
+                }
+            }
+        }
+
+        private void minLevelValue_Leave(object sender, EventArgs e) {
+            if (minLevelValue.Text.Length > 0) {
+                if (minLevelValue.Text != "0" || minLevelValue.Text != "0.0") {
+                    if (ParseDouble(minLevelValue.Text) == 0d) {
+                        DisplayValidationErrorBox("Enter a valid decimal number greater than zero.");
+                    }
+                }
+            }
+        }
+
+        private void decayRateValue_Leave(object sender, EventArgs e) {
+            if (decayRateValue.Text.Length > 0) {
+                if (decayRateValue.Text != "0" || decayRateValue.Text != "0.0") {
+                    if (ParseDouble(decayRateValue.Text) == 0d) {
+                        DisplayValidationErrorBox("Enter a valid decimal number greater than zero.");
+                    }
+                }
+            }
+        }
+
+        private void ownerValue_TextChanged(object sender, EventArgs e) {
+            //doesn't need validation yet
+        }
+
+        private void attackSpeedValue_TextChanged(object sender, EventArgs e) {
+            if (attackSpeedValue.Text.Length > 0) {
+                if (attackSpeedValue.Text != "0" || attackSpeedValue.Text != "0.0") {
+                    if (ParseDouble(attackSpeedValue.Text) == 0d) {
+                        DisplayValidationErrorBox("Enter a valid decimal number greater than zero.");
+                    }
+                }
+            }
+        }
+        private void lowWarningValue_Leave(object sender, EventArgs e) {
+            if (lowWarningValue.Text.Length > 0) {
+                if (lowWarningValue.Text != "0" || lowWarningValue.Text != "0.0") {
+                    if (ParseDouble(lowWarningValue.Text) == 0d) {
+                        DisplayValidationErrorBox("Enter a valid decimal number greater than zero.");
+                    }
+                }
+            }
+        }
+
+        private void maxChargeValue_Leave(object sender, EventArgs e) {
+            if (maxChargeValue.Text.Length > 0) {
+                if (maxChargeValue.Text != "0" || maxChargeValue.Text != "0.0") {
+                    if (ParseDouble(maxChargeValue.Text) == 0d) {
+                        DisplayValidationErrorBox("Enter a valid decimal number greater than zero.");
+                    }
+                }
+            }
+        }
+
+        private void chargeValue_Leave(object sender, EventArgs e) {
+            if (chargeValue.Text.Length > 0) {
+                if (chargeValue.Text != "0" || chargeValue.Text != "0.0") {
+                    if (ParseDouble(chargeValue.Text) == 0d) {
+                        DisplayValidationErrorBox("Enter a valid decimal number greater than zero.");
+                    }
+                }
+            }
+        }
+
+        private void attackSpeedValue_Leave(object sender, EventArgs e) {
+            if (attackSpeedValue.Text.Length > 0) {
+                if (attackSpeedValue.Text != "0" || attackSpeedValue.Text != "0.0") {
+                    if (ParseDouble(attackSpeedValue.Text) == 0d) {
+                        DisplayValidationErrorBox("Enter a valid decimal number greater than zero.");
+                    }
+                }
+            }
+        }
+
+        private void maxDamageValue_Leave(object sender, EventArgs e) {
+            if (maxDamageValue.Text.Length > 0) {
+                if (maxDamageValue.Text != "0" || maxDamageValue.Text != "0.0") {
+                    if (ParseDouble(maxDamageValue.Text) == 0d) {
+                        DisplayValidationErrorBox("Enter a valid decimal number greater than zero.");
+                    }
+                }
+            }
+        }
+
+        private void minDamageValue_Leave(object sender, EventArgs e) {
+            if (minDamageValue.Text.Length > 0) {
+                if (minDamageValue.Text != "0" || minDamageValue.Text != "0.0") {
+                    if (ParseDouble(minDamageValue.Text) == 0d) {
+                        DisplayValidationErrorBox("Enter a valid decimal number greater than zero.");
+                    }
+                }
+            }
+        }
+
+        private void maxDefenseValue_Leave(object sender, EventArgs e) {
+            if (maxDefenseValue.Text.Length > 0) {
+                if (maxDefenseValue.Text != "0" || maxDefenseValue.Text != "0.0") {
+                    if (ParseDouble(maxDefenseValue.Text) == 0d) {
+                        DisplayValidationErrorBox("Enter a valid decimal number greater than zero.");
+                    }
+                }
+            }
+        }
+
+        private void defenseValue_Leave(object sender, EventArgs e) {
+            if (defenseValue.Text.Length > 0) {
+                if (defenseValue.Text != "0" || defenseValue.Text != "0.0") {
+                    if (ParseDouble(defenseValue.Text) == 0d) {
+                        DisplayValidationErrorBox("Enter a valid decimal number greater than zero.");
+                    }
+                }
+            }
+        }
+
+        private void addTrigger_Click(object sender, EventArgs e) {
+            TriggerForm triggerForm = new TriggerForm();
+            triggerForm.ShowDialog();
+            GetTriggerResult(triggerForm);
+        }
+
+        private void GetTriggerResult(TriggerForm triggerForm) {
+            if (triggerForm.DialogResult == System.Windows.Forms.DialogResult.OK) {
+                _itemTriggers.Add(triggerForm.Trigger);
+                triggersValue.Items.Add(triggerForm.Trigger["Trigger"].AsString);
+            }
+            else if (triggerForm.DialogResult == System.Windows.Forms.DialogResult.Abort) {
+                if (triggersValue.SelectedIndex != -1) {
+                    _itemTriggers.RemoveAt(triggersValue.SelectedIndex);
+                    triggersValue.Items.RemoveAt(triggersValue.SelectedIndex);
+                }
+            }
+            else {
+                //do nothing
+            }
+
+            triggerForm.Close();
+        }
+        #endregion Item Stuff
+
+        private void triggersValue_SelectedIndexChanged(object sender, EventArgs e) {
+            if (triggersValue.SelectedIndex != -1) {
+                TriggerForm triggerForm = new TriggerForm(_itemTriggers[triggersValue.SelectedIndex].AsBsonDocument);
+                triggerForm.ShowDialog();
+                GetTriggerResult(triggerForm);
+            }
+        }
+    }
+}

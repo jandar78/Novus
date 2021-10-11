@@ -1,0 +1,119 @@
+calculation = "( Cunning + Wisdom )/2 + (( Cunning + Wisdom ) /2 * ( IntelligenceRank * 0.1))";
+
+--functions go first so we can call them later on
+function GetPercentage (percent)
+	playersInRoom = {GetMethodResult("Room", "GetPlayersInRoom", { roomID, percent })};
+	npcsInRoom = {GetMethodResult("Room", "GetNPCsInRoom", { roomID, percent })};
+	itemsInRoom = {GetMethodResult("Room", "GetItemsInRoom", { roomID, percent })};
+	
+	local message = "";
+   
+	for i, players in ipairs(playersInRoom) do
+		p = GetMethodResult("Server", "GetAUserFromList", {players});
+		if p ~= nil then	
+			message = message .. GetProperty(GetProperty(p, "Player", "Character.Character"), "FirstName", "System.String") .. " is " 
+					.. string.lower(GetProperty(GetProperty(p, "Player", "Character.Character"), "StanceState", "System.String")) .. " there. \r\n";
+		end
+	end
+
+	for i, npcs in ipairs(npcsInRoom) do
+		n = GetMethodResult("NPCUtils", "GetUserAsNPCFromList", {npcs});
+		if n ~= nil then		
+			message = message .. GetProperty(GetProperty(n, "Player", "Character.Character"), "FirstName", "System.String") .. " is " 
+					.. string.lower(GetProperty(GetProperty(n, "Player", "Character.Character"), "StanceState", "System.String")) .. " there. \r\n";
+		end
+	end
+
+	for i, items in ipairs(itemsInRoom) do
+		i = GetMethodResult("Items", "GetByIDFromList", {items});
+		if i ~= nil then	
+			message = message .. GetProperty(i, "Name", "System.String") .. " is laying there. \r\n";
+		end
+	end
+
+	return message;
+end 
+
+--set up variables we will need
+playerLocation = GetProperty(GetPlayer("Character"), "Location", "System.Double");
+direction = GetProperty(null, "UserCommand", "", "Skill")[2]; --, 2, "System.Double");
+adjacentRoom = GetMethodResult("Room", "GetRoomExit", {playerLocation, direction});
+skillCheck = ParseAndCalCulateCheck(GetPlayer("Character"), ;
+
+hasRoom = true;
+--make sure there is an adjacent room
+if (adjacentRoom == nil) then
+	hasRoom = false;
+else
+	roomID = GetDictionaryElement(GetField(adjacentRoom, "availableExits"), direction);
+	isDark = GetMethodResult("Room", "IsDark", { roomID });
+	door = GetDictionaryElement(GetField(adjacentRoom, "doors"), direction);
+	hasDoor = GetProperty(adjacentRoom, "HasDoor", "System.Boolean");
+end
+ 
+--array of messages to select from
+successFailMessages = {"You can't peek in that direction, the door is closed and has no keyhole!",
+					   "There isn't a place to peek towards the " .. direction .. ".",
+			           "You fail to see anything to the " .. direction .. ".",
+			           "You see ",
+					   "It's too dark to see anything!"					   
+			          }
+					  
+messageOthers = {GetProperty(GetPlayer("Character"), "FirstName", "System.String") .. " takes a peek to the " .. direction .. ".",
+				  GetProperty(GetPlayer("Character"), "FirstName", "System.String") .. " attempted to peek to the " .. direction .. "."
+				 }
+msg = "";
+msgOther ="";
+
+--the business logic for the skill
+if (hasRoom == true) then
+	if ((hasDoor == false) or (hasDoor == true and (GetProperty(door, "IsPeekable", "System.Boolean") == true))) then
+		--player sees only title of room
+		if (isDark == true) then
+				AssignMessage("Player", successFailMessages[5]);
+		else
+			title = GetDictionaryElement(GetMethodResult("Room", "GetRoomTitleAndDescription", { roomID }), "Title") .. "\r\n";
+			description = GetDictionaryElement(GetMethodResult("Room", "GetRoomTitleAndDescription", { roomID }), "Description") .. "\r\n";
+			
+			if  (skillCheck > -9999 and skillCheck <= 12) then
+				msg = successFailMessages[3];
+				msgOther = messageOthers[2];
+			
+			elseif (skillCheck > 12 and skillCheck <= 15) then
+				msg = successFailMessages[4] .. title;				
+				msgOther = messageOthers[1];
+			
+			--player sees room title and description and has 1/5 chance of seeing every player, npc and item in room
+			elseif (skillCheck > 15 and skillCheck <= 19) then
+				msg = successFailMessages[4].. title .. description .. GetPercentage(20);				
+				msgOther = messageOthers[1];
+			
+			elseif (skillCheck > 19 and skillCheck <= 23) then
+				msg = successFailMessages[4].. title .. description .. GetPercentage(50);
+				msgOther = messageOthers[1];
+			
+			elseif (skillCheck > 23 and skillCheck <= 25.0) then
+				msg = successFailMessages[4].. title .. description .. GetPercentage(75);
+				msgOther = messageOthers[1];
+			
+			elseif (skillCheck > 25.0 and skillCheck <= 9999) then
+				msg = successFailMessages[3].. title .. description .. GetPercentage(100);
+				msgOther = messageOthers[1];
+			end
+		end	
+	else
+		msg = successFailMessages[1];
+		msgOther = messageOthers[2];
+	end	
+else 
+	msg = successFailMessages[2];
+	msgOther = messageOthers[2];
+end
+
+--if we had to send a different message to each player in a room dependent on a specific case we could use
+--SendMessage("playerID", "blah blah blah")
+AssignMessage("Player", msg);
+AssignMessage("Room", msgOther);
+
+
+	

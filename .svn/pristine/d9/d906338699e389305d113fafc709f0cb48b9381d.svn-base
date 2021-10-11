@@ -1,0 +1,394 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using MongoDB.Driver;
+using MongoDB.Bson;
+using MongoDB.Driver.Builders;
+using MongoDB.Driver.Linq;
+using Extensions;
+using System.Reflection;
+using Commands;
+using System.Threading;
+
+//An explanation on how rooms, exits and doors work
+//Rooms have exits whose direction points to the room it connects to.  These connections can have doors in between them that can block the player
+//from going between rooms, the "doors" (they can be called barricade, portcullis, gate, etc.) can be opened and closed by player as well as in
+//some cases destroyed (if the door is destructible).  Doors are visible from both connecting rooms opening, closing, destroying or locking
+//the door in one room affects it the same in the connecting room.  If a door has a description it will be displayed, otherwise the exit description will be displayed
+//if that is blank then finally the adjoining room title will be displayed.  If a door is destroyed then a destroyed description will be displayed followed by the exit
+//or adjoinig room title. Mimicking the player being able to see through the destroyed door to what is beyond it.
+
+//Doors can accept voice commands from players and then call call a methods(s) (by chaining them together you can make a script) that can then do something that affects the players or the world
+//if someone utters the words "fire" in front of a door that says don't say fire, then maybe the entire room catches on fire.  Doors can also be opened, closed, locked, unlocked and even do things to other rooms
+//so you may not see a result where you are but you could be incinerating people in another room.
+
+
+//TODO:  Rooms could respawn items at different time intervals, this way areas are in charge of how many items exist in the world at a time by polling 
+//the ItemQuantity collection and then loading up the item from the ItemTemplate collection.
+namespace Rooms {
+
+    public class Room {
+
+        public static List<Exits> GetRoomExits(int roomId) {
+            MongoUtils.MongoData.ConnectToDatabase();
+            MongoDatabase worldDB = MongoUtils.MongoData.GetDatabase("World");
+            MongoCollection roomCollection = worldDB.GetCollection("Rooms");
+            MongoCollection doorCollection = worldDB.GetCollection("Doors");
+
+            IMongoQuery query = Query.EQ("_id", roomId);
+            BsonDocument room = roomCollection.FindOneAs<BsonDocument>(query);
+
+            //get the exits and any doors
+            BsonArray exitsFound = room["Exits"].AsBsonArray;
+
+            List<Exits> exitList = new List<Exits>();
+
+            foreach (BsonDocument doc in exitsFound) {
+                Exits exit = new Exits();
+                exit.availableExits.Add(doc["Name"].AsString, doc["LeadsToRoom"].AsInt32);
+                //if it has door grab that as well
+                //this query looks for a door with an id of either "roomid-adjecentroomid" or "adjacentroomid-roomid"
+                string oneWay = roomId.ToString() + "-" + exit.availableExits[doc["Name"].AsString].ToString();
+                string anotherWay = exit.availableExits[doc["Name"].AsString].ToString() + "-" + roomId.ToString();
+                IMongoQuery doorQuery = Query.Or(Query.EQ("_id", oneWay),
+                                                Query.EQ("_id", anotherWay));
+
+                BsonDocument bsonDoor = doorCollection.FindOneAs<BsonDocument>(doorQuery);
+
+                if (bsonDoor != null) {
+                    Door door = new Door(bsonDoor["Breakable"].AsBoolean, bsonDoor["Destroyed"].AsBoolean, bsonDoor["Openable"].AsBoolean, bsonDoor["Lockable"].AsBoolean, bsonDoor["Type"].AsString, bsonDoor["Hitpoints"].AsDouble, bsonDoor["Locked"].AsBoolean, bsonDoor["Open"].AsBoolean, bsonDoor["Name"].AsString,
+                                                new List<string>(new string[] { bsonDoor["Description"].AsString, bsonDoor["DescriptionDestroyed"].AsString }), bsonDoor["_id"].AsString, true, bsonDoor["Crawlable"].AsBoolean, bsonDoor["Listener"].AsBoolean, bsonDoor["Examine"].AsString);
+                    exit.doors.Add(doc["Name"].AsString, door);
+                }
+
+                exit.Direction = doc["Name"].AsString.ToLower();
+
+                //door description overrides it unless it's blank
+                if (exit.doors.Count > 0) {
+                    string doorDescription = exit.doors.ContainsKey(exit.Direction.CamelCaseWord()) == true ? (exit.doors[exit.Direction.CamelCaseWord()].Destroyed == true ? exit.doors[exit.Direction.CamelCaseWord()].Description + " that leads to " + exit.Description : exit.doors[exit.Direction.CamelCaseWord()].Description) : "";
+                    if (!string.IsNullOrEmpty(doorDescription)) exit.Description = doorDescription;
+                }
+
+                if (Room.IsDark(doc["LeadsToRoom"].AsInt32)) exit.Description = "something";
+
+                exitList.Add(exit);
+            }
+            return exitList;
+        }
+
+        public static List<string> GetNPCsInRoom(int roomId) {
+            MongoDatabase npcDB = MongoUtils.MongoData.GetDatabase("Characters");
+            MongoCollection npcCollection = npcDB.GetCollection("NPCCharacters");
+            IMongoQuery query = Query.EQ("Location", roomId);
+            MongoCursor npcsInRoom = npcCollection.FindAs<BsonDocument>(query);
+
+            List<string> npcList = new List<string>();
+
+            foreach (BsonDocument doc in npcsInRoom) {
+                npcList.Add(doc["_id"].AsObjectId.ToString());
+            }
+
+            return npcList;
+        }
+
+        public static List<string> GetPlayersInRoom(int roomId) {
+            MongoDatabase playersDB = MongoUtils.MongoData.GetDatabase("Characters");
+            MongoCollection playerCollection = playersDB.GetCollection("PlayerCharacter");
+            IMongoQuery query = Query.EQ("Location", roomId);
+            MongoCursor playersInRoom = playerCollection.FindAs<BsonDocument>(query);
+
+            List<string> playerList = new List<string>();
+
+            foreach (BsonDocument doc in playersInRoom) {
+                User.User temp = MySockets.Server.GetAUser(doc["_id"].AsObjectId.ToString());
+                if (temp != null && (temp.CurrentState != User.User.UserState.LIMBO || temp.CurrentState != User.User.UserState.LOGGING_IN ||
+                    temp.CurrentState != User.User.UserState.CREATING_CHARACTER || temp.CurrentState != User.User.UserState.JUST_CONNECTED)) {
+                    playerList.Add(doc["_id"].AsObjectId.ToString());
+                }
+            }
+
+            return playerList;
+        }
+
+        public static List<string> GetItemsInRoom(int roomId) {
+            MongoDatabase playersDB = MongoUtils.MongoData.GetDatabase("World");
+            MongoCollection playerCollection = playersDB.GetCollection("Items");
+            IMongoQuery query = Query.EQ("Location", roomId);
+            MongoCursor itemsInRoom = playerCollection.FindAs<BsonDocument>(query);
+
+            List<string> itemList = new List<string>();
+
+            foreach (BsonDocument doc in itemsInRoom) {
+                Items.Iitem item = Items.Items.GetByID(doc["_id"].AsObjectId.ToString());
+                if (item != null) {
+                    itemList.Add(item.Id.ToString());
+                }
+            }
+
+            return itemList;
+        }
+
+        public static Dictionary<string, string> GetRoomTitleAndDescription(int roomId) {
+            Dictionary<string, string> roomDescription = new Dictionary<string, string>();
+            BsonDocument roomFound = GetRoomDocument(roomId);
+
+            roomDescription.Add("Title", roomFound["Title"].AsString.CamelCaseString());
+            roomDescription.Add("Description", roomFound["Description"].AsString);
+
+            //Todo: A method that returns a bool for whether there is a light source somewhere in the room
+
+            if (IsDark(roomId)) { 
+                roomDescription["Title"] = "Somewhere Dark";
+                roomDescription["Description"] = "It is too dark to see anything!";
+            }
+            if (IsOutdoors(roomId)) {
+                string weather = roomFound["Weather"].AsString;
+                //let's find the message associated with the current weather pattern
+                if (!string.IsNullOrEmpty(weather) && String.Compare(weather, "clear", true) == 0) {
+                    BsonDocument temp = Calendar.Calendar.GetCalendarCollection().FindOneAs<BsonDocument>(Query.EQ("_id", "Weather"));
+                    roomDescription.Add("Weather", temp["CurrentMessage"].AsString);
+                }
+            }
+
+            return roomDescription;
+        }
+
+        public static BsonDocument GetRoom(int roomId) {
+            return GetRoomDocument(roomId);
+        }
+
+        public static void Updateweather(int roomId, string type) {
+            BsonDocument room = GetRoomDocument(roomId);
+            room["Weather"] = type;
+            UpdateRoom(room);
+        }
+
+        private static void UpdateRoom(BsonDocument room) {
+            GetRoomCollection().Save(room, WriteConcern.Acknowledged);
+        }
+
+        private static MongoCollection GetRoomCollection() {
+            MongoUtils.MongoData.ConnectToDatabase();
+            MongoDatabase db = MongoUtils.MongoData.GetDatabase("World");
+            MongoCollection result = db.GetCollection<BsonDocument>("Rooms");
+            return result;
+        }
+
+        public static RoomTypes GetRoomType(int roomId) {
+            return GetRoomType(GetRoomDocument(roomId));
+        }
+
+        private static RoomTypes GetRoomType(BsonDocument roomFound) {
+            string[] types = roomFound["Type"].AsString.Split(' ');
+            RoomTypes roomType = RoomTypes.NONE;
+
+            if (types.Count() > 0) {
+                foreach (string type in types) {
+                    RoomTypes parsedEnum = (RoomTypes)Enum.Parse(typeof(RoomTypes), type.ToUpper());
+                    roomType = roomType | parsedEnum;
+                }
+
+                roomType = roomType ^ RoomTypes.NONE; //let's get rid of the NONE
+            }
+
+            return roomType;
+        }
+
+        private static BsonDocument GetRoomDocument(int roomId) {
+            MongoUtils.MongoData.ConnectToDatabase();
+            MongoDatabase db = MongoUtils.MongoData.GetDatabase("World");
+            MongoCollection rooms = db.GetCollection("Rooms");
+            return rooms.FindOneAs<BsonDocument>(Query.EQ("_id", roomId));
+        }
+
+        public static List<RoomModifier> GetModifiers(int roomId) {
+            List<RoomModifier> roomModifierList = new List<RoomModifier>();
+
+            MongoDatabase worldDB = MongoUtils.MongoData.GetDatabase("World");
+            BsonDocument roomFound = GetRoomDocument(roomId);
+            BsonArray modifiers = roomFound["Modifiers"].AsBsonArray;
+
+            MongoCollection modifierCollection = worldDB.GetCollection("RoomModifiers");
+            foreach (BsonDocument mod in modifiers.Where(m => m.AsBsonDocument.Count() > 0)) {
+                IMongoQuery modifierQuery = Query.EQ("_id", mod["id"]);
+                BsonDocument modifier = modifierCollection.FindOneAs<BsonDocument>(modifierQuery);
+                if (modifier != null) { //just in case you never know what stupid thing a builder might have done
+                    RoomModifier roomMod = new RoomModifier();
+                    roomMod.TimeInterval = modifier["Timer"].AsInt32;
+
+                    //get the hints for the modifier
+                    BsonArray hintArray = modifier["Hints"].AsBsonArray;
+                    foreach (BsonDocument hint in hintArray.Where(h => h.AsBsonDocument.Count() > 0)) {
+                        Dictionary<string, string> dic = new Dictionary<string, string>();
+                        dic.Add("Attribute", hint["Attribute"].AsString);
+                        dic.Add("ValueToPass", hint["ValueToPass"].AsInt32.ToString());
+                        dic.Add("Display", hint["Display"].AsString);
+                        roomMod.Hints.Add(dic);
+                    }
+
+                    BsonArray affectArray = modifier["Affects"].AsBsonArray;
+                    foreach (BsonDocument affect in affectArray.Where(a => a.AsBsonDocument.Count() > 0)) {
+                        Dictionary<string, string> dic = new Dictionary<string, string>();
+                        dic.Add("Name", affect["Name"].AsString);
+                        dic.Add("Value", affect["Value"].AsDouble.ToString());
+                        dic.Add("DescriptionSelf", affect["DescriptionSelf"].AsString);
+                        dic.Add("DescriptionOthers", affect["DescriptionOthers"].AsString);
+                        roomMod.Affects.Add(dic);
+                    }
+                    roomModifierList.Add(roomMod);
+                }
+
+            }
+            return roomModifierList;
+        }
+
+        public static List<Dictionary<string, string>> GetModifierEffects(int roomId) {
+            List<Dictionary<string, string>> affects = new List<Dictionary<string, string>>();
+            foreach (RoomModifier mod in GetModifiers(roomId)) {
+                foreach (Dictionary<string, string> dic in mod.Affects) {
+                    if (mod.TimeInterval == 0) {
+                        affects.Add(dic);
+                    }
+                }
+            }
+
+            return affects;
+        }
+
+        public static bool LightSourcePresent(int roomId){
+            //foreach player/npc/item in room check to see if it is lightsource and on
+            bool lightSource = false;
+            List<string> players = GetPlayersInRoom(roomId);
+            List<string> npcs = GetNPCsInRoom(roomId);
+            List<string> items = GetItemsInRoom(roomId);
+
+            //check th eplayers and see if anyones equipment is a lightsource
+            foreach (string id in players) {
+                User.User temp = MySockets.Server.GetAUser(id);
+                Dictionary<Items.Wearable, Items.Iitem> equipped = temp.Player.GetEquipment();
+                foreach (Items.Iitem item in equipped.Values) {
+                    Items.Iiluminate light = item as Items.Iiluminate;
+                    if (light != null && light.isLit) {
+                        lightSource = true;
+                        break;
+                    }
+                }
+                if (lightSource) break;
+            }
+
+            //check the NPCS and do the same as we did with the players
+            if (!lightSource) {
+                foreach (string id in npcs) {
+                    Character.Iactor actor = Character.NPCUtils.GetAnNPCByID(id);
+                    Dictionary<Items.Wearable, Items.Iitem> equipped = actor.GetEquipment();
+                    foreach (Items.Iitem item in equipped.Values) {
+                        Items.Iiluminate light = item as Items.Iiluminate;
+                        if (light != null && light.isLit) {
+                            lightSource = true;
+                            break;
+                        }
+                    }
+                    if (lightSource) break;
+                }
+            }
+
+            //finally check for items in the room (just ones laying in the room, if a container is open check in container)
+            if (!lightSource) {
+                foreach (string id in items) {
+                    Items.Iitem item = Items.Items.GetByID(id);
+                    Items.Icontainer container = item as Items.Icontainer;
+                    Items.Iiluminate light = item as Items.Iiluminate; //even if container check this first. Container may have light enchanment.
+                    if (light != null && light.isLit) {
+                        lightSource = true;
+                        break;
+                    }
+                    if (container != null && container.Contents.Count > 0 && container.Opened) {//let's look in the container only if it's open
+                        foreach (string innerId in container.Contents) {
+                            Items.Iitem innerItem = Items.Items.GetByID(id);
+                            light = innerItem as Items.Iiluminate;
+                            if (light != null && light.isLit) {
+                                lightSource = true;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (lightSource) break;
+                }
+            }
+            return lightSource;
+        }
+
+        public static bool IsDark(int roomId) {          
+            if (!LightSourcePresent(roomId) && ((IsOutdoors(roomId) && Calendar.Calendar.IsNight()) ||
+                (GetRoomType(roomId) & RoomTypes.DARK_CAVE) == RoomTypes.DARK_CAVE)) {
+                return true;
+            }
+            return false;
+        }
+
+        public static bool IsOutdoors(int roomId) {
+            return (GetRoomType(roomId) & RoomTypes.OUTDOORS) == RoomTypes.OUTDOORS;
+        }
+
+        public static void InformPlayersInRoom(string message, int roomId, List<string> ignoreId) {
+            if (!string.IsNullOrEmpty(message)) {
+                List<string> playersInRoom = Room.GetPlayersInRoom(roomId);
+                foreach (string id in playersInRoom) {
+                    if (!ignoreId.Contains(id)) {
+                        User.User otherUser = MySockets.Server.GetAUser(id);
+                        if (otherUser != null && otherUser.CurrentState == User.User.UserState.TALKING) {
+                            otherUser.MessageHandler(message);
+                        }
+                    }
+                }
+                //send whatever the message was to the doors to consume
+                List<object> paramsOut = null;
+                foreach (Exits exit in GetRoomExits(roomId)) {
+                    if (exit.doors.Count > 0 && exit.doors[exit.Direction.CamelCaseWord()].Listener) {
+                        string methodToCall = exit.doors[exit.Direction.CamelCaseWord()].CheckPhrase(message, out paramsOut);
+                    }
+                }
+            }
+        }      
+
+        public static void ApplyRoomModifiers(int tick) {
+            MongoUtils.MongoData.ConnectToDatabase();
+            MongoDatabase worldDB = MongoUtils.MongoData.GetDatabase("World");
+            MongoCollection roomCollection = worldDB.GetCollection("Rooms");
+            MongoCursor roomsFound = roomCollection.FindAs<BsonDocument>(Query.Exists("Modifiers"));
+            MongoCollection modifierCollection = worldDB.GetCollection("RoomModifiers");
+
+            //allright this isn't as bad as it seems this actually executed pretty fast and it's running on a separate thread anyways since it's
+            //coming off a timer event
+            foreach (BsonDocument doc in roomsFound) {
+                BsonArray modArray = doc["Modifiers"].AsBsonArray;
+                foreach (BsonDocument mods in modArray.Where(m => m.AsBsonDocument.Count() > 0)) {
+                    BsonDocument modFound = modifierCollection.FindOneAs<BsonDocument>(Query.EQ("_id", mods["id"]));
+                    if (modFound["Timer"].AsInt32 > 0 && tick % modFound["Timer"].AsInt32 == 0) { //we only want to go through the rooms where the timer has hit
+                        BsonArray affectArray = modFound["Affects"].AsBsonArray;
+                        //we want to show the value always as positive to the players, only internally should they be negative
+                        foreach (BsonDocument affect in affectArray) {
+                            double makePositive = 1;
+                            if (affect["Value"].AsDouble < 0) {
+                                makePositive = -1;
+                            }
+
+                            foreach (string playerid in GetPlayersInRoom((doc["_id"].AsInt32))) {
+                                User.User user = MySockets.Server.GetAUser(playerid);
+                                if (user != null) {
+                                    user.Player.ApplyEffectOnAttribute("Hitpoints", affect["Value"].AsDouble);
+                                    user.MessageHandler(String.Format(affect["DescriptionSelf"].AsString, affect["Value"].AsDouble * makePositive));
+                                    InformPlayersInRoom(String.Format(affect["DescriptionOthers"].AsString, user.Player.FirstName,
+                                                              user.Player.Gender.ToString() == "Male" ? "his" : "her"), doc["_id"].AsInt32, new List<string>(new string[] { user.UserID }));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

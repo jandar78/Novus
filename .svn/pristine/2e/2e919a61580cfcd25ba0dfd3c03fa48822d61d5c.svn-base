@@ -1,0 +1,69 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using MongoDB.Driver;
+using MongoDB.Driver.Builders;
+using MongoDB.Bson;
+
+namespace Items {
+    public class Weapon : Iitem, Iweapon {
+        //Iitem
+        public ObjectId Id { get; set; }
+        public string Name { get; set; }
+        public string Description { get; set; }
+        public double Weight { get; set; }
+        public ItemCondition CurrentCondition { get; set; }
+        public ItemCondition MaxCondition { get; set; }
+        public bool IsWearable { get; set; }
+        public int MinimumLevel { get; set; }
+        public Wearable WornOn { get; set; }
+        public int Location { get; set; }
+        public ItemType ItemType { get; set; }
+        
+        //Iweapon
+        public double MinDamage { get; set; }
+        public double MaxDamage { get; set; }
+        public double AttackSpeed { get; set; }
+        public bool IsWieldable { get; set; }
+        public double CurrentMinDamage { get; set; }
+        public double CurrentMaxDamage { get; set; }
+
+        #region Public Methods
+        public void DeteriorateCondition() {
+            //TODO: condition should affect item stats as well
+            int newCondition = ((int)CurrentCondition) - 1;
+            if (newCondition >= 0) { //otherwise it can't deteriorate any more and it's broken anyways
+                CurrentCondition = (ItemCondition)newCondition;
+            }
+            Save();
+        }
+
+        public void ImproveCondition() {
+            //this shouldn't return anything because items will decay over time with use....silently
+            //TODO: condition should affect item stats as well
+            int newCondition = ((int)CurrentCondition) + 1;
+            if (newCondition <= (int)MaxCondition) { //can't go higher than the max
+                CurrentCondition = (ItemCondition)newCondition;
+                Save();
+            }
+            else {
+                //this should probably return a string so that we can informa player for example that it can't be repaired byeond its current point
+                //or to what level it was repaired
+            }
+        }
+
+        public void Save() {
+            MongoUtils.MongoData.ConnectToDatabase();
+            MongoDatabase db = MongoUtils.MongoData.GetDatabase("World");
+            MongoCollection collection = db.GetCollection("Items");
+            collection.Save<Weapon>(this);
+        }
+
+        public Weapon() { }
+        #endregion Public Methods
+    }
+
+    public enum WeaponType { BLADE, BLUNT, POLE } //a few type of weapons
+}

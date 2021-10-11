@@ -1,0 +1,141 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using MongoDB.Driver;
+using MongoDB.Driver.Builders;
+using MongoDB.Bson;
+using Extensions;
+using MongoDB.Bson.Serialization;
+using MongoDB.Bson.Serialization.Attributes;
+using MongoDB.Bson.Serialization.Options;
+//TODO: OK so the way Items are handled right now will probably not be conducive for integrating the crafting system yes we could probably use
+//a dynamic wrapper to have the object inherit different interfaces but with the flexibility mongo gives us Item can inherit from all interfaces
+//and then we can just say what type of item it is in a field and the item can do all the heavy lifting, this way crafting will be much simpler
+//and we can add/remove interfaces at will.
+
+namespace Items {
+    public partial class Items : Iitem, Iweapon, Iedible, Icontainer, Iiluminate, Iclothing {
+        #region Properties
+        public ObjectId Id { get; set; }
+        public string Name { get; set; }
+        public string Description { get; set; }
+        public double Weight { get; set; }
+        public ItemCondition CurrentCondition { get; set; }
+        public ItemCondition MaxCondition { get; set; }
+        public bool IsWearable { get; set; }
+        public int MinimumLevel { get; set; }
+        [BsonDictionaryOptions(DictionaryRepresentation.ArrayOfDocuments)]
+        public Dictionary<ItemType, int> ItemType { get; set; }
+        public Wearable WornOn { get; set; }
+        public int Location { get; set; }
+        public bool IsMovable { get; set; }
+        public string Trigger { get; set;}
+        public string Owner { get; set; }
+        #endregion Properties
+
+        #region Public Static Methods
+        public static string ParseItemName(List<string> commands) {
+            commands.RemoveAt(0);
+            commands.RemoveAt(0);
+
+            if (string.Equals(commands[commands.Count - 1], "inventory", StringComparison.InvariantCultureIgnoreCase)) {
+                commands.RemoveAt(commands.Count - 1);
+            }
+
+            StringBuilder itemName = new StringBuilder();
+            foreach (string word in commands) {
+                if (string.Equals(word, "in", StringComparison.InvariantCultureIgnoreCase) || string.Equals(word, "from", StringComparison.InvariantCultureIgnoreCase)) {
+                    break; // we've reached the end of the item name if we encounter either of these
+                }
+                itemName.Append(word + " ");
+            }
+            return itemName.ToString().Trim().CamelCaseString();
+        }
+
+        public static List<Iitem> GetByName(string name, string owner) {
+            MongoUtils.MongoData.ConnectToDatabase();
+            MongoDatabase db = MongoUtils.MongoData.GetDatabase("World");
+            MongoCollection collection = db.GetCollection("Items");
+            name = name.CamelCaseString();
+            //find any items in the location that match what the player typed
+            var doc = collection.FindAs<BsonDocument>(Query.And(Query.Matches("Name", name), Query.EQ("Owner", owner)));
+            
+            List<Iitem> result = new List<Iitem>();
+
+            if (doc != null) {
+                foreach (BsonDocument itemDoc in doc) {
+                    result.Add(ItemFactory.CreateItem(itemDoc["_id"].AsObjectId));
+                }             
+            }
+            return result;
+        }
+
+        public static void DeChargeLightSources() {
+            MongoUtils.MongoData.ConnectToDatabase();
+            MongoDatabase db = MongoUtils.MongoData.GetDatabase("World");
+            MongoCollection collection = db.GetCollection("Items");
+            var doc = collection.FindAs<BsonDocument>(Query.And(Query.EQ("ItemType", 5), Query.EQ("isLit", true)));
+
+            foreach (BsonDocument item in doc) {
+                Iitem lightSource = GetByID(item["_id"].AsObjectId.ToString());
+                Iiluminate light = lightSource as Iiluminate;
+                light.Drain();
+            }
+        }
+
+        public static Iitem GetByID(string id) {
+            MongoUtils.MongoData.ConnectToDatabase();
+            MongoDatabase db = MongoUtils.MongoData.GetDatabase("World");
+            MongoCollection collection = db.GetCollection("Items");
+            var doc = collection.FindOneAs<BsonDocument>(Query.EQ("_id", ObjectId.Parse(id)));
+            Iitem result = null;
+            if (doc != null) {
+                result = ItemFactory.CreateItem(doc["_id"].AsObjectId);
+            }
+            return result;
+        }
+        #endregion Public Static Methods
+
+        #region Public Methods
+        public void DeteriorateCondition() {
+            //TODO: condition should affect item stats as well
+            int newCondition = ((int)CurrentCondition) - 1;
+            if (newCondition >= 1) { //otherwise it can't deteriorate any more and it's broken anyways
+                CurrentCondition = (ItemCondition)newCondition;
+            }
+            Save();
+        }
+
+        public void ImproveCondition() {
+            //TODO: condition should affect item stats as well
+            int newCondition = ((int)CurrentCondition) + 1;
+            if (newCondition <= (int)ItemCondition.EXCELLENT) { //can't go higher than Excellent
+                CurrentCondition = (ItemCondition)newCondition;
+            }
+            Save();
+        }
+
+        public void Save() {
+            MongoUtils.MongoData.ConnectToDatabase();
+            MongoDatabase db = MongoUtils.MongoData.GetDatabase("World");
+            MongoCollection collection = db.GetCollection("Items");
+
+            collection.Save<Items>(this);
+        }
+        #endregion Public Methods
+
+        public Items(){}
+              
+        public string Examine() {
+            return Description;
+        }
+
+    }
+
+    public enum Wearable { NONE, HEAD, LEFT_EAR, RIGHT_EAR, NECK, BACK, CHEST, SHOULDERS, WAIST, FEET, HANDS, WIELD, WIELD_RIGHT, WIELD_LEFT} //this is enough for now add more later
+    public enum ItemCondition {NONE, DESTROYED_BEYOND_REPAIR, DESTROYED, DAMAGED, VERY_WORN, WORN, GOOD, VERY_GOOD, EXCELLENT } //a few item conditions
+    public enum ItemType { WEAPON, CLOTHING, EDIBLE, DRINKABLE, CONTAINER, ILUMINATION } //a couple of item types
+    public enum EdibleType { FOOD, BEVERAGE }
+}

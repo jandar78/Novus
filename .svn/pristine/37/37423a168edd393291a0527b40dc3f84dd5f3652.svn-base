@@ -1,0 +1,115 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace User
+{
+	public class User {
+
+		public enum UserState {NONE, JUST_CONNECTED, LOGGING_IN, CREATING_CHARACTER, TALKING, LIMBO, DISCONNECT,  };
+
+		#region Properties
+        public bool HourFormat24 {
+            get;
+            set;
+        }
+
+		public string UserID {
+			get;
+			set;
+		}
+
+		public DateTime LastDisconnected {
+			get;
+			set;
+		}
+
+		public Character.Character Player {
+			get {
+				return _character;
+			}
+		   set{
+			}
+		}
+
+		public UserState CurrentState {
+			get;
+			set;
+		}
+
+		public bool LoginCompleted {
+			get;
+			set;
+		}
+
+		public string LogID {
+			get {
+				return _userBuffer.LogId;
+			}
+			set {
+				_userBuffer.LogId = value;
+			}
+		}
+
+		public string OutBuffer {
+			get {
+				return _userBuffer.OutgoingBuffer;
+			}
+			set {
+				_userBuffer.OutgoingBuffer = value;
+			}
+		}
+
+		public string InBuffer {
+			get {
+				return _userBuffer.IncomingBuffer;
+			}
+			set {
+				_userBuffer.IncomingBuffer = value;
+			}
+		}
+
+		public string InBufferPeek {
+			get {
+				return _userBuffer.IncomingBufferPeek.Replace("\r\n","");
+			}
+		}
+
+		public string telnetBufferPeek {
+			get {
+				return _userBuffer.IncomingTelnetBufferPeek.Replace("\r\n", "");
+			}
+		}
+
+		public bool InBufferReady {
+			get {
+				return _userBuffer.IncomingReady;
+			}
+			private set { }
+		}
+
+
+
+		#endregion Properties
+
+		#region members
+		private ClientHandling.MessageBuffer _userBuffer;
+		private Character.Character _character;
+        private bool _TimeFormat;
+		#endregion members
+
+		#region Constructors
+		public User() {
+			CurrentState = UserState.JUST_CONNECTED;
+			UserID = Guid.NewGuid().ToString();
+			_userBuffer = new ClientHandling.MessageBuffer(UserID);
+			_character = CharacterFactory.Factory.CreateCharacter(CharacterEnums.CharacterType.PLAYER, CharacterEnums.CharacterRace.HUMAN, CharacterEnums.CharacterClass.FIGHTER, CharacterEnums.Genders.MALE);
+			LoginCompleted = false;
+			LastDisconnected = DateTime.MinValue;
+		}
+		#endregion Constructors
+		
+	}
+}
